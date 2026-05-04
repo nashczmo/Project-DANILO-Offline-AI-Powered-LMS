@@ -135,20 +135,39 @@ export default {
         "ring": "0 0 0 3px rgb(99 102 241 / 0.15)",
       },
       animation: {
-        "fade-in":    "fadeIn 0.3s ease-out both",
-        "slide-up":   "slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both",
-        "slide-down": "slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) both",
-        "scale-in":   "scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both",
-        "spin-slow":  "spin 1.2s linear infinite",
-        "pulse-dot":  "pulseDot 2s ease-in-out infinite",
+        "fade-in":    "fadeIn 0.4s ease-out both",
+        "slide-up":   "slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "slide-down": "slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "slide-left": "slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "scale-in":   "scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "float":      "float 3s ease-in-out infinite",
       },
       keyframes: {
-        fadeIn:    { "0%": { opacity: "0" }, "100%": { opacity: "1" } },
-        slideUp:   { "0%": { opacity: "0", transform: "translateY(10px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
-        slideDown: { "0%": { opacity: "0", transform: "translateY(-8px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
-        scaleIn:   { "0%": { opacity: "0", transform: "scale(0.96)" }, "100%": { opacity: "1", transform: "scale(1)" } },
-        pulseDot:  { "0%, 100%": { opacity: "1" }, "50%": { opacity: "0.5" } },
-      },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" }
+        },
+        slideUp: {
+          "0%": { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        slideDown: {
+          "0%": { opacity: "0", transform: "translateY(-12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        slideLeft: {
+          "0%": { opacity: "0", transform: "translateX(24px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" }
+        },
+        scaleIn: {
+          "0%": { opacity: "0", transform: "scale(0.96)" },
+          "100%": { opacity: "1", transform: "scale(1)" }
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-8px)" }
+        },
+      }
     },
   },
   plugins: [],
@@ -381,19 +400,19 @@ input, select, textarea { font-family: inherit; }
 
   /* ---- Cards ---- */
   .dn-card {
-    @apply bg-white rounded-xl border border-slate-200/80;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    @apply bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/60 shadow-sm;
+    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
   }
   .dn-card-hover:hover {
-    @apply shadow-md;
-    transform: translateY(-1px);
+    @apply shadow-lg border-slate-300/80;
+    transform: translateY(-2px);
   }
   .dn-card-interactive {
     @apply dn-card cursor-pointer;
   }
   .dn-card-interactive:hover {
-    @apply shadow-md border-slate-300;
-    transform: translateY(-1px);
+    @apply shadow-lg border-primary-200;
+    transform: translateY(-2px);
   }
 
   /* ---- Typography ---- */
@@ -435,44 +454,44 @@ input, select, textarea { font-family: inherit; }
     @apply opacity-40 cursor-not-allowed;
   }
   .dn-btn:active:not(:disabled) {
-    transform: scale(0.98);
+    transform: scale(0.97);
   }
 
   .dn-btn-primary {
-    @apply dn-btn bg-primary-600 text-white;
+    @apply dn-btn bg-primary-600 text-white shadow-sm shadow-primary-600/20;
   }
   .dn-btn-primary:hover:not(:disabled) {
-    @apply bg-primary-700;
+    @apply bg-primary-700 shadow-md shadow-primary-600/30;
   }
   .dn-btn-secondary {
-    @apply dn-btn bg-white text-slate-700 border border-slate-200;
+    @apply dn-btn bg-white text-slate-700 border border-slate-200 shadow-sm;
   }
   .dn-btn-secondary:hover:not(:disabled) {
-    @apply bg-slate-50 border-slate-300;
+    @apply bg-slate-50 border-slate-300 shadow-md;
   }
   .dn-btn-accent {
-    @apply dn-btn bg-accent-600 text-white;
+    @apply dn-btn bg-accent-600 text-white shadow-sm shadow-accent-600/20;
   }
   .dn-btn-accent:hover:not(:disabled) {
-    @apply bg-accent-700;
+    @apply bg-accent-700 shadow-md shadow-accent-600/30;
   }
   .dn-btn-warm {
-    @apply dn-btn bg-warm-500 text-white;
+    @apply dn-btn bg-warm-500 text-white shadow-sm shadow-warm-500/20;
   }
   .dn-btn-warm:hover:not(:disabled) {
-    @apply bg-warm-600;
+    @apply bg-warm-600 shadow-md shadow-warm-500/30;
   }
   .dn-btn-danger {
-    @apply dn-btn bg-danger-500 text-white;
+    @apply dn-btn bg-danger-500 text-white shadow-sm shadow-danger-500/20;
   }
   .dn-btn-danger:hover:not(:disabled) {
-    @apply bg-danger-600;
+    @apply bg-danger-600 shadow-md shadow-danger-500/30;
   }
   .dn-btn-ghost {
-    @apply dn-btn bg-transparent text-slate-500;
+    @apply dn-btn bg-transparent text-slate-600;
   }
   .dn-btn-ghost:hover:not(:disabled) {
-    @apply bg-slate-100 text-slate-700;
+    @apply bg-slate-100 text-slate-900;
   }
 
   /* ---- Badges ---- */
@@ -673,107 +692,82 @@ EOF
   cat > "${APP_ROOT}/frontend/src/components/LoginView.jsx" <<'EOF'
 export default function LoginView({ form, onChange, onSubmit, loading, error }) {
   return (
-    <div className="min-h-screen flex" role="main">
-
-      {/* Left Panel - decorative, hidden on mobile */}
-      <div className="hidden lg:flex lg:w-[45%] bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <svg className="absolute -top-20 -left-20 w-[500px] h-[500px] text-white" viewBox="0 0 200 200" fill="currentColor"><circle cx="100" cy="100" r="80" opacity="0.3"/></svg>
-          <svg className="absolute bottom-10 right-10 w-[300px] h-[300px] text-white" viewBox="0 0 200 200" fill="currentColor"><circle cx="100" cy="100" r="60" opacity="0.2"/></svg>
+    <div className="min-h-screen flex bg-slate-50" role="main">
+      {/* Left Panel - Credentials Portal (40%) */}
+      <div className="w-full lg:w-[40%] flex flex-col justify-between p-8 sm:p-12 relative z-10 bg-white shadow-[10px_0_40px_-15px_rgba(0,0,0,0.05)] border-r border-slate-100">
+        <div className="lg:hidden text-center mb-8">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">DANILO</h1>
+          <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest">Localized &middot; Offline</p>
         </div>
-        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16">
-          <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center mb-8">
-            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
+
+        <div className="my-auto w-full max-w-[380px] mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome Back</h2>
+            <p className="text-sm text-slate-500 mt-1.5">Sign in to your learning portal</p>
           </div>
-          <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">
-            Project<br />DANILO
-          </h1>
-          <p className="text-primary-200 text-base mt-4 leading-relaxed max-w-sm">
-            Offline-first Learning Management System designed for DepEd last-mile schools.
-          </p>
-          <div className="flex items-center gap-3 mt-8">
-            <span className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-3.5 py-1.5 text-xs font-medium text-primary-100">
-              <span className="w-1.5 h-1.5 rounded-full bg-success-400" />
-              AI-Powered
-            </span>
-            <span className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-sm px-3.5 py-1.5 text-xs font-medium text-primary-100">
-              <span className="w-1.5 h-1.5 rounded-full bg-warm-400" />
-              Offline-Ready
-            </span>
+
+          <form onSubmit={onSubmit} className="space-y-5" aria-label="Login form">
+            <div>
+              <input
+                id="login-username" name="username" value={form.username} onChange={onChange}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-center font-medium" 
+                placeholder="Username"
+                autoComplete="username" autoCapitalize="none" aria-required="true"
+              />
+            </div>
+            <div>
+              <input
+                id="login-password" type="password" name="password" value={form.password} onChange={onChange}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-center font-medium" 
+                placeholder="Password"
+                autoComplete="current-password" aria-required="true"
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-xl bg-danger-50 border border-danger-200 px-4 py-3 animate-scale-in text-center" role="alert">
+                <p className="text-sm font-medium text-danger-600">{error}</p>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading}
+              className="w-full rounded-2xl bg-primary-600 text-white font-semibold py-3.5 text-sm transition-all hover:bg-primary-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary-600/20 mt-2">
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 rounded-full border-2 border-primary-300 border-t-white animate-spin" />
+                  Authenticating...
+                </span>
+              ) : "Sign In"}
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <p className="text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">System Roles</p>
+          <div className="flex items-center justify-center gap-2.5">
+            <span className="px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold tracking-wide">Admin</span>
+            <span className="px-3 py-1 rounded-full bg-warm-50 border border-warm-200 text-warm-700 text-xs font-semibold tracking-wide">Faculty</span>
+            <span className="px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-semibold tracking-wide">Learner</span>
           </div>
         </div>
       </div>
 
-      {/* Right Panel - login form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-slate-50">
-        <div className="w-full max-w-[400px] animate-fade-in">
-
-          {/* Mobile branding */}
-          <div className="lg:hidden text-center mb-10">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-600 mb-4">
-              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Project DANILO</h1>
-            <p className="text-sm text-slate-500 mt-1">Learning Management System</p>
+      {/* Right Panel - Branding Anchor (60%) */}
+      <div className="hidden lg:flex lg:w-[60%] relative overflow-hidden items-center justify-center bg-slate-50">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary-100 via-slate-50 to-white opacity-80" />
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMCwwLDAsMC4wMikiLz48L3N2Zz4=')] opacity-50" />
+        
+        <div className="relative z-10 text-center flex flex-col items-center">
+          <div className="w-20 h-20 rounded-3xl bg-white border border-primary-100 shadow-xl shadow-primary-500/10 flex items-center justify-center mb-8">
+            <svg className="w-10 h-10 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
           </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
-            <div className="mb-6">
-              <p className="dn-overline text-primary-600">DepEd Offline Portal</p>
-              <h2 className="text-lg font-semibold text-slate-900 mt-1">Sign in to continue</h2>
-            </div>
-
-            <form onSubmit={onSubmit} className="space-y-4" aria-label="Login form">
-              <div>
-                <label htmlFor="login-username" className="block text-xs font-medium text-slate-600 mb-1.5">Username</label>
-                <input
-                  id="login-username" name="username" value={form.username} onChange={onChange}
-                  className="dn-input" placeholder="Enter your username"
-                  autoComplete="username" autoCapitalize="none" aria-required="true"
-                />
-              </div>
-              <div>
-                <label htmlFor="login-password" className="block text-xs font-medium text-slate-600 mb-1.5">Password</label>
-                <input
-                  id="login-password" type="password" name="password" value={form.password} onChange={onChange}
-                  className="dn-input" placeholder="Enter your password"
-                  autoComplete="current-password" aria-required="true"
-                />
-              </div>
-
-              {error && (
-                <div className="rounded-lg bg-danger-50 border border-danger-200 px-4 py-3 animate-scale-in" role="alert">
-                  <p className="text-sm font-medium text-danger-600">{error}</p>
-                </div>
-              )}
-
-              <button type="submit" disabled={loading}
-                className="w-full rounded-lg bg-primary-600 text-white font-semibold py-3 text-sm transition-all hover:bg-primary-700 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed">
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Signing in...
-                  </span>
-                ) : "Sign In"}
-              </button>
-            </form>
-
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <p className="text-[11px] text-slate-400 text-center mb-2.5 font-medium uppercase tracking-wider">Available Roles</p>
-              <div className="flex items-center justify-center gap-2">
-                <span className="dn-badge bg-primary-50 text-primary-700">Admin</span>
-                <span className="dn-badge bg-warm-50 text-warm-700">Teacher</span>
-                <span className="dn-badge bg-accent-50 text-accent-700">Student</span>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-center text-xs text-slate-400 mt-6">
-            Offline-First LMS &middot; DepEd Last-Mile Schools
+          <h1 className="text-6xl font-black text-slate-900 tracking-tighter drop-shadow-sm mb-4">
+            DANILO
+          </h1>
+          <p className="text-xl font-medium text-slate-500 tracking-wide">
+            Localized. Offline. Empowered.
           </p>
         </div>
       </div>
@@ -830,16 +824,10 @@ export default function StreamView({ items }) {
     <section className="dn-page-enter" aria-label="Activity Stream">
       <div className="mb-5">
         <h2 className="dn-title">Stream</h2>
-        <p className="dn-subtitle mt-0.5">Announcements, assignments, and reminders from your teachers.</p>
+        <p className="dn-subtitle mt-0.5">Announcements, assignments, and reminders from your faculty.</p>
       </div>
       {!items || items.length === 0 ? (
-        <div className="dn-card p-10 text-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 4h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" /></svg>
-          </div>
-          <p className="font-medium text-slate-700">No posts yet</p>
-          <p className="text-sm text-slate-400 mt-1">Announcements will appear here once your teachers post them.</p>
-        </div>
+        <Empty title="No posts yet" body="Faculty announcements will appear here." icon={<svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 4h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" /></svg>} />
       ) : (
         <div className="space-y-3">{items.map((item) => <PostCard key={item.id} item={item} />)}</div>
       )}
@@ -925,13 +913,7 @@ export default function ContentView({ items, search, onSearchChange, quarter, on
       </div>
 
       {items.length === 0 ? (
-        <div className="dn-card p-10 text-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
-          </div>
-          <p className="font-medium text-slate-700">{hasFilters ? "No modules match your filters." : "No lessons available yet."}</p>
-          {!hasFilters && workflow && <p className="text-sm text-slate-400 mt-1">{workflow.message}</p>}
-        </div>
+        <Empty title="No modules found" body={search ? "Try adjusting your search filters." : "Your faculty has not uploaded any modules yet."} icon={<svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">{items.map((item) => <LessonCard key={item.id} item={item} />)}</div>
       )}
@@ -956,13 +938,7 @@ export default function GradesView({ grades }) {
         <p className="dn-subtitle mt-0.5">Performance summary per subject and quarter.</p>
       </div>
       {!grades || grades.length === 0 ? (
-        <div className="dn-card p-10 text-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
-          </div>
-          <p className="font-medium text-slate-700">No grades available</p>
-          <p className="text-sm text-slate-400 mt-1">Grades will appear after teachers record scores.</p>
-        </div>
+        <Empty title="No grades available" body="Grades will appear after faculty record scores." icon={<svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>} />
       ) : (
         <div className="space-y-4">
           {grades.map((grade) => {
@@ -975,7 +951,7 @@ export default function GradesView({ grades }) {
                       <p className="dn-overline text-warm-600">{grade.subject}</p>
                       <h3 className="text-base font-semibold text-slate-900 tracking-tight mt-1">{grade.courseTitle}</h3>
                       <p className="text-xs text-slate-400 mt-0.5">{grade.courseCode} &middot; Quarter {grade.quarter}</p>
-                      {grade.teacher && <p className="text-xs text-slate-400 mt-0.5">Teacher: {grade.teacher}</p>}
+                      {grade.teacher && <p className="text-xs text-slate-400 mt-0.5">Faculty: {grade.teacher}</p>}
                     </div>
                     <div className={`rounded-xl ${gs.bg} ring-1 ${gs.ring} px-5 py-3 text-center flex-shrink-0`}>
                       <p className={`text-[10px] font-bold ${gs.text} uppercase tracking-widest`}>Final Grade</p>
@@ -1082,87 +1058,174 @@ function TypingIndicator() {
   );
 }
 
-export default function TutorView({ modules, form, onChange, onSubmit, loading, messages }) {
+export default function TutorView({ token, modules, form, onChange, onSubmit, loading, messages }) {
   const hasModules = modules && modules.length > 0;
   const endRef = useRef(null);
+  const [sessions, setSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sessionMessages, setSessionMessages] = useState(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, sessionMessages, loading]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch("/api/ai/sessions", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setSessions(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [token, messages]);
+
+  async function loadSession(id) {
+    setActiveSessionId(id);
+    setSidebarOpen(false);
+    try {
+      const data = await fetch(`/api/ai/sessions/${id}/messages`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json());
+      setSessionMessages(data.messages || []);
+    } catch (_) { setSessionMessages([]); }
+  }
+
+  async function newSession() {
+    setActiveSessionId(null);
+    setSessionMessages(null);
+    setSidebarOpen(false);
+  }
+
+  async function deleteSession(id, e) {
+    e.stopPropagation();
+    await fetch(`/api/ai/sessions/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (activeSessionId === id) { setActiveSessionId(null); setSessionMessages(null); }
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return "";
+    try { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch (_) { return ""; }
+  }
+
+  const displayMessages = sessionMessages !== null ? sessionMessages : (messages || []);
 
   return (
-    <section className="flex flex-col h-[calc(100dvh-150px)] sm:h-[calc(100dvh-170px)] lg:h-[calc(100dvh-140px)] min-h-[480px] dn-page-enter" aria-label="AI Tutor">
+    <section className="flex h-[calc(100dvh-150px)] sm:h-[calc(100dvh-170px)] lg:h-[calc(100dvh-140px)] min-h-[480px] gap-3 dn-page-enter" aria-label="AI Tutor">
 
-      <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-warm-500 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 tracking-tight">AI Tutor</h2>
-            <p className="text-xs text-slate-400">Powered by local Ollama model</p>
-          </div>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+      <aside className={`fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-200 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between gap-2 px-3 py-3 border-b border-slate-100">
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Chat History</span>
+          <button onClick={newSession} className="text-xs dn-btn-primary px-2.5 py-1 min-h-[28px]">+ New</button>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5 bg-warm-50 border border-warm-200 rounded-full px-3 py-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-warm-500 dn-status-dot-pulse" />
-          <span className="text-xs font-medium text-warm-700">Offline AI</span>
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-50">
+          {sessions.length === 0 && (
+            <p className="px-3 py-4 text-xs text-slate-400 text-center">No previous sessions</p>
+          )}
+          {sessions.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => loadSession(s.id)}
+              className={`w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors group ${activeSessionId === s.id ? "bg-primary-50" : ""}`}
+            >
+              <p className={`text-xs font-medium truncate ${activeSessionId === s.id ? "text-primary-700" : "text-slate-700"}`}>{s.title}</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[10px] text-slate-400">{s.messageCount} msg</span>
+                <button
+                  onClick={(e) => deleteSession(s.id, e)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-danger-500 hover:text-danger-700 px-1 transition-opacity"
+                  title="Delete session"
+                >✕</button>
+              </div>
+            </button>
+          ))}
         </div>
-      </div>
+      </aside>
 
-      <div className="flex-shrink-0 mb-3">
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <select name="moduleId" value={form.moduleId} onChange={onChange} className="dn-input text-sm" aria-label="Select lesson context">
-            <option value="">{hasModules ? "Select lesson context (optional)" : "No modules available"}</option>
-            {(modules || []).map((m) => <option key={m.id} value={m.id}>{m.subject} &middot; {m.title}</option>)}
-          </select>
-          <select name="responseMode" value={form.responseMode} onChange={onChange} className="dn-input sm:w-32 text-sm" aria-label="Response mode">
-            <option value="short">Short</option>
-            <option value="normal">Normal</option>
-            <option value="detailed">Detailed</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto bg-slate-50 rounded-xl border border-slate-200 p-3 sm:p-4 space-y-3 min-h-0 overscroll-contain" role="log" aria-live="polite">
-        {(!messages || messages.length === 0) && !loading && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <div className="w-14 h-14 rounded-2xl bg-warm-50 border border-warm-100 flex items-center justify-center mb-4">
-              <svg className="w-7 h-7 text-warm-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.25}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+      <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+            </button>
+            <div className="w-8 h-8 rounded-lg bg-warm-500 flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
             </div>
-            <p className="text-sm font-semibold text-slate-700 mb-1">Ready to help</p>
-            <p className="text-sm text-slate-400 max-w-xs leading-relaxed">
-              {hasModules
-                ? "Select a lesson and ask a question. The AI tutor runs entirely offline."
-                : "Ask any question. Module context can be added once lessons are uploaded."}
-            </p>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 tracking-tight">DANILO AI Tutor</h2>
+              <p className="text-[10px] text-slate-400">Offline · Local Ollama</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeSessionId && (
+              <button onClick={newSession} className="text-xs dn-btn-secondary px-2.5 py-1 min-h-[28px]">New Chat</button>
+            )}
+            <div className="hidden sm:flex items-center gap-1 bg-warm-50 border border-warm-200 rounded-full px-2.5 py-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-warm-500 dn-status-dot-pulse" />
+              <span className="text-[10px] font-medium text-warm-700">Offline AI</span>
+            </div>
+          </div>
+        </div>
+
+        {sessionMessages === null && (
+          <div className="flex-shrink-0 mb-3">
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <select name="moduleId" value={form.moduleId} onChange={onChange} className="dn-input text-sm" aria-label="Select lesson context">
+                <option value="">{hasModules ? "Select lesson context (optional)" : "No modules available"}</option>
+                {(modules || []).map((m) => <option key={m.id} value={m.id}>{m.subject} · {m.title}</option>)}
+              </select>
+              <select name="responseMode" value={form.responseMode} onChange={onChange} className="dn-input sm:w-28 text-sm" aria-label="Response mode">
+                <option value="short">Short</option>
+                <option value="normal">Normal</option>
+                <option value="detailed">Detailed</option>
+              </select>
+            </div>
           </div>
         )}
-        {messages && messages.map((msg) => (
-          msg.role === "user"
-            ? <ChatBubbleUser key={msg.id} content={msg.content} />
-            : <ChatBubbleAI key={msg.id} content={msg.content} context={msg.context} />
-        ))}
-        {loading && <TypingIndicator />}
-        <div ref={endRef} />
-      </div>
 
-      <form onSubmit={onSubmit} className="flex-shrink-0 mt-3 pb-safe-chat">
-        <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
-          <input
-            name="question" value={form.question} onChange={onChange}
-            placeholder="Ask a question..."
-            className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-            aria-label="Type your question" disabled={loading}
-          />
-          <button type="submit" disabled={loading || !form.question.trim()} className="dn-btn-warm min-w-[44px] flex-shrink-0 px-3 rounded-lg" aria-label="Send message">
-            {loading ? (
-              <span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin inline-block" />
-            ) : (
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
-            )}
-          </button>
+        <div className="flex-1 overflow-y-auto bg-slate-50 rounded-xl border border-slate-200 p-3 sm:p-4 space-y-3 min-h-0 overscroll-contain" role="log" aria-live="polite">
+          {displayMessages.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+              <div className="w-12 h-12 rounded-2xl bg-warm-50 border border-warm-100 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-warm-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.25}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+              </div>
+              <p className="text-sm font-semibold text-slate-700 mb-1">Ready to help</p>
+              <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                {activeSessionId ? "This session is empty." : hasModules ? "Select a lesson and ask a question." : "Ask anything — the AI runs entirely offline."}
+              </p>
+            </div>
+          )}
+          {displayMessages.map((msg, idx) => {
+            const key = msg.id || idx;
+            const ts = msg.createdAt ? fmtTime(msg.createdAt) : "";
+            return msg.role === "user"
+              ? <div key={key}><ChatBubbleUser content={msg.content} />{ts && <p className="text-right text-[10px] text-slate-300 mt-0.5 pr-1">{ts}</p>}</div>
+              : <div key={key}><ChatBubbleAI content={msg.content} context={msg.context} />{ts && <p className="text-[10px] text-slate-300 mt-0.5 pl-10">{ts}</p>}</div>;
+          })}
+          {loading && <TypingIndicator />}
+          <div ref={endRef} />
         </div>
-      </form>
+
+        {sessionMessages === null && (
+          <form onSubmit={onSubmit} className="flex-shrink-0 mt-3 pb-safe-chat">
+            <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
+              <input
+                name="question" value={form.question} onChange={onChange}
+                placeholder="Ask a question..."
+                className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                aria-label="Type your question" disabled={loading}
+              />
+              <button type="submit" disabled={loading || !form.question.trim()} className="dn-btn-warm min-w-[44px] flex-shrink-0 px-3 rounded-lg" aria-label="Send message">
+                {loading ? (
+                  <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin inline-block" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </section>
   );
 }
@@ -1212,14 +1275,12 @@ export function Stat({ label, value, accent }) {
 
 export function Empty({ icon, title, body }) {
   return (
-    <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
-      {icon && (
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-300">
-          {icon}
-        </div>
-      )}
-      <p className="font-medium text-slate-700">{title}</p>
-      {body && <p className="mt-1 text-sm text-slate-400 leading-relaxed">{body}</p>}
+    <div className="dn-card p-10 text-center animate-slide-up">
+      <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-4 shadow-inner shadow-slate-200/50 animate-float">
+        {icon || <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>}
+      </div>
+      <p className="font-semibold text-slate-800 tracking-tight">{title}</p>
+      {body && <p className="text-sm text-slate-500 mt-1.5 max-w-xs mx-auto leading-relaxed">{body}</p>}
     </div>
   );
 }
@@ -1321,21 +1382,29 @@ const defaultUserForm = {
   educationLevel: "Junior High School", gradeLevel: "Grade 7", strand: "", sectionName: "",
 };
 
-function makeUsername(fullName, role) {
-  const base = String(fullName || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/^\.+|\.+$/g, "");
-  const prefix = role === "teacher" ? "t" : role === "admin" ? "a" : "s";
-  return base ? `${prefix}.${base}` : "";
+const ROLE_DISPLAY = { student: "Learner", teacher: "Faculty", admin: "Admin" };
+const ROLE_BADGE_TONE = { admin: "blue", teacher: "gold", student: "green" };
+
+function makeUsername(fullName, role, sectionName) {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return "";
+  const initials = parts.map((p) => p[0].toUpperCase()).join("");
+  if (role === "teacher") return `FAC-${initials}`;
+  if (role === "admin") return `ADM-${initials}`;
+  const sec = String(sectionName || "LRN").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return `${sec}-${initials}`;
 }
 
 export function AdminUsersView({ token, users, reload }) {
   const [form, setForm] = useState(defaultUserForm);
   const [edit, setEdit] = useState(null);
   const [filter, setFilter] = useState("");
+  const [sections, setSections] = useState([]);
   const visible = users.filter((u) => !filter || u.role === filter);
+
+  useEffect(() => {
+    apiRequest("/admin/sections", { token }).then((d) => setSections(Array.isArray(d) ? d : [])).catch(() => {});
+  }, [token]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -1366,29 +1435,46 @@ export function AdminUsersView({ token, users, reload }) {
       <div className="dn-card p-5">
         <SectionHeader
           title={edit ? "Edit User" : "New User"}
-          subtitle={edit ? `Editing ${edit.fullName}` : "Add teachers, students, or admin users"}
+          subtitle={edit ? `Editing ${edit.fullName}` : "Add Faculty, Learners, or Admin accounts"}
         />
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-3">
           <Field label="Role">
             <select className="dn-input" value={form.role} onChange={(e) => {
               const role = e.target.value;
-              setForm((prev) => ({ ...prev, role, username: edit || prev.username ? prev.username : makeUsername(prev.fullName, role) }));
+              setForm((prev) => ({ ...prev, role, username: edit || prev.username ? prev.username : makeUsername(prev.fullName, role, prev.sectionName) }));
             }}>
-              <option>student</option><option>teacher</option><option>admin</option>
+              <option value="student">Learner</option><option value="teacher">Faculty</option><option value="admin">Admin</option>
             </select>
           </Field>
           <Field label="Full Name">
             <input className="dn-input" value={form.fullName} onChange={(e) => {
               const fullName = e.target.value;
-              setForm((prev) => ({ ...prev, fullName, username: edit || prev.username ? prev.username : makeUsername(fullName, prev.role) }));
+              setForm((prev) => ({ ...prev, fullName, username: edit || prev.username ? prev.username : makeUsername(fullName, prev.role, prev.sectionName) }));
             }} required />
           </Field>
           <Field label="Username">
-            <input className="dn-input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="Auto-generated" autoCapitalize="none" />
+            <input
+              className={`dn-input ${edit ? "bg-slate-50 text-slate-400 cursor-not-allowed" : ""}`}
+              value={form.username}
+              onChange={(e) => { if (!edit) setForm({ ...form, username: e.target.value }); }}
+              readOnly={!!edit}
+              placeholder="Auto-generated from name + section"
+              autoCapitalize="none"
+            />
           </Field>
           <GradeCascade value={form} onChange={setForm} />
           <Field label="Section">
-            <input className="dn-input" value={form.sectionName} onChange={(e) => setForm({ ...form, sectionName: e.target.value })} />
+            {sections.length > 0 ? (
+              <select className="dn-input" value={form.sectionName} onChange={(e) => {
+                const sectionName = e.target.value;
+                setForm((prev) => ({ ...prev, sectionName, username: edit ? prev.username : makeUsername(prev.fullName, prev.role, sectionName) }));
+              }}>
+                <option value="">No section</option>
+                {sections.map((s) => <option key={s.id} value={s.name}>{s.name} — {s.gradeLevel}</option>)}
+              </select>
+            ) : (
+              <input className="dn-input bg-slate-50 text-slate-400" value="No sections yet — create sections first" readOnly />
+            )}
           </Field>
           <div className="flex items-end gap-2">
             <button className="dn-btn-primary w-full">{edit ? "Save Changes" : "Create User"}</button>
@@ -1402,11 +1488,11 @@ export function AdminUsersView({ token, users, reload }) {
       </div>
 
       <div className="dn-card p-5">
-        <SectionHeader title="User Accounts" subtitle={users.length ? `${users.length} total users` : "No users yet"}>
+        <SectionHeader title="User Accounts" subtitle={users.length ? `${users.length} total accounts` : "No users yet"}>
           <select className="dn-input w-auto" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="">All Roles</option>
-            <option value="student">Students</option>
-            <option value="teacher">Teachers</option>
+            <option value="student">Learners</option>
+            <option value="teacher">Faculty</option>
             <option value="admin">Admins</option>
           </select>
         </SectionHeader>
@@ -1428,7 +1514,7 @@ export function AdminUsersView({ token, users, reload }) {
                   <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{u.fullName}</td>
                     <td className="px-4 py-2.5">
-                      <Badge tone={u.role === "admin" ? "blue" : u.role === "teacher" ? "gold" : "green"}>{u.role}</Badge>
+                      <Badge tone={ROLE_BADGE_TONE[u.role] || "default"}>{u.displayRole || ROLE_DISPLAY[u.role] || u.role}</Badge>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-slate-500 text-xs">{u.username}</td>
                     <td className="px-4 py-2.5 text-slate-400 text-xs hidden sm:table-cell">
@@ -1452,7 +1538,7 @@ export function AdminUsersView({ token, users, reload }) {
             </table>
           </div>
         ) : (
-          <Empty title="No accounts" body="Create student and teacher accounts to begin enrollment." />
+          <Empty title="No accounts" body="Create Learner and Faculty accounts to begin enrollment." />
         )}
       </div>
     </section>
@@ -1482,7 +1568,7 @@ export function AdminClassesView({ token, users, courses, reload }) {
   return (
     <section className="space-y-5 dn-page-enter" aria-label="Class Management">
       <div className="dn-card p-5">
-        <SectionHeader title="Create Class" subtitle="Set up a new course and assign a teacher" />
+        <SectionHeader title="Create Subject" subtitle="Set up a new subject and assign faculty" />
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-3">
           <Field label="Code"><input className="dn-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required /></Field>
           <Field label="Title"><input className="dn-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></Field>
@@ -1498,7 +1584,7 @@ export function AdminClassesView({ token, users, courses, reload }) {
               <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
             </select>
           </Field>
-          <Field label="Teacher">
+          <Field label="Faculty">
             <select className="dn-input" value={form.teacherId} onChange={(e) => setForm({ ...form, teacherId: e.target.value })}>
               <option value="">Unassigned</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
@@ -1508,13 +1594,13 @@ export function AdminClassesView({ token, users, courses, reload }) {
             <input className="dn-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
           <div className="flex items-end">
-            <button className="dn-btn-primary w-full">Create Class</button>
+            <button className="dn-btn-primary w-full">Create Subject</button>
           </div>
         </form>
       </div>
 
       <div className="dn-card p-5">
-        <SectionHeader title="All Classes" subtitle={`${courses.length} classes configured`} />
+        <SectionHeader title="All Subjects" subtitle={`${courses.length} subject${courses.length === 1 ? "" : "s"} configured`} />
         {courses.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {courses.map((c) => (
@@ -1526,13 +1612,13 @@ export function AdminClassesView({ token, users, courses, reload }) {
                 <h3 className="font-semibold text-slate-900 tracking-tight">{c.title}</h3>
                 <p className="text-sm text-slate-500 mt-0.5">{c.subject}</p>
                 <p className="text-xs text-slate-400 mt-2">
-                  {c.teacherName || "Unassigned"} &middot; {c.studentTotal ?? 0} students &middot; {c.moduleTotal ?? 0} modules
+                  {c.teacherName || "Unassigned"} &middot; {c.studentTotal ?? 0} learners &middot; {c.moduleTotal ?? 0} modules
                 </p>
               </div>
             ))}
           </div>
         ) : (
-          <Empty title="No classes" body="Create a class, assign a teacher, then enroll learners." />
+          <Empty title="No subjects" body="Create a subject, assign faculty, then enroll learners." />
         )}
       </div>
     </section>
@@ -1544,15 +1630,30 @@ export function AdminClassesView({ token, users, courses, reload }) {
    ======================================================================== */
 
 export function AdminEnrollmentsView({ token, users, courses, reload }) {
-  const students = users.filter((u) => u.role === "student" && u.isActive !== false);
+  const learners = users.filter((u) => u.role === "student" && u.isActive !== false);
   const teachers = users.filter((u) => u.role === "teacher" && u.isActive !== false);
   const [sel, setSel] = useState({});
+  const [sectionSel, setSectionSel] = useState({});
   const [teacherSel, setTeacherSel] = useState({});
+  const [enrollMode, setEnrollMode] = useState({});
+  const [sections, setSections] = useState([]);
 
-  async function enroll(courseId) {
+  useEffect(() => {
+    apiRequest("/admin/sections", { token }).then((data) => setSections(Array.isArray(data) ? data : [])).catch(() => {});
+  }, [token]);
+
+  async function enrollLearner(courseId) {
     if (!sel[courseId]) return;
     await apiRequest(`/admin/courses/${courseId}/enroll`, { method: "POST", token, body: { studentId: sel[courseId] } });
     setSel({ ...sel, [courseId]: "" });
+    reload();
+  }
+
+  async function enrollSection(courseId) {
+    const sectionName = sectionSel[courseId];
+    if (!sectionName) return;
+    await apiRequest(`/admin/courses/${courseId}/enroll-section`, { method: "POST", token, body: { sectionName } });
+    setSectionSel({ ...sectionSel, [courseId]: "" });
     reload();
   }
 
@@ -1566,7 +1667,7 @@ export function AdminEnrollmentsView({ token, users, courses, reload }) {
   return (
     <section className="space-y-5 dn-page-enter" aria-label="Enrollment Management">
       <div className="dn-card p-5">
-        <SectionHeader title="Enrollment Management" subtitle="Assign teachers and enroll students in classes">
+        <SectionHeader title="Enrollment Management" subtitle="Assign faculty and enroll learners by section or individually">
           <button className="dn-btn-secondary text-xs" onClick={() => downloadReport("/admin/reports/roster", "danilo-roster.csv", token)}>
             Export Roster
           </button>
@@ -1593,22 +1694,49 @@ export function AdminEnrollmentsView({ token, users, courses, reload }) {
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="flex gap-2">
                   <select className="dn-input text-xs flex-1" value={teacherSel[c.id] || ""} onChange={(e) => setTeacherSel({ ...teacherSel, [c.id]: e.target.value })}>
-                    <option value="">Assign teacher...</option>
+                    <option value="">Assign faculty...</option>
                     {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
                   </select>
                   <button className="dn-btn-secondary text-xs py-1.5 min-h-[36px] flex-shrink-0" onClick={() => assignTeacher(c.id)}>Assign</button>
                 </div>
-                <div className="flex gap-2">
-                  <select className="dn-input text-xs flex-1" value={sel[c.id] || ""} onChange={(e) => setSel({ ...sel, [c.id]: e.target.value })}>
-                    <option value="">Enroll student...</option>
-                    {students.map((s) => <option key={s.id} value={s.id}>{s.fullName}</option>)}
-                  </select>
-                  <button className="dn-btn-primary text-xs py-1.5 min-h-[36px] flex-shrink-0" onClick={() => enroll(c.id)}>Enroll</button>
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${enrollMode[c.id] !== "individual" ? "bg-primary-50 border-primary-200 text-primary-700 font-medium" : "bg-white border-slate-200 text-slate-500"}`}
+                      onClick={() => setEnrollMode({ ...enrollMode, [c.id]: "section" })}
+                    >By Section</button>
+                    <button
+                      type="button"
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${enrollMode[c.id] === "individual" ? "bg-primary-50 border-primary-200 text-primary-700 font-medium" : "bg-white border-slate-200 text-slate-500"}`}
+                      onClick={() => setEnrollMode({ ...enrollMode, [c.id]: "individual" })}
+                    >Individual</button>
+                  </div>
+                  {enrollMode[c.id] === "individual" ? (
+                    <div className="flex gap-2">
+                      <select className="dn-input text-xs flex-1" value={sel[c.id] || ""} onChange={(e) => setSel({ ...sel, [c.id]: e.target.value })}>
+                        <option value="">Enroll learner...</option>
+                        {learners.map((s) => <option key={s.id} value={s.id}>{s.fullName}</option>)}
+                      </select>
+                      <button className="dn-btn-primary text-xs py-1.5 min-h-[36px] flex-shrink-0" onClick={() => enrollLearner(c.id)}>Enroll</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select className="dn-input text-xs flex-1" value={sectionSel[c.id] || ""} onChange={(e) => setSectionSel({ ...sectionSel, [c.id]: e.target.value })}>
+                        <option value="">Select section...</option>
+                        {sections.length === 0
+                          ? <option disabled value="">No sections created yet</option>
+                          : sections.map((s) => <option key={s.id} value={s.name}>{s.name} — {s.gradeLevel}</option>)
+                        }
+                      </select>
+                      <button className="dn-btn-primary text-xs py-1.5 min-h-[36px] flex-shrink-0" onClick={() => enrollSection(c.id)}>Enroll</button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )) : (
-            <Empty title="No classes" body="Create a class first, then manage enrollment here." />
+            <Empty title="No subjects" body="Create a subject first, then manage enrollment here." />
           )}
         </div>
       </div>
@@ -1668,8 +1796,8 @@ export function ReportsView({ token, dashboard }) {
           </button>
         </SectionHeader>
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <Stat label="Students" value={t.students} accent />
-          <Stat label="Teachers" value={t.teachers} />
+          <Stat label="Learners" value={t.learners ?? t.students} accent />
+          <Stat label="Faculty" value={t.faculty ?? t.teachers} />
           <Stat label="Classes" value={t.classes} />
           <Stat label="Enrollments" value={t.enrollments} />
           <Stat label="Modules" value={t.modules} />
@@ -1679,35 +1807,183 @@ export function ReportsView({ token, dashboard }) {
     </section>
   );
 }
-
-/* ========================================================================
    ADMIN: SYSTEM STATUS
    ======================================================================== */
 
-export function SystemView({ dashboard }) {
-  const s = dashboard?.system || {};
-  const highlights = dashboard?.operationsHighlights || [];
+export function SystemView({ token, addToast, dismissToast }) {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const ramToastId = React.useRef(null);
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiRequest("/admin/system", { token });
+      setStatus(data);
+      setLastRefresh(new Date());
+
+      if (data?.hardware?.ramPercent >= 85) {
+        if (!ramToastId.current) {
+          ramToastId.current = addToast("CRITICAL: System RAM is at or above 85%. Free up memory or decrease OLLAMA_NUM_CTX.", "danger");
+        }
+      } else if (ramToastId.current) {
+        dismissToast(ramToastId.current);
+        ramToastId.current = null;
+      }
+    } catch (err) {
+      setError(err?.message || "Could not load system status.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
+  }, [token]);
+
+  const s = status || {};
+  const t = s.totals || {};
+  const hw = s.hardware || {};
+
+  const StatusDot = ({ value }) => {
+    const ok = value === "connected" || value === "online";
+    const warn = value === "degraded";
+    return (
+      <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
+        ok ? "bg-success-50 text-success-700" : warn ? "bg-warm-50 text-warm-700" : "bg-red-50 text-red-700"
+      }`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${
+          ok ? "bg-success-500" : warn ? "bg-warm-400" : "bg-red-500"
+        }`} />
+        {value || "unknown"}
+      </span>
+    );
+  };
+
+  function GaugeBar({ pct, label, detail, warnAt = 70, critAt = 85 }) {
+    if (pct === null || pct === undefined) return (
+      <div className="rounded-2xl border border-slate-200/50 bg-white/80 backdrop-blur-md p-4 text-center">
+        <p className="dn-overline mb-1">{label}</p>
+        <p className="text-xs text-slate-400">Unavailable</p>
+      </div>
+    );
+    const isCrit = pct >= critAt;
+    const isWarn = !isCrit && pct >= warnAt;
+    const color = isCrit ? "#ef4444" : isWarn ? "#f59e0b" : "#10b981";
+    const textColor = isCrit ? "text-red-600" : isWarn ? "text-warm-600" : "text-success-600";
+    
+    const r = 40;
+    const c = Math.PI * r;
+    const offset = c - (pct / 100) * c;
+
+    return (
+      <div className="rounded-2xl border border-slate-200/50 bg-white/80 backdrop-blur-md p-4 flex flex-col items-center shadow-sm">
+        <p className="dn-overline mb-4 tracking-widest">{label}</p>
+        <div className="relative w-24 h-12 flex items-end justify-center">
+          <svg className="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 100 50">
+            <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#f1f5f9" strokeWidth="8" strokeLinecap="round" />
+            <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset} className="transition-all duration-1000 ease-out" />
+          </svg>
+          <span className={`absolute bottom-[-5px] text-xl font-bold ${textColor} leading-none`}>{pct}%</span>
+        </div>
+        {detail && <p className="text-[11px] text-slate-400 mt-5 font-medium uppercase tracking-wider">{detail}</p>}
+      </div>
+    );
+  }
 
   return (
     <section className="space-y-5 dn-page-enter" aria-label="System Status">
       <div className="dn-card p-5">
-        <SectionHeader title="System Information" subtitle="Current deployment configuration" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Portal URL" value={s.portalUrl} />
-          <Stat label="Wi-Fi SSID" value={s.wifiSsid} />
-          <Stat label="AI Model" value={s.aiModel} />
-          <Stat label="Database" value={s.database} />
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="dn-title">System Status</h2>
+            <p className="dn-subtitle mt-0.5">Beelink N95 · Live health{lastRefresh ? ` · ${lastRefresh.toLocaleTimeString()}` : ""}</p>
+          </div>
+          <button onClick={load} disabled={loading} className="dn-btn-secondary text-xs flex items-center gap-1.5">
+            <svg className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            Refresh
+          </button>
+        </div>
+        {error && <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">{error}</div>}
+
+        <div className="mb-5">
+          <p className="dn-overline mb-3">Services</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="dn-overline mb-2">Database</p>
+              <StatusDot value={s.database} />
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="dn-overline mb-2">AI (Ollama)</p>
+              <StatusDot value={s.ollama} />
+              {s.ollamaModel && <p className="text-[10px] text-slate-400 mt-1 truncate">{s.ollamaModel}</p>}
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="dn-overline mb-2">Wi-Fi SSID</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{s.wifiSsid || "—"}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="dn-overline mb-2">Portal URL</p>
+              <p className="text-sm font-semibold text-slate-800 truncate">{s.portalUrl || "—"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-5">
+          <p className="dn-overline mb-3">Hardware (N95 · 8 GB RAM · CPU-only inference)</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <GaugeBar pct={hw.cpuPercent} label="CPU" detail="Intel N95 · 4 cores" warnAt={75} critAt={90} />
+            <GaugeBar
+              pct={hw.ramPercent}
+              label="System RAM"
+              detail={hw.ramUsedMb && hw.ramTotalMb ? `${hw.ramUsedMb} / ${hw.ramTotalMb} MB` : null}
+              warnAt={70}
+              critAt={85}
+            />
+            <GaugeBar
+              pct={hw.diskPercent}
+              label="Disk"
+              detail={hw.diskUsedGb && hw.diskTotalGb ? `${hw.diskUsedGb} / ${hw.diskTotalGb} GB` : null}
+              warnAt={75}
+              critAt={90}
+            />
+          </div>
+          {hw.ramPercent >= 85 && (
+            <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <span className="text-red-500 mt-0.5">⚠</span>
+              <p className="text-xs text-red-700 font-medium">RAM usage is critically high ({hw.ramPercent}%). The AI model may become unresponsive. Consider reducing <code>OLLAMA_NUM_CTX</code> or restarting the Ollama service.</p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="dn-overline mb-3">Platform Totals</p>
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <Stat label="Learners" value={t.learners} accent />
+            <Stat label="Faculty" value={t.faculty} />
+            <Stat label="Active Classes" value={t.classes} />
+            <Stat label="Sections" value={t.sections} />
+            <Stat label="Departments" value={t.departments} />
+            <Stat label="Enrollments" value={t.enrollments} />
+            <Stat label="Modules" value={t.modules} />
+            <Stat label="Chat Sessions" value={t.chatSessions} />
+            <Stat label="Chat Messages" value={t.chatMessages} />
+          </div>
         </div>
       </div>
-      {highlights.length > 0 && (
+      {(s.ollamaAvailableModels || []).length > 0 && (
         <div className="dn-card p-5">
-          <SectionHeader title="Operations Highlights" />
-          <div className="grid gap-3 sm:grid-cols-3">
-            {highlights.map((item) => (
-              <div key={item.label} className="rounded-lg bg-slate-50 border border-slate-100 p-3">
-                <p className="dn-overline">{item.label}</p>
-                <p className="text-sm font-medium text-slate-800 mt-1 truncate">{item.value}</p>
-              </div>
+          <SectionHeader title="Available AI Models" subtitle="Ollama model registry" />
+          <div className="flex flex-wrap gap-2 mt-2">
+            {s.ollamaAvailableModels.map((m) => (
+              <span key={m} className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                m === s.ollamaModel ? "bg-primary-50 border-primary-200 text-primary-700" : "bg-slate-50 border-slate-200 text-slate-600"
+              }`}>{m}{m === s.ollamaModel ? " ✓" : ""}</span>
             ))}
           </div>
         </div>
@@ -1746,6 +2022,122 @@ export function AdminAssignmentsView({ assignments }) {
           </div>
         ) : (
           <Empty title="No assignments" body="Assignments appear here once teachers create them." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ========================================================================
+   ADMIN: DEPARTMENTS
+   ======================================================================== */
+
+export function DepartmentsView({ token, users, reload }) {
+  const [departments, setDepartments] = useState([]);
+  const [form, setForm] = useState({ name: "", code: "", description: "", headId: "" });
+  const [edit, setEdit] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const faculty = users.filter((u) => u.role === "teacher" && u.isActive !== false);
+
+  async function loadDepts() {
+    setLoading(true);
+    try {
+      const data = await apiRequest("/admin/departments", { token });
+      setDepartments(Array.isArray(data) ? data : []);
+    } catch (_) {} finally { setLoading(false); }
+  }
+
+  useEffect(() => { loadDepts(); }, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const payload = { ...form, headId: form.headId ? Number(form.headId) : null };
+    if (edit) {
+      await apiRequest(`/admin/departments/${edit.id}`, { method: "PUT", token, body: payload });
+      setEdit(null);
+    } else {
+      await apiRequest("/admin/departments", { method: "POST", token, body: payload });
+    }
+    setForm({ name: "", code: "", description: "", headId: "" });
+    loadDepts();
+    reload();
+  }
+
+  async function deactivate(id) {
+    await apiRequest(`/admin/departments/${id}`, { method: "DELETE", token });
+    loadDepts();
+  }
+
+  function startEdit(d) {
+    setEdit(d);
+    setForm({ name: d.name, code: d.code, description: d.description || "", headId: d.headId || "" });
+  }
+
+  return (
+    <section className="space-y-5 dn-page-enter" aria-label="Departments">
+      <div className="dn-card p-5">
+        <SectionHeader
+          title={edit ? "Edit Department" : "New Department"}
+          subtitle="Manage learning area departments"
+        />
+        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-3">
+          <Field label="Department Name">
+            <input className="dn-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g. Mathematics" />
+          </Field>
+          <Field label="Code">
+            <input className="dn-input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required placeholder="e.g. MATH" maxLength={20} />
+          </Field>
+          <Field label="Department Head">
+            <select className="dn-input" value={form.headId} onChange={(e) => setForm({ ...form, headId: e.target.value })}>
+              <option value="">No head assigned</option>
+              {faculty.map((f) => <option key={f.id} value={f.id}>{f.fullName}</option>)}
+            </select>
+          </Field>
+          <Field label="Description" className="sm:col-span-2">
+            <input className="dn-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional description" />
+          </Field>
+          <div className="flex items-end gap-2">
+            <button className="dn-btn-primary w-full">{edit ? "Save Changes" : "Create Department"}</button>
+            {edit && (
+              <button type="button" className="dn-btn-secondary" onClick={() => { setEdit(null); setForm({ name: "", code: "", description: "", headId: "" }); }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      <div className="dn-card p-5">
+        <SectionHeader title="Departments" subtitle={departments.length ? `${departments.filter((d) => d.isActive).length} active` : "No departments yet"} />
+        {loading ? (
+          <div className="text-center py-6 text-sm text-slate-400">Loading...</div>
+        ) : departments.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {departments.map((d) => (
+              <div key={d.id} className={`rounded-xl border p-4 transition-all ${d.isActive ? "border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-sm" : "border-slate-100 bg-slate-50 opacity-60"}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge tone="blue">{d.code}</Badge>
+                  {!d.isActive && <Badge tone="red">Inactive</Badge>}
+                </div>
+                <h3 className="font-semibold text-slate-900 text-sm">{d.name}</h3>
+                {d.description && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{d.description}</p>}
+                {d.headId && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Head: {faculty.find((f) => f.id === d.headId)?.fullName || `ID ${d.headId}`}
+                  </p>
+                )}
+                <div className="flex gap-1.5 mt-3">
+                  <button className="dn-btn-secondary text-xs py-1 px-2 min-h-[28px]" onClick={() => startEdit(d)}>Edit</button>
+                  {d.isActive && (
+                    <button className="dn-btn-danger text-xs py-1 px-2 min-h-[28px]" onClick={() => deactivate(d.id)}>Deactivate</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty title="No departments" body="Create departments to organize learning areas and assign faculty heads." />
         )}
       </div>
     </section>
@@ -1796,7 +2188,7 @@ EOF
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiRequest, apiUpload } from "./api";
-import { AdminAssignmentsView, AdminAnnouncementsView, AdminClassesView, AdminEnrollmentsView, AdminUsersView, ReportsView, SystemView, TeacherAnnouncementsView } from "./components/AdminPages";
+import { AdminAssignmentsView, AdminAnnouncementsView, AdminClassesView, AdminEnrollmentsView, AdminUsersView, DepartmentsView, ReportsView, SystemView, TeacherAnnouncementsView } from "./components/AdminPages";
 import { ASSESSMENT_TYPES, Empty, Field } from "./components/shared";
 import ContentView from "./components/ContentView";
 import GradesView from "./components/GradesView";
@@ -1894,10 +2286,11 @@ const NAV = {
   admin: [
     { path: "/overview",     label: "Overview",     icon: Icons.home,    page: "overview" },
     { path: "/users",        label: "Users",        icon: Icons.users,   page: "users" },
-    { path: "/classes",      label: "Classes",      icon: Icons.classes, page: "classes" },
+    { path: "/classes",      label: "Subjects",     icon: Icons.classes, page: "classes" },
     { path: "/enrollments",  label: "Enrollments",  icon: Icons.enroll,  page: "enrollments" },
     { path: "/assignments",  label: "Assignments",  icon: Icons.assign,  page: "assignments" },
     { path: "/grades",       label: "Grades",       icon: Icons.grades,  page: "grades" },
+    { path: "/departments",  label: "Departments",  icon: Icons.users,   page: "departments" },
     { path: "/reports",      label: "Reports",      icon: Icons.reports, page: "reports" },
     { path: "/system",       label: "System",       icon: Icons.system,  page: "system" },
     { path: "/ai-tutor",    label: "AI Tutor",     icon: Icons.tutor,   page: "ai-tutor" },
@@ -1906,7 +2299,7 @@ const NAV = {
 const getNav = (role) => NAV[role] || NAV.student;
 
 const ALLOWED = {
-  admin:   ["overview", "users", "classes", "sections", "enrollments", "assignments", "grades", "reports", "settings", "system", "ai-tutor", "my-classes", "announcements", "class-detail", "not-found"],
+  admin:   ["overview", "users", "classes", "sections", "enrollments", "assignments", "grades", "departments", "reports", "settings", "system", "ai-tutor", "my-classes", "announcements", "class-detail", "not-found"],
   teacher: ["overview", "my-classes", "grades", "announcements", "ai-tutor", "class-detail", "not-found"],
   student: ["overview", "my-classes", "grades", "ai-tutor", "class-detail", "not-found"],
 };
@@ -2168,6 +2561,53 @@ function MobileBottomNav({ currentPage, navigate, role }) {
    HOME VIEW
    ======================================================================== */
 
+function AdminSetupChecklist({ dashboard, onNavigate }) {
+  const t = dashboard.totals || {};
+  const learners = t.learners ?? 0;
+  const faculty  = t.faculty  ?? 0;
+  const sections = t.sections ?? 0;
+  const subjects = t.classes  ?? 0;
+
+  const steps = [
+    { done: sections > 0,  label: "Create Sections",    sub: "Add your school's class sections",          path: "/sections",    nav: "/sections"    },
+    { done: faculty > 0,   label: "Add Faculty",         sub: "Create faculty accounts",                   path: "/users",       nav: "/users"       },
+    { done: subjects > 0,  label: "Create Subjects",     sub: "Set up subject records for each quarter",   path: "/classes",     nav: "/classes"     },
+    { done: learners > 0,  label: "Enroll Learners",     sub: "Add learner accounts — auto-inherit applies", path: "/users",     nav: "/users"       },
+  ];
+  const allDone = steps.every((s) => s.done);
+
+  if (allDone) return null;
+
+  return (
+    <div className="dn-card p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center text-primary-500 flex-shrink-0">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">School Setup Checklist</p>
+          <p className="text-xs text-slate-400">Complete these steps to get DANILO ready for learners</p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {steps.map((s, i) => (
+          <button key={i} onClick={() => onNavigate(s.nav)}
+            className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all border ${s.done ? "bg-success-50 border-success-200" : "bg-white border-slate-200 hover:border-primary-200 hover:bg-primary-50/50"}`}>
+            <span className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold border-2 ${s.done ? "bg-success-500 border-success-500 text-white" : "border-slate-300 text-slate-400"}`}>
+              {s.done ? "✓" : i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-medium ${s.done ? "text-success-700 line-through" : "text-slate-800"}`}>{s.label}</p>
+              <p className="text-[11px] text-slate-400 truncate">{s.sub}</p>
+            </div>
+            {!s.done && <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HomeView({ user, dashboard, onNavigate }) {
   const courseCount = Array.isArray(dashboard.courses) ? dashboard.courses.length : 0;
   const lessonCount = Array.isArray(dashboard.contentFolders) ? dashboard.contentFolders.length : 0;
@@ -2183,7 +2623,7 @@ function HomeView({ user, dashboard, onNavigate }) {
             <p className="text-slate-500 text-sm">{greeting},</p>
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-0.5">{user.fullName}</h2>
           </div>
-          <span className="dn-badge bg-primary-50 text-primary-700 capitalize">{user.role}</span>
+          <span className="dn-badge bg-primary-50 text-primary-700 capitalize">{user.displayRole || user.role}</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-slate-500">
           <div className="flex items-center gap-1.5">
@@ -2195,11 +2635,13 @@ function HomeView({ user, dashboard, onNavigate }) {
         </div>
       </div>
 
+      {user.role === "admin" && <AdminSetupChecklist dashboard={dashboard} onNavigate={onNavigate} />}
+
       <div className="grid grid-cols-2 gap-3">
         <div className="dn-card p-4 text-center">
           <div className="w-9 h-9 bg-primary-50 rounded-lg flex items-center justify-center mx-auto mb-2 text-primary-500">{Icons.classes}</div>
           <p className="text-xl font-bold text-primary-600">{courseCount}</p>
-          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mt-0.5">Classes</p>
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mt-0.5">Subjects</p>
         </div>
         <div className="dn-card p-4 text-center">
           <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center mx-auto mb-2 text-purple-500">{Icons.lessons}</div>
@@ -2218,15 +2660,7 @@ function HomeView({ user, dashboard, onNavigate }) {
           )}
         </div>
         {streamCount === 0 ? (
-          <div className="dn-card p-8 text-center">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center mx-auto mb-2">
-              <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-slate-600">No recent activity</p>
-            <p className="text-xs text-slate-400 mt-1">Posts from your teachers will appear here</p>
-          </div>
+          <Empty title="No recent activity" body="Posts from your faculty will appear here" icon={<svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
         ) : (
           <div className="space-y-2">
             {dashboard.stream.slice(0, 4).map((item) => (
@@ -2259,15 +2693,11 @@ function MyClassesView({ courses, navigate }) {
   return (
     <section className="animate-fade-in" aria-label="My Classes">
       <div className="mb-5">
-        <h2 className="dn-title">My Classes</h2>
-        <p className="dn-subtitle mt-0.5">Your enrolled courses. Tap a card to open.</p>
+        <h2 className="dn-title">My Subjects</h2>
+        <p className="dn-subtitle mt-0.5">Your enrolled subjects. Tap a card to open.</p>
       </div>
       {!courses || courses.length === 0 ? (
-        <div className="dn-card p-10 text-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">{Icons.classes}</div>
-          <p className="font-medium text-slate-700">No classes yet</p>
-          <p className="text-sm text-slate-400 mt-1">You will see your enrolled classes here once assigned.</p>
-        </div>
+        <Empty title="No subjects yet" body="You will see your enrolled subjects here once assigned." icon={Icons.classes} />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((c, i) => (
@@ -2512,15 +2942,15 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
       )}
       {tab === "people" && (
         <div className="dn-card p-5">
-          <h3 className="font-semibold text-slate-900 mb-3">Teacher</h3>
+          <h3 className="font-semibold text-slate-900 mb-3">Faculty</h3>
           <p className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-sm text-slate-700">{people.teacher?.fullName || "Unassigned"}</p>
-          <h3 className="font-semibold text-slate-900 mt-5 mb-3">Students</h3>
+          <h3 className="font-semibold text-slate-900 mt-5 mb-3">Learners</h3>
           {people.students?.length ? (
             <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
               {people.students.map((s) => <div key={s.id} className="p-3 text-sm"><p className="font-medium text-slate-700">{s.fullName}</p><p className="text-xs text-slate-400">{s.username}</p></div>)}
             </div>
           ) : (
-            <Empty title="No enrolled students" body="Learners will appear here after enrollment." />
+            <Empty title="No enrolled learners" body="Learners will appear here after enrollment." />
           )}
         </div>
       )}
@@ -2576,16 +3006,19 @@ function NotFoundView({ navigate }) {
 function ToastContainer({ toasts, onDismiss }) {
   if (!toasts.length) return null;
   return (
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm" role="alert" aria-live="polite">
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none" role="alert" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id}
-          className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border animate-fade-in text-sm ${
-            t.type === "success" ? "bg-success-50 border-success-200 text-success-800" :
-            t.type === "error"   ? "bg-red-50 border-red-200 text-red-800" :
-            "bg-primary-50 border-primary-200 text-primary-800"
+          className={`flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl border backdrop-blur-md pointer-events-auto transform transition-all animate-slide-left text-sm ${
+            t.type === "success" ? "bg-success-50/90 border-success-200 text-success-800" :
+            t.type === "error"   ? "bg-danger-50/90 border-danger-200 text-danger-800" :
+            t.type === "danger"  ? "bg-red-600/90 border-red-700 text-white animate-pulse shadow-red-600/20" :
+            "bg-white/90 border-slate-200 text-slate-800"
           }`}>
-          <span className="flex-1">{t.message}</span>
-          <button type="button" onClick={() => onDismiss(t.id)} className="text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
+          <div className="flex-1 font-medium">{t.message}</div>
+          <button onClick={() => onDismiss(t.id)} className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
       ))}
     </div>
@@ -2646,7 +3079,10 @@ export default function App() {
   const addToast = useCallback((message, type = "info") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev.slice(-4), { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500);
+    if (type !== "danger") {
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500);
+    }
+    return id;
   }, []);
 
   const dismissToast = useCallback((id) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
@@ -2897,6 +3333,7 @@ export default function App() {
       case "ai-tutor":
         return (
           <TutorView
+            token={token}
             modules={dashboard.contentFolders}
             form={tutorForm}
             onChange={handleTutorChange}
@@ -2911,13 +3348,15 @@ export default function App() {
         return <AdminClassesView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
       case "enrollments":
         return <AdminEnrollmentsView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
+      case "departments":
+        return <DepartmentsView token={token} users={adminUsers} reload={reloadData} />;
       case "assignments":
         return <AdminAssignmentsView assignments={adminAssignments} />;
       case "reports":
         return <ReportsView token={token} dashboard={dashboard} />;
       case "system":
       case "settings":
-        return <SystemView dashboard={dashboard} />;
+        return <SystemView token={token} addToast={addToast} dismissToast={dismissToast} />;
       case "announcements":
         return user.role === "admin"
           ? <AdminAnnouncementsView token={token} reload={reloadData} />

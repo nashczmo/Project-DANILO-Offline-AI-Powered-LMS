@@ -17,6 +17,7 @@ python-multipart==0.0.20
 pypdf==5.4.0
 python-docx==1.1.2
 python-pptx==1.0.2
+psutil==6.1.1
 EOF
 
   cat > "${APP_ROOT}/backend/Dockerfile" <<'EOF'
@@ -42,8 +43,7 @@ EOF
 
   cat > "${APP_ROOT}/backend/app/database.py" <<'EOF'
 import os
-
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv(
@@ -52,7 +52,22 @@ DATABASE_URL = os.getenv(
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL must be set by the installer-generated environment")
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(
+    DATABASE_URL, 
+    pool_pre_ping=True, 
+    connect_args={"check_same_thread": False, "timeout": 15}
+)
+
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA cache_size=-64000") # 64MB memory cache
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA temp_store=MEMORY")
+    cursor.close()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -87,6 +102,7 @@ class User(Base):
     grade_level = Column(String(50), nullable=True)
     strand = Column(String(80), nullable=True)
     section_name = Column(String(120), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     password_salt = Column(String(255), nullable=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -94,6 +110,24 @@ class User(Base):
 
     taught_courses = relationship("Course", back_populates="teacher", foreign_keys="Course.teacher_id")
     enrollments = relationship("Enrollment", back_populates="student")
+    department = relationship("Department", back_populates="members", foreign_keys=[department_id])
+    chat_sessions = relationship("ChatSession", back_populates="user")
+
+
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False, unique=True)
+    code = Column(String(20), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    head_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    head = relationship("User", foreign_keys=[head_id])
+    members = relationship("User", back_populates="department", foreign_keys="User.department_id")
+    courses = relationship("Course", back_populates="department")
 
 
 class Course(Base):
@@ -113,10 +147,12 @@ class Course(Base):
     school_year = Column(String(20), nullable=False)
     description = Column(Text, nullable=False)
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     teacher = relationship("User", back_populates="taught_courses")
+    department = relationship("Department", back_populates="courses")
     enrollments = relationship("Enrollment", back_populates="course")
     modules = relationship("Module", back_populates="course")
     posts = relationship("StreamPost", back_populates="course")
@@ -160,12 +196,12 @@ class Module(Base):
     title = Column(String(255), nullable=False)
     summary = Column(Text, nullable=False)
     essential_question = Column(Text, nullable=False)
+    file_url = Column(String(500), nullable=True)
+    content = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     course = relationship("Course", back_populates="modules")
     conversations = relationship("AIConversation", back_populates="module")
-    file_url = Column(String(500), nullable=True)
-    content = Column(Text, nullable=True)
 
 
 class StreamPost(Base):
@@ -330,6 +366,35 @@ class AIConversation(Base):
     student = relationship("User")
     course = relationship("Course")
     module = relationship("Module", back_populates="conversations")
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(255), nullable=False, default="New Conversation")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="chat_sessions")
+    messages = relationship("ChatMessage", back_populates="session", order_by="ChatMessage.created_at")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    module_id = Column(Integer, ForeignKey("modules.id"), nullable=True)
+    response_mode = Column(String(20), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("ChatSession", back_populates="messages")
+    module = relationship("Module")
 EOF
 
   cat > "${APP_ROOT}/backend/app/security.py" <<'EOF'
@@ -378,6 +443,7 @@ class TutorRequest(BaseModel):
     question: str = Field(min_length=4)
     module_id: int | None = None
     course_id: int | None = None
+    session_id: int | None = None
     response_mode: str = "normal"
 
     @field_validator("response_mode")
@@ -414,6 +480,7 @@ def get_or_create_user(
     full_name: str,
     password: str,
     grade_level: str | None = None,
+    education_level: str | None = None,
     section_name: str | None = None,
 ) -> User:
     user = session.scalar(select(User).where(func.lower(User.username) == username.lower()))
@@ -433,6 +500,7 @@ def get_or_create_user(
         email=email,
         full_name=full_name,
         grade_level=grade_level,
+        education_level=education_level,
         section_name=section_name,
         password_salt="",
         password_hash=hash_password(password),
@@ -717,6 +785,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import httpx
+try:
+    import psutil as _psutil
+except ImportError:
+    _psutil = None
 from fastapi import APIRouter, Body, Depends, FastAPI, File, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -726,7 +798,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .database import Base, SessionLocal, engine, get_db
-from .models import AIConversation, Assignment, AuditLog, Course, Enrollment, GradeEntry, Module, Quiz, QuizAttempt, QuizQuestion, Section, StreamPost, Submission, User
+from .models import AIConversation, Assignment, AuditLog, ChatMessage, ChatSession, Course, Department, Enrollment, GradeEntry, Module, Quiz, QuizAttempt, QuizQuestion, Section, StreamPost, Submission, User
 from .schemas import LoginRequest, TutorRequest
 from .seed import seed_defaults
 from .security import create_access_token, decode_access_token, hash_password, verify_password
@@ -744,11 +816,10 @@ JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "")
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "45"))
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "1024"))
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
 OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "1800"))
 PORTAL_DOMAIN = os.getenv("PORTAL_DOMAIN", "")
 SSID = os.getenv("SSID", "")
-DANILO_SEED_DEMO = os.getenv("DANILO_SEED_DEMO", "0") == "1"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip() or "admin"
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 CORS_ORIGINS = [
@@ -807,6 +878,7 @@ def migrate_users_table() -> None:
     inspector = inspect(engine)
     course_columns = {column["name"] for column in inspector.get_columns("courses")} if "courses" in inspector.get_table_names() else set()
     module_columns = {column["name"] for column in inspector.get_columns("modules")} if "modules" in inspector.get_table_names() else set()
+    user_columns = {column["name"] for column in inspector.get_columns("users")} if "users" in inspector.get_table_names() else set()
     with engine.begin() as connection:
         if "courses" in inspector.get_table_names() and "teacher_id" in course_columns:
             connection.execute(text("ALTER TABLE courses ALTER COLUMN teacher_id DROP NOT NULL"))
@@ -816,6 +888,8 @@ def migrate_users_table() -> None:
             connection.execute(text("ALTER TABLE courses ADD COLUMN education_level VARCHAR(40) DEFAULT 'Junior High School' NOT NULL"))
         if "courses" in inspector.get_table_names() and "strand" not in course_columns:
             connection.execute(text("ALTER TABLE courses ADD COLUMN strand VARCHAR(80)"))
+        if "courses" in inspector.get_table_names() and "department_id" not in course_columns:
+            connection.execute(text("ALTER TABLE courses ADD COLUMN department_id INTEGER REFERENCES departments(id)"))
         if "modules" in inspector.get_table_names() and "file_url" not in module_columns:
             connection.execute(text("ALTER TABLE modules ADD COLUMN file_url VARCHAR(500)"))
         if "modules" in inspector.get_table_names() and "content" not in module_columns:
@@ -826,40 +900,8 @@ def migrate_users_table() -> None:
             connection.execute(text("ALTER TABLE modules ADD COLUMN lesson_objectives TEXT"))
         if "modules" in inspector.get_table_names() and "assessment_type" not in module_columns:
             connection.execute(text("ALTER TABLE modules ADD COLUMN assessment_type VARCHAR(120)"))
-
-
-def seed_demo_lms(db: Session) -> None:
-    if db.scalar(select(User).where(User.username == "teacher1")):
-        return
-    teachers = [
-        User(role="teacher", username="teacher1", email="teacher1@danilo.local", full_name="Maria Santos", education_level="Junior High School", password_salt="", password_hash=hash_password("teacher123"), is_active=True),
-        User(role="teacher", username="teacher2", email="teacher2@danilo.local", full_name="Jose Reyes", education_level="Junior High School", password_salt="", password_hash=hash_password("teacher123"), is_active=True),
-    ]
-    students = [
-        User(role="student", username=f"student{i}", email=f"student{i}@danilo.local", full_name=f"Learner {i:02d}", education_level="Junior High School", grade_level="Grade 7", strand=None, section_name="Mabini", password_salt="", password_hash=hash_password("student123"), is_active=True)
-        for i in range(1, 11)
-    ]
-    db.add_all(teachers + students)
-    db.flush()
-    courses = [
-        Course(code="G7-ENG-Q1", title="Grade 7 English", subject="English", education_level="Junior High School", grade_level="Grade 7", strand=None, quarter="Q1", school_year="2026-2027", description="Reading, writing, and communication for offline classrooms.", teacher_id=teachers[0].id, is_active=True),
-        Course(code="G7-MATH-Q1", title="Grade 7 Mathematics", subject="Mathematics", education_level="Junior High School", grade_level="Grade 7", strand=None, quarter="Q1", school_year="2026-2027", description="Number sense, patterns, and problem solving.", teacher_id=teachers[1].id, is_active=True),
-        Course(code="G7-SCI-Q1", title="Grade 7 Science", subject="Science", education_level="Junior High School", grade_level="Grade 7", strand=None, quarter="Q1", school_year="2026-2027", description="Scientific inquiry and local environment lessons.", teacher_id=teachers[0].id, is_active=True),
-    ]
-    db.add_all(courses)
-    db.flush()
-    for course in courses:
-        for student in students:
-            db.add(Enrollment(course_id=course.id, student_id=student.id, status="active"))
-        db.add(StreamPost(course_id=course.id, author_id=course.teacher_id, title=f"Welcome to {course.title}", body="Download lessons before class and check assignments weekly.", post_type="announcement"))
-        db.add(Assignment(course_id=course.id, title="Week 1 Learning Check", instructions="Write a short response showing what you learned from the first lesson.", points=100, created_by=course.teacher_id))
-    db.flush()
-    first_assignments = db.scalars(select(Assignment)).all()
-    for student in students[:5]:
-        for course in courses:
-            db.add(GradeEntry(student_id=student.id, course_id=course.id, quarter="Q1", component="Week 1 Activity", score=88 + (student.id % 7), max_score=100, weight=1, remarks="Demo grade", recorded_by=course.teacher_id))
-    db.add(AuditLog(actor_id=None, action="seed_demo", entity_type="system", details="Created demo teachers, students, classes, modules, assignments, and grades."))
-    db.commit()
+        if "users" in inspector.get_table_names() and "department_id" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN department_id INTEGER REFERENCES departments(id)"))
 
 
 @asynccontextmanager
@@ -873,8 +915,6 @@ async def lifespan(_: FastAPI):
             admin_password=ADMIN_PASSWORD,
             portal_domain=PORTAL_DOMAIN,
         )
-        if DANILO_SEED_DEMO:
-            seed_demo_lms(db)
     finally:
         db.close()
     yield
@@ -924,10 +964,14 @@ def get_current_user(
     return user
 
 
+ROLE_DISPLAY = {"student": "Learner", "teacher": "Faculty", "admin": "Admin"}
+
+
 def serialize_user(user: User) -> dict:
     return {
         "id": user.id,
         "role": user.role,
+        "displayRole": ROLE_DISPLAY.get(user.role, user.role.capitalize()),
         "username": user.username,
         "email": user.email,
         "fullName": user.full_name,
@@ -935,6 +979,7 @@ def serialize_user(user: User) -> dict:
         "gradeLevel": user.grade_level,
         "strand": user.strand,
         "sectionName": user.section_name,
+        "departmentId": user.department_id,
         "isActive": user.is_active,
     }
 
@@ -981,30 +1026,33 @@ def normalize_local_account(value: str) -> str:
     return "".join(ch for ch in value.lower() if ch.isalnum())
 
 
-def generated_username_from_name(full_name: str) -> str:
-    parts = [normalize_local_account(part) for part in full_name.replace(".", " ").split()]
-    parts = [part for part in parts if part]
+def generated_username_from_name(full_name: str, role: str = "student", section_name: str | None = None) -> str:
+    parts = full_name.replace(".", " ").split()
+    parts = [p.strip() for p in parts if p.strip()]
     if len(parts) < 2:
         raise HTTPException(status_code=400, detail="Full name must include at least first and last name")
-    first_initial = parts[0][0]
-    last_name = parts[-1]
-    middle_initial = parts[-2][0] if len(parts) > 2 else ""
-    return f"{first_initial}{middle_initial}{last_name}@danilo.local"
+    initials = "".join(p[0].upper() for p in parts if p)
+    if role == "teacher":
+        prefix = "FAC"
+        return f"{prefix}-{initials}"
+    elif role == "admin":
+        prefix = "ADM"
+        return f"{prefix}-{initials}"
+    section_prefix = normalize_local_account(section_name or "").upper() if section_name else "LRN"
+    return f"{section_prefix}-{initials}"
 
 
 def unique_local_username(db: Session, base_username: str, user_id: int | None = None) -> str:
-    local, _, domain = base_username.partition("@")
-    domain = domain or "danilo.local"
-    candidate = f"{local}@{domain}"
-    suffix = 2
-    while True:
-        stmt = select(User).where(or_(func.lower(User.username) == candidate.lower(), func.lower(User.email) == candidate.lower()))
+    import string
+    candidate = base_username
+    for suffix in [""] + list(string.ascii_lowercase):
+        attempt = f"{candidate}{suffix}" if suffix else candidate
+        stmt = select(User).where(func.lower(User.username) == attempt.lower())
         if user_id:
             stmt = stmt.where(User.id != user_id)
         if not db.scalar(stmt):
-            return candidate
-        candidate = f"{local}{suffix}@{domain}"
-        suffix += 1
+            return attempt
+    raise HTTPException(status_code=409, detail="Could not generate a unique username — please specify one manually")
 
 
 def validate_grade_path(education_level: str | None, grade_level: str | None, strand: str | None) -> tuple[str | None, str | None, str | None]:
@@ -1444,8 +1492,8 @@ SYSTEM_PROMPT = (
     "- Never produce violent, sexual, explicit, or age-inappropriate content.\n"
     "- Never provide instructions for weapons, drugs, self-harm, or illegal activities.\n"
     "- If a question is harmful, off-topic, or inappropriate, respond with a polite educational redirect.\n"
-    "- Keep all responses respectful, student-friendly, and focused on learning.\n"
-    "- When unsure, guide the student back to their lesson or subject.\n\n"
+    "- Keep all responses respectful, age-appropriate, and focused on learning.\n"
+    "- When unsure, guide the learner back to their lesson or subject.\n\n"
     "TONE: Encouraging, clear, patient, and age-appropriate at all times."
 )
 SAFETY_KEYWORDS = {
@@ -1457,10 +1505,10 @@ SAFETY_REDIRECT = (
     "I'm DANILO, your learning assistant. I can only help with school-related topics. "
     "Let's focus on your lessons — what subject would you like help with?"
 )
-ROLLING_MEMORY_LIMIT = int(os.getenv("DANILO_ROLLING_MEMORY", "6"))
+ROLLING_MEMORY_LIMIT = int(os.getenv("DANILO_ROLLING_MEMORY", "5"))
 RESPONSE_MODE_OPTIONS = {
     "short": {"num_predict": 120, "instruction": "Answer briefly in 1 to 2 short paragraphs."},
-    "normal": {"num_predict": 280, "instruction": "Answer in 2 to 4 clear paragraphs with a student-friendly tone."},
+    "normal": {"num_predict": 280, "instruction": "Answer in 2 to 4 clear paragraphs with a learner-friendly tone."},
     "detailed": {"num_predict": 600, "instruction": "Give a fuller ChatGPT-like explanation with steps and examples when helpful."},
 }
 
@@ -1471,20 +1519,35 @@ def check_safety(question: str) -> bool:
 
 
 def build_rolling_memory(db: Session, user_id: int, course_id: int | None, limit: int) -> list[dict]:
+    # Fetch recent history (limit * 2 gives us request/response pairs)
     stmt = (
-        select(AIConversation)
-        .where(AIConversation.student_id == user_id)
-        .order_by(AIConversation.created_at.desc())
-        .limit(limit)
+        select(ChatMessage)
+        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        .where(ChatSession.user_id == user_id, ChatSession.is_active == True)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(limit * 2)
     )
-    if course_id:
-        stmt = stmt.where(AIConversation.course_id == course_id)
     rows = db.scalars(stmt).all()
     memory = []
-    for row in reversed(rows):
-        memory.append({"role": "user", "content": trim_text(row.prompt, 300)})
-        memory.append({"role": "assistant", "content": trim_text(row.response, 500)})
-    return memory
+    
+    # Calculate rolling token budget. 
+    # Max ctx=2048. System prompt/context takes ~1000 tokens.
+    # Leave 500 for the response. We have ~548 tokens (approx 2000 chars) for memory.
+    char_budget = 2000 
+    current_chars = 0
+
+    for row in rows: # We iterate from newest to oldest
+        content = trim_text(row.content, 400)
+        chars = len(content)
+        
+        # If adding this message exceeds the context safety budget, we stop loading history.
+        if current_chars + chars > char_budget:
+            break
+            
+        current_chars += chars
+        memory.append({"role": row.role if row.role in ("user", "assistant") else "user", "content": content})
+        
+    return list(reversed(memory)) # Return chronological order
 
 
 def tutor_mode(value: str | None) -> str:
@@ -1548,7 +1611,7 @@ def build_tutor_prompt(
     context_budget = max(600, OLLAMA_CONTEXT_CHARS)
     lesson_lines = []
     if course:
-        lesson_lines.append(f"Course: {trim_text(course.title, 120)}")
+        lesson_lines.append(f"Subject: {trim_text(course.title, 120)}")
     if module:
         content_parts = [
             f"Module: {module.title}",
@@ -1564,15 +1627,15 @@ def build_tutor_prompt(
     prompt = "\n".join(
         [
             RESPONSE_MODE_OPTIONS[mode]["instruction"],
-            "Use Filipino when the student asks in Filipino; otherwise use English.",
-            "Use only the lesson context when the question depends on lesson facts. If it is missing, say more information is needed.",
-            "Include one short example or practice task when useful.",
-            f"Grade Level: {current_user.grade_level or 'Not specified'}",
+            "Use Filipino when the learner asks in Filipino; otherwise use English.",
+            "Use only the lesson context when the question depends on lesson facts. If context is missing, say more information is needed.",
+            "Include one short example or practice task when useful. Never break character — always respond as a school tutor.",
+            f"Learner Grade Level: {current_user.grade_level or 'Not specified'}",
             "Recorded Grades:",
             *[f"- {line}" for line in grade_lines],
             "Lesson Context:",
             *[f"- {line}" for line in (lesson_lines or ["No selected lesson."])],
-            f"Student Question: {payload.question.strip()}",
+            f"Learner Question: {payload.question.strip()}",
         ]
     )
     return prompt, module, course, grade_lines, mode
@@ -1829,14 +1892,32 @@ def grades(current_user: User = Depends(get_current_user), db: Session = Depends
 @router.get("/admin/overview")
 def admin_overview(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
+    learner_count = db.query(User).filter(User.role == "student").count()
+    faculty_count = db.query(User).filter(User.role == "teacher").count()
+    admin_count = db.query(User).filter(User.role == "admin").count()
+    active_courses = db.query(Course).filter(Course.is_active == True).count()
+    enrollment_count = db.query(Enrollment).filter(Enrollment.status == "active").count()
+    module_count = db.query(Module).count()
+    grade_count = db.query(GradeEntry).count()
+    section_count = db.query(Section).filter(Section.is_active == True).count()
+    dept_count = db.query(Department).filter(Department.is_active == True).count()
+    chat_session_count = db.query(ChatSession).count()
+    chat_message_count = db.query(ChatMessage).count()
+    ai_convo_count = db.query(AIConversation).count()
     return {
         "totals": {
-            "students": db.query(User).filter(User.role == "student").count(),
-            "teachers": db.query(User).filter(User.role == "teacher").count(),
-            "classes": db.query(Course).filter(Course.is_active == True).count(),
-            "enrollments": db.query(Enrollment).filter(Enrollment.status == "active").count(),
-            "modules": db.query(Module).count(),
-            "grades": db.query(GradeEntry).count(),
+            "learners": learner_count,
+            "faculty": faculty_count,
+            "admins": admin_count,
+            "classes": active_courses,
+            "enrollments": enrollment_count,
+            "modules": module_count,
+            "grades": grade_count,
+            "sections": section_count,
+            "departments": dept_count,
+            "chatSessions": chat_session_count,
+            "chatMessages": chat_message_count,
+            "aiConversations": ai_convo_count,
         },
         "system": {
             "portalUrl": f"http://{PORTAL_DOMAIN}",
@@ -1882,15 +1963,30 @@ def admin_create_user(payload: dict = Body(default={}), current_user: User = Dep
     strand = clean_text(payload.get("strand"), required=False, max_length=80)
     if role == "student" or education_level or grade_level or strand:
         education_level, grade_level, strand = validate_grade_path(education_level, grade_level, strand)
+    section_name_val = clean_text(payload.get("sectionName") or payload.get("section_name"), required=False, max_length=120)
     username_override = clean_text(payload.get("username"), required=False, max_length=120)
-    username = username_override.lower() if username_override else unique_local_username(db, generated_username_from_name(full_name))
-    email = clean_text(payload.get("email"), required=False, max_length=255) or username
+    username = username_override.upper() if username_override else unique_local_username(db, generated_username_from_name(full_name, role, section_name_val))
+    email = clean_text(payload.get("email"), required=False, max_length=255) or f"{username}@danilo.local"
     if db.scalar(select(User).where(or_(func.lower(User.username) == username.lower(), func.lower(User.email) == email.lower()))):
         raise HTTPException(status_code=409, detail="Username or email already exists")
     password = clean_text(payload.get("password") or "danilo123", max_length=255)
-    user = User(role=role, username=username, email=email, full_name=full_name, education_level=education_level, grade_level=grade_level, strand=strand, section_name=clean_text(payload.get("sectionName") or payload.get("section_name"), required=False, max_length=120), password_salt="", password_hash=hash_password(password), is_active=bool(payload.get("isActive", True)))
+    user = User(role=role, username=username, email=email, full_name=full_name, education_level=education_level, grade_level=grade_level, strand=strand, section_name=section_name_val, password_salt="", password_hash=hash_password(password), is_active=bool(payload.get("isActive", True)))
     db.add(user)
     db.flush()
+    if user.role == "student" and section_name_val:
+        enrolled_course_ids = db.scalars(
+            select(Enrollment.course_id).distinct()
+            .join(User, Enrollment.student_id == User.id)
+            .where(
+                func.lower(User.section_name) == section_name_val.lower(),
+                User.role == "student",
+                User.is_active == True,
+                Enrollment.status == "active",
+                User.id != user.id,
+            )
+        ).all()
+        for cid in enrolled_course_ids:
+            db.add(Enrollment(course_id=cid, student_id=user.id, status="active"))
     log_action(db, current_user, "create_user", "user", user.id, user.role)
     db.commit()
     db.refresh(user)
@@ -2652,6 +2748,24 @@ def content_pdf(module_id: int, current_user: User = Depends(get_current_user), 
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
+def _get_or_create_chat_session(db: Session, user_id: int, session_id: int | None, question: str) -> "ChatSession":
+    if session_id:
+        session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id))
+        if session:
+            return session
+    title = question[:60].strip() or "New Conversation"
+    session = ChatSession(user_id=user_id, title=title, is_active=True)
+    db.add(session)
+    db.flush()
+    return session
+
+
+def _save_chat_messages(db: Session, session_id: int, question: str, answer: str, module_id: int | None, response_mode: str) -> None:
+    db.add(ChatMessage(session_id=session_id, role="user", content=question, module_id=module_id, response_mode=response_mode))
+    db.add(ChatMessage(session_id=session_id, role="assistant", content=answer, module_id=module_id, response_mode=response_mode))
+    db.execute(text("UPDATE chat_sessions SET updated_at = NOW() WHERE id = :sid"), {"sid": session_id})
+
+
 @router.post("/ai/tutor")
 async def tutor(
     payload: TutorRequest,
@@ -2660,7 +2774,7 @@ async def tutor(
 ) -> dict:
     if check_safety(payload.question):
         save_ai_conversation(db, user_id=current_user.id, course_id=None, module_id=None, question=payload.question, answer=SAFETY_REDIRECT)
-        return {"answer": SAFETY_REDIRECT, "mode": "normal", "metrics": {}, "context": {"moduleTitle": None, "courseTitle": None, "gradeSignals": []}, "safety_filtered": True}
+        return {"answer": SAFETY_REDIRECT, "mode": "normal", "metrics": {}, "context": {"moduleTitle": None, "courseTitle": None, "gradeSignals": []}, "safety_filtered": True, "sessionId": None}
 
     prompt, module, course, grade_lines, mode = build_tutor_prompt(db, current_user, payload)
     memory = build_rolling_memory(db, current_user.id, course.id if course else None, ROLLING_MEMORY_LIMIT)
@@ -2689,11 +2803,15 @@ async def tutor(
         question=payload.question,
         answer=answer,
     )
+    chat_session = _get_or_create_chat_session(db, current_user.id, payload.session_id, payload.question)
+    _save_chat_messages(db, chat_session.id, payload.question, answer, module.id if module else None, mode)
+    db.commit()
 
     return {
         "answer": answer,
         "mode": mode,
         "metrics": metrics,
+        "sessionId": chat_session.id,
         "context": {
             "moduleTitle": module.title if module else None,
             "courseTitle": course.title if course else None,
@@ -2721,6 +2839,9 @@ async def tutor_stream(
     course_id = course.id if course else None
     module_id = module.id if module else None
     question = payload.question
+    chat_session = _get_or_create_chat_session(db, current_user.id, payload.session_id, question)
+    session_id = chat_session.id
+    db.commit()
 
     async def event_stream():
         answer_parts: list[str] = []
@@ -2739,9 +2860,11 @@ async def tutor_stream(
                                 question=question,
                                 answer=answer,
                             )
+                            _save_chat_messages(stream_db, session_id, question, answer, module_id, mode)
+                            stream_db.commit()
                         finally:
                             stream_db.close()
-                    yield f"event: done\ndata: {json.dumps(item.get('metrics', {}))}\n\n"
+                    yield f"event: done\ndata: {json.dumps({**item.get('metrics', {}), 'sessionId': session_id})}\n\n"
                 else:
                     chunk = item.get("content", "")
                     answer_parts.append(chunk)
@@ -2754,6 +2877,220 @@ async def tutor_stream(
             yield "event: error\ndata: {\"detail\":\"DANILO Tutor is offline or still getting ready. Check local Ollama, then try again.\"}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.get("/admin/departments")
+def admin_list_departments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+    require_role(current_user, "admin")
+    rows = db.scalars(select(Department).order_by(Department.name.asc())).all()
+    return [{"id": d.id, "name": d.name, "code": d.code, "description": d.description, "headId": d.head_id, "isActive": d.is_active} for d in rows]
+
+
+@router.post("/admin/departments")
+def admin_create_department(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    name = clean_text(payload.get("name"), max_length=120)
+    code = clean_text(payload.get("code"), max_length=20).upper()
+    if db.scalar(select(Department).where(func.lower(Department.code) == code.lower())):
+        raise HTTPException(status_code=409, detail="Department code already exists")
+    dept = Department(name=name, code=code, description=clean_text(payload.get("description"), required=False, max_length=500), head_id=payload.get("headId") or None, is_active=True)
+    db.add(dept)
+    db.commit()
+    db.refresh(dept)
+    return {"ok": True, "id": dept.id, "name": dept.name, "code": dept.code}
+
+
+@router.put("/admin/departments/{dept_id}")
+def admin_update_department(dept_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    dept = db.get(Department, dept_id)
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    for attr, key, limit in [("name", "name", 120), ("code", "code", 20), ("description", "description", 500)]:
+        if key in payload:
+            val = clean_text(payload.get(key), required=attr not in {"description"}, max_length=limit)
+            setattr(dept, attr, val.upper() if attr == "code" else val)
+    if "headId" in payload:
+        dept.head_id = payload.get("headId") or None
+    if "isActive" in payload:
+        dept.is_active = bool(payload["isActive"])
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/admin/departments/{dept_id}")
+def admin_delete_department(dept_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    dept = db.get(Department, dept_id)
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    dept.is_active = False
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/admin/courses/{course_id}/enroll-section")
+def admin_enroll_section(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    course = db.get(Course, course_id)
+    if not course or not course.is_active:
+        raise HTTPException(status_code=404, detail="Course not found")
+    section_id = payload.get("sectionId")
+    section_name = payload.get("sectionName")
+    if section_id:
+        section = db.get(Section, int(section_id))
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+        learners = db.scalars(select(User).where(func.lower(User.section_name) == section.name.lower(), User.role == "student", User.is_active == True)).all()
+    elif section_name:
+        learners = db.scalars(select(User).where(func.lower(User.section_name) == section_name.lower(), User.role == "student", User.is_active == True)).all()
+    else:
+        raise HTTPException(status_code=400, detail="sectionId or sectionName is required")
+    enrolled = 0
+    skipped = 0
+    for learner in learners:
+        existing = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == learner.id))
+        if existing:
+            if existing.status != "active":
+                existing.status = "active"
+                enrolled += 1
+            else:
+                skipped += 1
+        else:
+            db.add(Enrollment(course_id=course_id, student_id=learner.id, status="active"))
+            enrolled += 1
+    log_action(db, current_user, "enroll_section", "course", course_id, f"enrolled={enrolled} skipped={skipped}")
+    db.commit()
+    return {"ok": True, "enrolled": enrolled, "skipped": skipped, "total": len(learners)}
+
+
+@router.get("/admin/system")
+def admin_system_status(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        db_status = "error"
+    try:
+        import httpx as _httpx
+        r = _httpx.get(f"{OLLAMA_URL}/api/tags", timeout=4.0)
+        ollama_status = "online" if r.status_code == 200 else "degraded"
+        ollama_models = [m.get("name") for m in (r.json().get("models") or [])]
+    except Exception:
+        ollama_status = "offline"
+        ollama_models = []
+    if _psutil:
+        try:
+            cpu_pct = _psutil.cpu_percent(interval=0.3)
+            vm = _psutil.virtual_memory()
+            ram_total_mb = round(vm.total / 1024 / 1024)
+            ram_used_mb = round(vm.used / 1024 / 1024)
+            ram_pct = vm.percent
+            disk = _psutil.disk_usage("/")
+            disk_total_gb = round(disk.total / 1024 / 1024 / 1024, 1)
+            disk_used_gb = round(disk.used / 1024 / 1024 / 1024, 1)
+            disk_pct = disk.percent
+        except Exception:
+            cpu_pct = ram_pct = disk_pct = None
+            ram_total_mb = ram_used_mb = disk_total_gb = disk_used_gb = None
+    else:
+        cpu_pct = ram_pct = disk_pct = None
+        ram_total_mb = ram_used_mb = disk_total_gb = disk_used_gb = None
+    return {
+        "database": db_status,
+        "ollama": ollama_status,
+        "ollamaModel": OLLAMA_MODEL,
+        "ollamaAvailableModels": ollama_models,
+        "portalUrl": f"http://{PORTAL_DOMAIN}",
+        "wifiSsid": SSID,
+        "mode": "LAN offline-first",
+        "hardware": {
+            "cpuPercent": cpu_pct,
+            "ramPercent": ram_pct,
+            "ramUsedMb": ram_used_mb,
+            "ramTotalMb": ram_total_mb,
+            "diskPercent": disk_pct,
+            "diskUsedGb": disk_used_gb,
+            "diskTotalGb": disk_total_gb,
+        },
+        "totals": {
+            "learners": db.query(User).filter(User.role == "student").count(),
+            "faculty": db.query(User).filter(User.role == "teacher").count(),
+            "classes": db.query(Course).filter(Course.is_active == True).count(),
+            "sections": db.query(Section).filter(Section.is_active == True).count(),
+            "departments": db.query(Department).filter(Department.is_active == True).count(),
+            "enrollments": db.query(Enrollment).filter(Enrollment.status == "active").count(),
+            "modules": db.query(Module).count(),
+            "chatSessions": db.query(ChatSession).count(),
+            "chatMessages": db.query(ChatMessage).count(),
+        },
+    }
+
+
+@router.get("/ai/sessions")
+def list_chat_sessions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+    sessions = db.scalars(
+        select(ChatSession)
+        .where(ChatSession.user_id == current_user.id, ChatSession.is_active == True)
+        .order_by(ChatSession.updated_at.desc())
+        .limit(50)
+    ).all()
+    return [{"id": s.id, "title": s.title, "createdAt": s.created_at.isoformat(), "updatedAt": s.updated_at.isoformat(), "messageCount": len(s.messages)} for s in sessions]
+
+
+@router.post("/ai/sessions")
+def create_chat_session(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    title = clean_text(payload.get("title") or "New Conversation", max_length=255)
+    session = ChatSession(user_id=current_user.id, title=title, is_active=True)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return {"id": session.id, "title": session.title, "createdAt": session.created_at.isoformat(), "updatedAt": session.updated_at.isoformat(), "messageCount": 0}
+
+
+@router.put("/ai/sessions/{session_id}")
+def update_chat_session(session_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if "title" in payload:
+        session.title = clean_text(payload["title"], max_length=255)
+    if "isActive" in payload:
+        session.is_active = bool(payload["isActive"])
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/ai/sessions/{session_id}")
+def delete_chat_session(session_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session.is_active = False
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/ai/sessions/{session_id}/messages")
+def get_session_messages(session_id: int, offset: int = 0, limit: int = 60, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    total = db.scalar(select(func.count()).where(ChatMessage.session_id == session_id))
+    messages = db.scalars(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.asc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return {
+        "sessionId": session_id,
+        "title": session.title,
+        "total": total,
+        "messages": [{"id": m.id, "role": m.role, "content": m.content, "moduleId": m.module_id, "responseMode": m.response_mode, "createdAt": m.created_at.isoformat()} for m in messages],
+    }
 
 
 app.include_router(router)

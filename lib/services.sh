@@ -22,6 +22,11 @@ upstream danilo_backend {
   keepalive 32;
 }
 
+sendfile        on;
+tcp_nopush      on;
+tcp_nodelay     on;
+keepalive_timeout  65;
+
 gzip            on;
 gzip_comp_level 5;
 gzip_min_length 512;
@@ -184,6 +189,11 @@ services:
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
       OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.5" # Leave 1.5 cores for OS/FastAPI/Nginx
+          memory: 4096M # Max memory footprint for CPU model
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:

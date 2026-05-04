@@ -118,7 +118,8 @@ run_full_install() {
   note "Docker Compose files will be generated after environment validation"
 
   step 4 8 "Database setup"
-  mkdir -p "${APP_ROOT}"
+  mkdir -p "${APP_ROOT}" "${CONTENT_ROOT}"
+  secure_project_root
   configure_ollama_model
   generate_secrets
   validate_runtime_environment
@@ -157,7 +158,8 @@ run_update_mode() {
   run_logged_function "install_node" install_node
 
   step 2 5 "Runtime configuration"
-  mkdir -p "${APP_ROOT}"
+  mkdir -p "${APP_ROOT}" "${CONTENT_ROOT}"
+  secure_project_root
   configure_ollama_model
   generate_secrets
   validate_runtime_environment

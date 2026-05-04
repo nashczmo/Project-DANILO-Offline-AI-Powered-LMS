@@ -1,6 +1,6 @@
 # Project DANILO installer module: ai.sh
 
-DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-qwen2.5:1.5b-instruct-q4_K_M}}"
+DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_S}}"
 DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-custom}"
 DANILO_CUSTOM_GGUF_PATH="${DANILO_CUSTOM_GGUF_PATH:-}"
 DANILO_CUSTOM_MODELFILE="${DANILO_CUSTOM_MODELFILE:-}"
@@ -28,7 +28,7 @@ FROM ${gguf_path}
 PARAMETER temperature 0.3
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
-PARAMETER num_ctx 1024
+PARAMETER num_ctx 2048
 
 SYSTEM You are DANILO, an offline DepEd-aligned AI tutor. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
 EOF
@@ -71,7 +71,7 @@ FROM ${container_models_dir}/custom.gguf
 PARAMETER temperature 0.3
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
-PARAMETER num_ctx 1024
+PARAMETER num_ctx 2048
 
 SYSTEM You are DANILO, an offline DepEd-aligned AI tutor. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
 EOF"
