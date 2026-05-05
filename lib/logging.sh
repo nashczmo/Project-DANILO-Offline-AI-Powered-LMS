@@ -57,7 +57,7 @@ print_install_intro() {
   printf '\n%s\n' "$(rule)"
   printf '%s%sPROJECT DANILO SETUP WIZARD%s\n' "${BOLD}" "${CYAN}" "${RESET}"
   printf '%sDigital Assistant Network for Interactive Learning Offline%s\n' "${DIM}" "${RESET}"
-  printf '%sA clean, offline-first DepEd school portal installer%s\n' "${GREEN}" "${RESET}"
+  printf '%sA clean, offline-first DepEd school portal installer for the 91%% learning poverty crisis%s\n' "${GREEN}" "${RESET}"
   printf '%slog%s     %s\n' "${DIM}" "${RESET}" "${LOG_FILE}"
   printf '%sstarted%s %s\n' "${DIM}" "${RESET}" "$(date '+%Y-%m-%d %H:%M:%S')"
 }
@@ -249,6 +249,9 @@ ${BOLD}access${RESET}    http://${access_ip}
 ${BOLD}access${RESET}    http://${PORTAL_DOMAIN}
 ${BOLD}elapsed${RESET}   $(format_duration "${elapsed}")
 ${DIM}log${RESET}       ${LOG_FILE}
+
+${BOLD}mission${RESET}
+Project DANILO helps Philippine schools address the 91% learning poverty rate with local lessons, teacher tools, and safe AI tutoring that continue working offline.
 
 ${BOLD}access flow${RESET}
 1. Join the Wi-Fi network shown above.

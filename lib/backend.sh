@@ -70,21 +70,28 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def wait_for_database(max_retries=30, delay=2):
-    """Retry database connection until available - critical for container startup order."""
-    for attempt in range(max_retries):
+def wait_for_database(max_retries=None, delay=None):
+    max_retries = int(os.getenv("DANILO_DB_MAX_RETRIES", str(max_retries or 120)))
+    delay = float(os.getenv("DANILO_DB_RETRY_DELAY_SECONDS", str(delay or 3)))
+    for attempt in range(1, max_retries + 1):
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-                logger.info("Database connection established after %d attempts", attempt + 1)
+                logger.info("Database connection established after %d attempts", attempt)
                 return True
-        except OperationalError as e:
-            if attempt < max_retries - 1:
-                logger.warning("Database not ready (attempt %d/%d): %s", attempt + 1, max_retries, str(e))
-                time.sleep(delay)
-            else:
+        except OperationalError as exc:
+            if attempt >= max_retries:
                 logger.error("Database connection failed after %d attempts", max_retries)
                 raise
+            wait_seconds = min(delay * attempt, 15)
+            logger.warning(
+                "Database not ready (attempt %d/%d): %s; retrying in %.1fs",
+                attempt,
+                max_retries,
+                exc,
+                wait_seconds,
+            )
+            time.sleep(wait_seconds)
     return False
 
 
@@ -922,8 +929,7 @@ def migrate_users_table() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Wait for database to be ready before starting - prevents crash on container startup race
-    wait_for_database(max_retries=30, delay=2)
+    wait_for_database()
     migrate_users_table()
     db = SessionLocal()
     try:
@@ -1504,7 +1510,10 @@ def build_pdf_document(title: str, lines: list[str]) -> bytes:
 
 
 SYSTEM_PROMPT = (
-    "You are DANILO, an offline DepEd-aligned AI tutor for Filipino students in Grades 1-12. "
+    "You are DANILO (Digital Assistant Network for Interactive Learning Offline), an offline "
+    "DepEd-aligned AI tutor for Filipino students in Grades 1-12. "
+    "Project DANILO exists to help schools address the 91% learning poverty rate by making "
+    "safe lessons, remediation, and teacher support available without internet. "
     "Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.\n\n"
     "SAFETY RULES (STRICTLY ENFORCED — users are under 18):\n"
     "- Never produce violent, sexual, explicit, or age-inappropriate content.\n"
@@ -2991,8 +3000,7 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
     except Exception:
         db_status = "error"
     try:
-        import httpx as _httpx
-        r = _httpx.get(f"{OLLAMA_URL}/api/tags", timeout=4.0)
+        r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=4.0)
         ollama_status = "online" if r.status_code == 200 else "degraded"
         ollama_models = [m.get("name") for m in (r.json().get("models") or [])]
     except Exception:

@@ -76,8 +76,9 @@ FRONTEND_URL=http://${PORTAL_DOMAIN}
 API_BASE_URL=/api
 CORS_ORIGINS=http://${PORTAL_DOMAIN},http://${LAN_IP},http://localhost:5173,http://127.0.0.1:5173
 EOF
+  chown root:root "${APP_ROOT}/.env"
   chmod 0600 "${APP_ROOT}/.env"
-  install -m 0600 "${APP_ROOT}/.env" "${BACKUP_ROOT}/env.last"
+  install -o root -g root -m 0600 "${APP_ROOT}/.env" "${BACKUP_ROOT}/env.last"
   note "Runtime secrets were written with restricted file permissions"
 }
 
