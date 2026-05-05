@@ -265,7 +265,7 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-  if (url.origin === self.location.origin && ["/icons/", "/assets/"].some((p) => url.pathname.startsWith(p))) {
+  if (url.origin === self.location.origin && ["/icons/", "/assets/", "/fonts/"].some((p) => url.pathname.startsWith(p))) {
     event.respondWith(fetch(request).catch(() => caches.match(request)));
   }
 });
@@ -3431,8 +3431,11 @@ validate_frontend_files() {
 validate_frontend_dist() {
   local index_file="${APP_ROOT}/frontend/dist/index.html"
   local build_marker="${APP_ROOT}/frontend/dist/danilo-build.txt"
+  local service_worker="${APP_ROOT}/frontend/dist/sw.js"
+  local font_file=""
   validate_generated_file "${index_file}" "frontend built index.html"
   validate_generated_file "${build_marker}" "frontend build marker"
+  validate_generated_file "${service_worker}" "frontend service worker"
   if [[ ! -d "${APP_ROOT}/frontend/dist/assets" ]]; then
     echo "Frontend build assets folder is missing: ${APP_ROOT}/frontend/dist/assets"
     return 1
@@ -3464,6 +3467,23 @@ validate_frontend_dist() {
 
   if ! find "${APP_ROOT}/frontend/dist/assets" -type f -name '*.css' | grep -q .; then
     echo "Frontend build assets folder does not contain a CSS bundle."
+    return 1
+  fi
+
+  for font_file in Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2; do
+    if [[ ! -s "${APP_ROOT}/frontend/dist/fonts/${font_file}" ]]; then
+      echo "Frontend dist is missing bundled Inter font: ${font_file}"
+      return 1
+    fi
+  done
+
+  if ! grep -Fq '"/fonts/Inter-Regular.woff2"' "${service_worker}"; then
+    echo "Frontend service worker does not precache Inter fonts."
+    return 1
+  fi
+
+  if ! grep -Fq '["/icons/", "/assets/", "/fonts/"]' "${service_worker}"; then
+    echo "Frontend service worker does not serve cached font requests while offline."
     return 1
   fi
 
