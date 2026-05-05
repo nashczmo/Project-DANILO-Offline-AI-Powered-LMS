@@ -360,9 +360,16 @@ validate_gateway_files() {
   fi
 
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    docker run --rm --add-host backend:127.0.0.1 \
-      -v "${APP_ROOT}/infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
-      nginx:1.27-alpine nginx -t >/dev/null
+    if docker image inspect nginx:1.27-alpine >/dev/null 2>&1; then
+      if ! docker run --rm --add-host backend:127.0.0.1 \
+        -v "${APP_ROOT}/infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+        nginx:1.27-alpine nginx -t >/dev/null; then
+        echo "Gateway nginx config failed syntax validation with nginx:1.27-alpine."
+        return 1
+      fi
+    else
+      warn "Skipping nginx config syntax validation because nginx:1.27-alpine is not cached locally"
+    fi
   else
     warn "Skipping nginx config syntax validation because Docker is not available"
   fi
