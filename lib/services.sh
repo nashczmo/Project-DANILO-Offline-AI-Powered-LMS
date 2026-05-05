@@ -22,26 +22,21 @@ upstream danilo_backend {
   keepalive 32;
 }
 
-sendfile        on;
-tcp_nopush      on;
-tcp_nodelay     on;
-keepalive_timeout  65;
-
-gzip            on;
-gzip_comp_level 5;
-gzip_min_length 512;
-gzip_proxied    any;
-gzip_vary       on;
-gzip_types
-  text/plain text/css text/xml text/javascript
-  application/javascript application/json application/xml
-  application/rss+xml image/svg+xml font/woff2;
-
 server {
   listen 80 default_server;
   server_name ${PORTAL_DOMAIN};
   root  /opt/danilo/app/frontend/dist;
   index index.html;
+
+  gzip            on;
+  gzip_comp_level 5;
+  gzip_min_length 512;
+  gzip_proxied    any;
+  gzip_vary       on;
+  gzip_types
+    text/plain text/css text/xml text/javascript
+    application/javascript application/json application/xml
+    application/rss+xml image/svg+xml font/woff2;
 
   # Security headers
   add_header X-Content-Type-Options  "nosniff"        always;
@@ -358,6 +353,19 @@ validate_generated_file() {
 validate_gateway_files() {
   validate_generated_file "${APP_ROOT}/gateway/Dockerfile" "gateway Dockerfile"
   validate_generated_file "${APP_ROOT}/infra/nginx/default.conf" "gateway nginx config"
+
+  if grep -Eq '^[[:space:]]*(sendfile|tcp_nopush|tcp_nodelay|keepalive_timeout)[[:space:]]' "${APP_ROOT}/infra/nginx/default.conf"; then
+    echo "Gateway nginx config contains http-context directives that duplicate the base nginx image."
+    return 1
+  fi
+
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker run --rm --add-host backend:127.0.0.1 \
+      -v "${APP_ROOT}/infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+      nginx:1.27-alpine nginx -t >/dev/null
+  else
+    warn "Skipping nginx config syntax validation because Docker is not available"
+  fi
 }
 
 validate_project_docs() {
