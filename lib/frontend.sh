@@ -265,7 +265,7 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
-  if (url.origin === self.location.origin && ["/icons/", "/assets/"].some((p) => url.pathname.startsWith(p))) {
+  if (url.origin === self.location.origin && ["/icons/", "/assets/", "/fonts/"].some((p) => url.pathname.startsWith(p))) {
     event.respondWith(fetch(request).catch(() => caches.match(request)));
   }
 });
