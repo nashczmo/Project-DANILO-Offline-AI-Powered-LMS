@@ -211,8 +211,17 @@ EOF
 EOF
 
   cat > "${APP_ROOT}/frontend/public/sw.js" <<'EOF'
-const CACHE_NAME = "danilo-static-v4";
-const STATIC_FILES = ["/manifest.webmanifest", "/icons/icon-192.svg", "/icons/icon-512.svg"];
+const CACHE_NAME = "danilo-static-v5";
+const STATIC_FILES = [
+  "/manifest.webmanifest",
+  "/icons/icon-192.svg",
+  "/icons/icon-512.svg",
+  "/fonts/Inter-Regular.woff2",
+  "/fonts/Inter-Medium.woff2",
+  "/fonts/Inter-SemiBold.woff2",
+  "/fonts/Inter-Bold.woff2",
+  "/fonts/Inter-ExtraBold.woff2"
+];
 const OFFLINE_HTML = `<!doctype html>
 <html lang="en">
   <head>
@@ -220,7 +229,8 @@ const OFFLINE_HTML = `<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DANILO Offline</title>
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f8fafc; color: #1e293b; }
+      @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Inter-Regular.woff2") format("woff2"); }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Inter, system-ui, sans-serif; background: #f8fafc; color: #1e293b; }
       main { max-width: 28rem; padding: 1.5rem; text-align: center; }
       h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
       p { color: #64748b; line-height: 1.6; margin: 0; }
@@ -279,29 +289,24 @@ EOF
 </svg>
 EOF
 
-  # Bundle Inter fonts locally for offline-first operation
-  # Fonts are embedded as base64 to ensure zero external dependencies
-  local FONT_DIR="${APP_ROOT}/frontend/public/fonts"
-  mkdir -p "${FONT_DIR}"
-  
-  # Download fonts during installer run (when internet may be available)
-  # If download fails, the CSS will fall back to system fonts
-  local INTER_BASE="https://rsms.me/inter/font-files"
-  local INTER_FILES="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2"
-  local font_available=0
-  for f in $INTER_FILES; do
-    if [ ! -f "${FONT_DIR}/${f}" ]; then
-      if curl -fsSL -o "${FONT_DIR}/${f}" "${INTER_BASE}/${f}" 2>/dev/null; then
-        font_available=1
-      fi
+  local font_dir="${APP_ROOT}/frontend/public/fonts"
+  local source_font_dir="${SCRIPT_DIR}/assets/fonts"
+  local inter_files="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2"
+  local missing_fonts=()
+  local font_file=""
+
+  for font_file in ${inter_files}; do
+    if [[ -f "${source_font_dir}/${font_file}" ]]; then
+      install -m 0644 "${source_font_dir}/${font_file}" "${font_dir}/${font_file}"
     else
-      font_available=1
+      missing_fonts+=("${font_file}")
     fi
   done
-  
-  # If no fonts downloaded, create a fallback CSS that uses system fonts
-  if [ "$font_available" -eq 0 ]; then
-    note "Inter fonts not available - CSS will use system font stack fallback"
+
+  if (( ${#missing_fonts[@]} > 0 )); then
+    printf 'Missing bundled Inter font files: %s\n' "${missing_fonts[*]}"
+    printf 'Expected local font directory: %s\n' "${source_font_dir}"
+    exit 1
   fi
 
   cat > "${APP_ROOT}/frontend/src/main.jsx" <<'EOF'
@@ -767,10 +772,8 @@ export default function LoginView({ form, onChange, onSubmit, loading, error }) 
         </div>
       </div>
 
-      {/* Right Panel - Branding Anchor (60%) */}
-      <div className="hidden lg:flex lg:w-[60%] relative overflow-hidden items-center justify-center bg-slate-50">
+      <div className="hidden lg:flex lg:w-[60%] relative overflow-hidden items-center justify-center bg-slate-50 dn-login-brand">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary-100 via-slate-50 to-white opacity-80" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMCwwLDAsMC4wMikiLz48L3N2Zz4=')] opacity-50" />
         
         <div className="relative z-10 text-center flex flex-col items-center">
           <div className="w-20 h-20 rounded-3xl bg-white border border-primary-100 shadow-xl shadow-primary-500/10 flex items-center justify-center mb-8">
@@ -1388,10 +1391,6 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "../api";
 import { ASSESSMENT_TYPES, DEPED_SUBJECTS, Badge, Empty, Field, GradeCascade, SectionHeader, Stat, downloadReport } from "./shared";
 
-/* ========================================================================
-   ADMIN: USER MANAGEMENT
-   ======================================================================== */
-
 const defaultUserForm = {
   role: "student", fullName: "", username: "", password: "danilo123",
   educationLevel: "Junior High School", gradeLevel: "Grade 7", strand: "", sectionName: "",
@@ -1560,9 +1559,6 @@ export function AdminUsersView({ token, users, reload }) {
   );
 }
 
-/* ========================================================================
-   ADMIN: CLASS MANAGEMENT
-   ======================================================================== */
 
 const defaultCourseForm = {
   code: "", title: "", subject: "", educationLevel: "Junior High School",
@@ -1640,9 +1636,6 @@ export function AdminClassesView({ token, users, courses, reload }) {
   );
 }
 
-/* ========================================================================
-   ADMIN: ENROLLMENT MANAGEMENT
-   ======================================================================== */
 
 export function AdminEnrollmentsView({ token, users, courses, reload }) {
   const learners = users.filter((u) => u.role === "student" && u.isActive !== false);
@@ -1759,9 +1752,6 @@ export function AdminEnrollmentsView({ token, users, courses, reload }) {
   );
 }
 
-/* ========================================================================
-   ADMIN: ANNOUNCEMENTS
-   ======================================================================== */
 
 export function AdminAnnouncementsView({ token, reload }) {
   const [form, setForm] = useState({ title: "", body: "" });
@@ -1793,9 +1783,6 @@ export function AdminAnnouncementsView({ token, reload }) {
   );
 }
 
-/* ========================================================================
-   ADMIN: REPORTS
-   ======================================================================== */
 
 export function ReportsView({ token, dashboard }) {
   const t = dashboard?.totals || {};
@@ -1822,9 +1809,6 @@ export function ReportsView({ token, dashboard }) {
     </section>
   );
 }
-/* ========================================================================
-   ADMIN: SYSTEM STATUS
-   ======================================================================== */
 
 export function SystemView({ token, addToast, dismissToast }) {
   const [status, setStatus] = useState(null);
@@ -2008,9 +1992,6 @@ export function SystemView({ token, addToast, dismissToast }) {
   );
 }
 
-/* ========================================================================
-   ADMIN: ASSIGNMENTS OVERVIEW
-   ======================================================================== */
 
 export function AdminAssignmentsView({ assignments }) {
   return (
@@ -2044,9 +2025,6 @@ export function AdminAssignmentsView({ assignments }) {
   );
 }
 
-/* ========================================================================
-   ADMIN: DEPARTMENTS
-   ======================================================================== */
 
 export function DepartmentsView({ token, users, reload }) {
   const [departments, setDepartments] = useState([]);
@@ -2738,9 +2716,6 @@ function MyClassesView({ courses, navigate }) {
 }
 
 
-/* ========================================================================
-   TEACHER QUICK TOOLS
-   ======================================================================== */
 
 function TeacherQuickTools({ token, user, course, tab, people, reload }) {
   const [moduleForm, setModuleForm] = useState({ title: "", melcCode: "", learningCompetency: "", lessonObjectives: "", assessmentType: "", quarter: course.quarter || "Q1", week: 1, summary: "" });
@@ -3503,6 +3478,7 @@ build_frontend_static() {
   run_step_command "Installing DANILO frontend dependencies" npm --prefix "${APP_ROOT}/frontend" install --no-audit --no-fund
   run_step_command "Building DANILO frontend static assets" npm --prefix "${APP_ROOT}/frontend" run build
   run_step_command "Setting readable permissions for gateway-served frontend assets" chmod -R a+rX "${APP_ROOT}/frontend/dist"
+  run_step_command "Setting local Inter font permissions" chmod -R a+rX "${APP_ROOT}/frontend/public/fonts"
   validate_frontend_dist
 }
 

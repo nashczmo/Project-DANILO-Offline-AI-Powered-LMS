@@ -139,6 +139,7 @@ run_full_install() {
   run_logged_function "write_gateway_files" write_gateway_files
   validate_gateway_files
   run_logged_function "write_compose_file" write_compose_file
+  run_logged_function "secure_project_root" secure_project_root
   run_logged_function "build_stack" build_stack
 
   step 7 8 "Backend startup"
@@ -175,6 +176,7 @@ run_update_mode() {
   run_logged_function "write_gateway_files" write_gateway_files
   validate_gateway_files
   run_logged_function "write_compose_file" write_compose_file
+  run_logged_function "secure_project_root" secure_project_root
 
   step 4 5 "Rebuild and restart"
   run_logged_function "build_stack" build_stack
@@ -202,6 +204,7 @@ run_rebuild_frontend_mode() {
   run_logged_function "write_gateway_files" write_gateway_files
   validate_gateway_files
   run_logged_function "write_compose_file" write_compose_file
+  run_logged_function "secure_project_root" secure_project_root
 
   step 3 4 "Frontend rebuild"
   local build_args=()

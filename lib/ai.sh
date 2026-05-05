@@ -30,7 +30,7 @@ PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
 PARAMETER num_ctx 2048
 
-SYSTEM You are DANILO, an offline DepEd-aligned AI tutor. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
+SYSTEM You are DANILO (Digital Assistant Network for Interactive Learning Offline), an offline DepEd-aligned AI tutor helping Philippine schools address the 91% learning poverty rate. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
 EOF
 
     export DANILO_CUSTOM_GGUF_PATH="${gguf_path}"
@@ -73,7 +73,7 @@ PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
 PARAMETER num_ctx 2048
 
-SYSTEM You are DANILO, an offline DepEd-aligned AI tutor. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
+SYSTEM You are DANILO (Digital Assistant Network for Interactive Learning Offline), an offline DepEd-aligned AI tutor helping Philippine schools address the 91% learning poverty rate. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
 EOF"
 
     if run_step_command "Creating Ollama custom model ${DANILO_CUSTOM_OLLAMA_MODEL}" docker exec "${container}" ollama create "${DANILO_CUSTOM_OLLAMA_MODEL}" -f "${container_models_dir}/Modelfile"; then
@@ -153,14 +153,13 @@ wait_for_container_healthy() {
         return 0
       fi
       if [[ "${health_status}" == "unhealthy" ]]; then
-        echo "${label} reported unhealthy for service: ${service}"
-        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=120 "${service}" || true
-        exit 1
+        warn "${label} reported unhealthy for service: ${service}; continuing to wait because low-power CPU startup can be slow"
+        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=40 "${service}" || true
       fi
     fi
 
     attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 90 ]]; then
+    if [[ "${attempts}" -gt 180 ]]; then
       echo "${label} did not become healthy for service: ${service}"
       docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps || true
       docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=120 "${service}" || true

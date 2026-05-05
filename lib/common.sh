@@ -52,15 +52,22 @@ LAST_FAILED_COMMAND=""
 
 secure_project_root() {
   if [[ -d "${PROJECT_ROOT}" ]]; then
-    # Secure the root DANILO directory
-    # Only root (the installer/systemd) needs write access. Group/others get read/execute so Docker can mount volumes safely.
     chown -R root:root "${PROJECT_ROOT}"
-    chmod 755 "${PROJECT_ROOT}"
-    
-    if [[ -d "${CONTENT_ROOT}" ]]; then
-      # Content root is used to serve PDFs. Needs to be readable.
-      chmod 755 "${CONTENT_ROOT}"
-    fi
+    chmod 0755 "${PROJECT_ROOT}"
+  fi
+
+  if [[ -d "${APP_ROOT}" ]]; then
+    find "${APP_ROOT}" -type d -exec chmod 0755 {} +
+    find "${APP_ROOT}" -type f ! -name .env -exec chmod 0644 {} +
+  fi
+
+  if [[ -f "${APP_ROOT}/.env" ]]; then
+    chown root:root "${APP_ROOT}/.env"
+    chmod 0600 "${APP_ROOT}/.env"
+  fi
+
+  if [[ -d "${CONTENT_ROOT}" ]]; then
+    chmod -R a+rX "${CONTENT_ROOT}"
   fi
 }
 

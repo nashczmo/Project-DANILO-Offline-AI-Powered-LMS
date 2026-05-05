@@ -103,6 +103,12 @@ server {
     try_files          \$uri =404;
   }
 
+  location /fonts/ {
+    expires            1y;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    try_files          \$uri =404;
+  }
+
   location / {
     try_files \$uri /index.html;
   }
@@ -161,10 +167,10 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
 
   backend:
     build:
@@ -174,14 +180,13 @@ services:
       - .env
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      # Extended timeout for CPU-constrained systems running Llama
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=10)\""]
-      interval: 15s
-      timeout: 15s
-      retries: 20
-      start_period: 60s
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=20)\""]
+      interval: 30s
+      timeout: 25s
+      retries: 40
+      start_period: 180s
 
   ollama:
     image: ollama/ollama:latest
@@ -199,10 +204,10 @@ services:
       - ollama_data:/root/.ollama
     healthcheck:
       test: ["CMD", "ollama", "list"]
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 60s
+      interval: 30s
+      timeout: 20s
+      retries: 40
+      start_period: 180s
 
   gateway:
     build:
@@ -213,9 +218,9 @@ services:
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
       ollama:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "80:80"
     volumes:
@@ -225,11 +230,11 @@ services:
       - /var/cache/nginx
       - /var/run
     healthcheck:
-      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && test -f /opt/danilo/app/frontend/dist/danilo-build.txt && test -n \"$\$(find /opt/danilo/app/frontend/dist/assets -type f -name '*.js' 2>/dev/null | head -n1)\" && test -n \"$\$(find /opt/danilo/app/frontend/dist/assets -type f -name '*.css' 2>/dev/null | head -n1)\" && wget -qO- http://127.0.0.1/ | grep -q '/assets/.*\\.js' && wget -qO- http://127.0.0.1/ | grep -q '/assets/.*\\.css'"]
-      interval: 20s
-      timeout: 10s
-      retries: 15
-      start_period: 30s
+      test: ["CMD-SHELL", 'test -f /opt/danilo/app/frontend/dist/index.html && test -f /opt/danilo/app/frontend/dist/danilo-build.txt && test -n "$$(find /opt/danilo/app/frontend/dist/assets -type f -name "*.js" 2>/dev/null | head -n1)" && test -n "$$(find /opt/danilo/app/frontend/dist/assets -type f -name "*.css" 2>/dev/null | head -n1)" && wget -qO- http://127.0.0.1/ | grep -Eq "/assets/.*[.]js" && wget -qO- http://127.0.0.1/ | grep -Eq "/assets/.*[.]css"']
+      interval: 30s
+      timeout: 20s
+      retries: 30
+      start_period: 120s
 
 volumes:
   postgres_data:
@@ -385,8 +390,8 @@ EOF
 Description=Project DANILO Application Stack
 Requires=docker.service
 BindsTo=docker.service
-After=docker.service
-Wants=danilo-ap.service
+After=docker.service network-online.target
+Wants=network-online.target danilo-ap.service
 
 [Service]
 Type=oneshot
