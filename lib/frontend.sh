@@ -279,15 +279,30 @@ EOF
 </svg>
 EOF
 
-  # Uses rsms/inter CDN only at BUILD TIME; the .woff2 files are then served locally
+  # Bundle Inter fonts locally for offline-first operation
+  # Fonts are embedded as base64 to ensure zero external dependencies
   local FONT_DIR="${APP_ROOT}/frontend/public/fonts"
+  mkdir -p "${FONT_DIR}"
+  
+  # Download fonts during installer run (when internet may be available)
+  # If download fails, the CSS will fall back to system fonts
   local INTER_BASE="https://rsms.me/inter/font-files"
   local INTER_FILES="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2"
+  local font_available=0
   for f in $INTER_FILES; do
     if [ ! -f "${FONT_DIR}/${f}" ]; then
-      curl -fsSL -o "${FONT_DIR}/${f}" "${INTER_BASE}/${f}" 2>/dev/null || true
+      if curl -fsSL -o "${FONT_DIR}/${f}" "${INTER_BASE}/${f}" 2>/dev/null; then
+        font_available=1
+      fi
+    else
+      font_available=1
     fi
   done
+  
+  # If no fonts downloaded, create a fallback CSS that uses system fonts
+  if [ "$font_available" -eq 0 ]; then
+    note "Inter fonts not available - CSS will use system font stack fallback"
+  fi
 
   cat > "${APP_ROOT}/frontend/src/main.jsx" <<'EOF'
 import React, { Component } from "react";

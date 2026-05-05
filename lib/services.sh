@@ -162,9 +162,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
-      timeout: 3s
-      retries: 15
-      start_period: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
 
   backend:
     build:
@@ -176,11 +176,12 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 15s
+      # Extended timeout for CPU-constrained systems running Llama
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=10)\""]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 60s
 
   ollama:
     image: ollama/ollama:latest
@@ -192,16 +193,16 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.5" # Leave 1.5 cores for OS/FastAPI/Nginx
-          memory: 4096M # Max memory footprint for CPU model
+          cpus: "2.5"
+          memory: 4096M
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 15s
       timeout: 10s
-      retries: 12
-      start_period: 20s
+      retries: 15
+      start_period: 60s
 
   gateway:
     build:
@@ -213,6 +214,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     ports:
       - "80:80"
     volumes:
@@ -222,10 +225,11 @@ services:
       - /var/cache/nginx
       - /var/run
     healthcheck:
-      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && test -f /opt/danilo/app/frontend/dist/danilo-build.txt && test -n \"$$(find /opt/danilo/app/frontend/dist/assets -type f -name '*.js' 2>/dev/null | head -n1)\" && test -n \"$$(find /opt/danilo/app/frontend/dist/assets -type f -name '*.css' 2>/dev/null | head -n1)\" && wget -qO- http://127.0.0.1/ | grep -q '/assets/.*\\.js' && wget -qO- http://127.0.0.1/ | grep -q '/assets/.*\\.css'"]
+      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && test -f /opt/danilo/app/frontend/dist/danilo-build.txt && test -n \"$\$(find /opt/danilo/app/frontend/dist/assets -type f -name '*.js' 2>/dev/null | head -n1)\" && test -n \"$\$(find /opt/danilo/app/frontend/dist/assets -type f -name '*.css' 2>/dev/null | head -n1)\" && wget -qO- http://127.0.0.1/ | grep -q '/assets/.*\\.js' && wget -qO- http://127.0.0.1/ | grep -q '/assets/.*\\.css'"]
       interval: 20s
-      timeout: 5s
-      retries: 12
+      timeout: 10s
+      retries: 15
+      start_period: 30s
 
 volumes:
   postgres_data:

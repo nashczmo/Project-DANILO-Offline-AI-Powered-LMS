@@ -43,33 +43,49 @@ EOF
 
   cat > "${APP_ROOT}/backend/app/database.py" <<'EOF'
 import os
-from sqlalchemy import create_engine, event
+import time
+import logging
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.exc import OperationalError
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL"
-)
+logger = logging.getLogger("danilo.db")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL must be set by the installer-generated environment")
 
+# PostgreSQL engine with connection pooling and health checks
 engine = create_engine(
-    DATABASE_URL, 
-    pool_pre_ping=True, 
-    connect_args={"check_same_thread": False, "timeout": 15}
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,
+    connect_args={"connect_timeout": 15}
 )
-
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA synchronous=NORMAL")
-    cursor.execute("PRAGMA cache_size=-64000") # 64MB memory cache
-    cursor.execute("PRAGMA busy_timeout=5000")
-    cursor.execute("PRAGMA temp_store=MEMORY")
-    cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+
+def wait_for_database(max_retries=30, delay=2):
+    """Retry database connection until available - critical for container startup order."""
+    for attempt in range(max_retries):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                logger.info("Database connection established after %d attempts", attempt + 1)
+                return True
+        except OperationalError as e:
+            if attempt < max_retries - 1:
+                logger.warning("Database not ready (attempt %d/%d): %s", attempt + 1, max_retries, str(e))
+                time.sleep(delay)
+            else:
+                logger.error("Database connection failed after %d attempts", max_retries)
+                raise
+    return False
 
 
 def get_db():
@@ -797,7 +813,7 @@ from sqlalchemy import func, inspect, or_, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .database import Base, SessionLocal, engine, get_db
+from .database import Base, SessionLocal, engine, get_db, wait_for_database
 from .models import AIConversation, Assignment, AuditLog, ChatMessage, ChatSession, Course, Department, Enrollment, GradeEntry, Module, Quiz, QuizAttempt, QuizQuestion, Section, StreamPost, Submission, User
 from .schemas import LoginRequest, TutorRequest
 from .seed import seed_defaults
@@ -906,6 +922,8 @@ def migrate_users_table() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Wait for database to be ready before starting - prevents crash on container startup race
+    wait_for_database(max_retries=30, delay=2)
     migrate_users_table()
     db = SessionLocal()
     try:
