@@ -59,4 +59,4 @@ sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec -T olla
 sudo grep '^OLLAMA_MODEL=' /opt/danilo/app/.env
 ```
 
-If `models/*.gguf` exists before install, the active model should be `danilo-custom`. If no GGUF file exists, the active model should be `qwen2.5:1.5b-instruct-q4_K_M`.
+If `models/*.gguf` exists before install, the active model should be `danilo-custom`. If no GGUF file exists, the active model should be `llama3.1:8b-instruct-q4_K_S`.

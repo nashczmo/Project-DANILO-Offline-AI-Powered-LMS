@@ -25,7 +25,7 @@ or:
 
 ```text
 No custom GGUF found
-Using default model: qwen2.5:1.5b-instruct-q4_K_M
+Using default model: llama3.1:8b-instruct-q4_K_S
 ```
 
 The generated Ollama model creation is equivalent to:
@@ -80,12 +80,12 @@ danilo-custom
 If no `.gguf` file exists, DANILO uses:
 
 ```text
-qwen2.5:1.5b-instruct-q4_K_M
+llama3.1:8b-instruct-q4_K_S
 ```
 
 Notes:
 
 - Only the first `.gguf` file by sorted filename is registered automatically.
 - The registered model name is always `danilo-custom`.
-- If custom model registration fails, the installer rewrites the runtime environment to use `qwen2.5:1.5b-instruct-q4_K_M`.
+- If custom model registration fails, the installer rewrites the runtime environment to use `llama3.1:8b-instruct-q4_K_S`.
 - `sudo bash danilo.sh --verify` confirms the active model is loaded in Ollama.

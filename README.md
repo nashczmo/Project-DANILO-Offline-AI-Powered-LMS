@@ -60,7 +60,7 @@ sudo bash danilo.sh --help
 
 ## Custom GGUF Models
 
-Put a `.gguf` file in `models/` before install. The installer automatically creates `danilo-custom`, writes `models/Modelfile`, and makes it the default AI tutor model. Without a GGUF file, DANILO uses `qwen2.5:1.5b-instruct-q4_K_M`.
+Put a `.gguf` file in `models/` before install. The installer automatically creates `danilo-custom`, writes `models/Modelfile`, and makes it the default AI tutor model. Without a GGUF file, DANILO uses `llama3.1:8b-instruct-q4_K_S`.
 
 See `docs/CUSTOM_MODEL.md`.
 
