@@ -82,9 +82,65 @@ internet_reachable_now() {
     curl -fsS --connect-timeout 5 https://download.docker.com >/dev/null 2>&1
 }
 
+check_port_conflicts() {
+  # Ports used by the DANILO stack: 80 (gateway), 53 (dnsmasq), 67 (hostapd/DHCP)
+  local conflicting_ports=()
+  local port=0
+
+  for port in 80 53; do
+    if command_missing ss; then
+      break
+    fi
+    if ss -tlnp "sport = :${port}" 2>/dev/null | grep -q "LISTEN"; then
+      conflicting_ports+=("${port}")
+    fi
+  done
+
+  if (( ${#conflicting_ports[@]} > 0 )); then
+    warn "Port(s) already in use: ${conflicting_ports[*]}"
+    warn "DANILO requires ports 80 and 53. Stop conflicting services before installing."
+    warn "Common fix: sudo systemctl stop apache2 nginx systemd-resolved"
+    # This is a warning, not a fatal error, because the installer reconfigures
+    # resolved and nginx will be in the container stack.
+  fi
+}
+
+validate_docker_available() {
+  if command_missing docker; then
+    note "Docker is not yet installed; it will be installed during this step"
+    return 0
+  fi
+  if ! docker info >/dev/null 2>&1; then
+    warn "Docker is installed but the daemon is not running; will attempt to start it"
+    return 0
+  fi
+  note "Docker daemon is already running"
+}
+
+validate_ram_minimum() {
+  local required_mb="${DANILO_MIN_RAM_MB:-3072}"
+  local available_mb=0
+
+  if command_missing free; then
+    note "Cannot check available RAM (free command not found)"
+    return 0
+  fi
+
+  available_mb="$(free -m | awk '/^Mem:/ { print $2 }')"
+  if (( available_mb < required_mb )); then
+    warn "System reports only ${available_mb} MB RAM. Project DANILO recommends at least $((required_mb / 1024)) GB."
+    warn "phi3:mini requires ~2.3 GB RAM. The portal will attempt to start, but AI may be unstable."
+  else
+    note "RAM check passed: ${available_mb} MB available (minimum ${required_mb} MB required)"
+  fi
+}
+
 preflight_checks() {
   validate_ubuntu_version
   validate_disk_space
+  validate_ram_minimum
+  check_port_conflicts
+  validate_docker_available
   if [[ ! -d "${LOCAL_LESSONS_DIR}" ]]; then
     note "Local lessons folder not found: ${LOCAL_LESSONS_DIR}"
     note "The portal will start with no lesson content. Use --sync later to add lessons."

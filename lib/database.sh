@@ -6,7 +6,7 @@ generate_secrets() {
   PORTAL_DOMAIN="${DANILO_PORTAL_DOMAIN:-${PORTAL_DOMAIN:-danilo.local}}"
   SSID="${DANILO_SSID:-${SSID:-PROJECT-DANILO}}"
   WIFI_PASSPHRASE="${DANILO_WIFI_PASSPHRASE:-${WIFI_PASSPHRASE:-ProjectDANILO2026!}}"
-  OLLAMA_MODEL="${DANILO_OLLAMA_MODEL:-${OLLAMA_MODEL:-llama3.1:8b-instruct-q4_K_S}}"
+  OLLAMA_MODEL="${DANILO_OLLAMA_MODEL:-${OLLAMA_MODEL:-phi3:mini}}"
   POSTGRES_DB="${DANILO_POSTGRES_DB:-${POSTGRES_DB:-danilo}}"
   POSTGRES_USER="${DANILO_POSTGRES_USER:-${POSTGRES_USER:-danilo}}"
   JWT_SECRET="${DANILO_JWT_SECRET:-${JWT_SECRET:-}}"
@@ -26,7 +26,11 @@ generate_secrets() {
   [[ -z "${JWT_SECRET:-}" ]] && JWT_SECRET="$(openssl rand -hex 32 | tr -d '\r\n')"
   [[ -z "${POSTGRES_PASSWORD:-}" ]] && POSTGRES_PASSWORD="$(openssl rand -hex 24 | tr -d '\r\n')"
   [[ -z "${ADMIN_USERNAME:-}" ]] && ADMIN_USERNAME="admin"
-  [[ -z "${ADMIN_PASSWORD:-}" ]] && ADMIN_PASSWORD="ProjectDANILO2026!"
+  # Generate a random admin password on first install; never expose a static default in version control
+  if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASSWORD="$(openssl rand -base64 15 | tr -d '/+=\r\n' | head -c 18)"
+    DANILO_FIRST_INSTALL_PASSWORD=1
+  fi
   if [[ -z "${DATABASE_URL:-}" ]]; then
     DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
   fi

@@ -7,6 +7,7 @@ write_backend_files() {
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
 sqlalchemy==2.0.40
+alembic==1.14.0
 psycopg[binary]==3.2.6
 PyJWT==2.10.1
 httpx==0.28.1
@@ -18,6 +19,144 @@ pypdf==5.4.0
 python-docx==1.1.2
 python-pptx==1.0.2
 psutil==6.1.1
+EOF
+
+  # ---------------------------------------------------------------------------
+  # Alembic migration support
+  # ---------------------------------------------------------------------------
+  mkdir -p "${APP_ROOT}/backend/alembic/versions"
+
+  cat > "${APP_ROOT}/backend/alembic.ini" <<'EOF'
+[alembic]
+script_location = alembic
+prepend_sys_path = .
+sqlalchemy.url = %(DATABASE_URL)s
+
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+EOF
+
+  cat > "${APP_ROOT}/backend/alembic/env.py" <<'EOF'
+import os
+from logging.config import fileConfig
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+
+config = context.config
+if config.config_file_name:
+    fileConfig(config.config_file_name)
+
+database_url = os.getenv("DATABASE_URL", "")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
+
+from app.models import Base  # noqa: E402
+target_metadata = Base.metadata
+
+
+def run_migrations_offline() -> None:
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"})
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    connectable = engine_from_config(config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool)
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+EOF
+
+  cat > "${APP_ROOT}/backend/alembic/script.py.mako" <<'EOF'
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+"""
+from typing import Sequence, Union
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+revision: str = ${repr(up_revision)}
+down_revision: Union[str, None] = ${repr(down_revision)}
+branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
+depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade() -> None:
+    ${downgrades if downgrades else "pass"}
+EOF
+
+  cat > "${APP_ROOT}/backend/alembic/versions/0001_initial_schema.py" <<'EOF'
+"""Initial schema – create all Project DANILO tables.
+
+Revision ID: 0001
+Revises:
+Create Date: 2026-01-01 00:00:00.000000
+"""
+from typing import Sequence, Union
+from alembic import op
+import sqlalchemy as sa
+
+revision: str = "0001"
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    # Tables are created by SQLAlchemy Base.metadata.create_all() on startup.
+    # This migration is a no-op marker so that Alembic tracks the baseline.
+    pass
+
+
+def downgrade() -> None:
+    pass
 EOF
 
   cat > "${APP_ROOT}/backend/Dockerfile" <<'EOF'
@@ -32,6 +171,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -129,6 +270,7 @@ class User(Base):
     password_salt = Column(String(255), nullable=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
+    force_password_change = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     taught_courses = relationship("Course", back_populates="teacher", foreign_keys="Course.teacher_id")
@@ -270,6 +412,8 @@ class Submission(Base):
     student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     response_text = Column(Text, nullable=True)
     status = Column(String(30), nullable=False, default="submitted")
+    score = Column(Float, nullable=True)
+    feedback = Column(Text, nullable=True)
     submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     assignment = relationship("Assignment")
@@ -828,12 +972,35 @@ from .seed import seed_defaults
 from .security import create_access_token, decode_access_token, hash_password, verify_password
 from .student_insights import analyze_student_performance
 
+import asyncio
+import hashlib
+from collections import OrderedDict
+from logging.handlers import RotatingFileHandler
+
+# ---------------------------------------------------------------------------
+# Structured logging – write to rotating files in addition to stdout so that
+# logs survive container restarts and can be read by the admin panel.
+# ---------------------------------------------------------------------------
+_LOG_DIR = os.getenv("DANILO_LOG_DIR", "/var/log/danilo")
+os.makedirs(_LOG_DIR, exist_ok=True)
+
+def _make_file_handler(name: str, max_bytes: int = 10 * 1024 * 1024, backups: int = 5) -> RotatingFileHandler:
+    path = os.path.join(_LOG_DIR, name)
+    handler = RotatingFileHandler(path, maxBytes=max_bytes, backupCount=backups)
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    return handler
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("danilo")
+logger.addHandler(_make_file_handler("backend.log"))
+
+# Separate AI logger for tutor interactions
+ai_logger = logging.getLogger("danilo.ai")
+ai_logger.addHandler(_make_file_handler("ai.log"))
 
 JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
@@ -863,8 +1030,47 @@ if not PORTAL_DOMAIN:
 if not SSID:
     raise RuntimeError("SSID must be set by the installer environment")
 
+# ---------------------------------------------------------------------------
+# AI scalability protections
+# Max 3 concurrent Ollama generations to protect 8 GB RAM environment.
+# Per-user cooldown of 5 s between requests (prevents rapid-fire button spam).
+# ---------------------------------------------------------------------------
+_AI_MAX_CONCURRENT = int(os.getenv("DANILO_AI_MAX_CONCURRENT", "3"))
+_AI_SEMAPHORE: asyncio.Semaphore | None = None  # created inside lifespan
+_AI_USER_LAST_REQUEST: dict[int, float] = {}  # user_id -> timestamp
+_AI_COOLDOWN_SECONDS = float(os.getenv("DANILO_AI_COOLDOWN_SECONDS", "5"))
+
+# ---------------------------------------------------------------------------
+# Lightweight LRU response cache: cache the last 256 distinct prompts so that
+# students asking the same question get instant responses without loading the GPU.
+# ---------------------------------------------------------------------------
+_AI_CACHE_MAXSIZE = int(os.getenv("DANILO_AI_CACHE_SIZE", "256"))
+_ai_response_cache: "OrderedDict[str, str]" = OrderedDict()
+
+def _cache_key(prompt: str, mode: str) -> str:
+    return hashlib.sha256(f"{mode}:{prompt}".encode()).hexdigest()
+
+def _cache_get(prompt: str, mode: str) -> str | None:
+    key = _cache_key(prompt, mode)
+    if key in _ai_response_cache:
+        _ai_response_cache.move_to_end(key)
+        return _ai_response_cache[key]
+    return None
+
+def _cache_set(prompt: str, mode: str, response: str) -> None:
+    key = _cache_key(prompt, mode)
+    _ai_response_cache[key] = response
+    _ai_response_cache.move_to_end(key)
+    while len(_ai_response_cache) > _AI_CACHE_MAXSIZE:
+        _ai_response_cache.popitem(last=False)
+
 security = HTTPBearer()
 router = APIRouter(prefix="/api")
+admin_router = APIRouter(prefix="/api", tags=["admin"])
+teacher_router = APIRouter(prefix="/api", tags=["teacher"])
+student_router = APIRouter(prefix="/api", tags=["student"])
+ai_router = APIRouter(prefix="/api", tags=["ai"])
+classes_router = APIRouter(prefix="/api", tags=["classes"])
 
 
 def migrate_users_table() -> None:
@@ -926,10 +1132,22 @@ def migrate_users_table() -> None:
             connection.execute(text("ALTER TABLE modules ADD COLUMN assessment_type VARCHAR(120)"))
         if "users" in inspector.get_table_names() and "department_id" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN department_id INTEGER REFERENCES departments(id)"))
+        if "users" in inspector.get_table_names() and "force_password_change" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN force_password_change BOOLEAN DEFAULT false NOT NULL"))
+
+    inspector = inspect(engine)
+    submission_columns = {column["name"] for column in inspector.get_columns("submissions")} if "submissions" in inspector.get_table_names() else set()
+    with engine.begin() as connection:
+        if "submissions" in inspector.get_table_names() and "score" not in submission_columns:
+            connection.execute(text("ALTER TABLE submissions ADD COLUMN score FLOAT"))
+        if "submissions" in inspector.get_table_names() and "feedback" not in submission_columns:
+            connection.execute(text("ALTER TABLE submissions ADD COLUMN feedback TEXT"))
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    global _AI_SEMAPHORE
+    _AI_SEMAPHORE = asyncio.Semaphore(_AI_MAX_CONCURRENT)
     wait_for_database()
     migrate_users_table()
     db = SessionLocal()
@@ -945,7 +1163,24 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Project DANILO API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Project DANILO API",
+    version="1.0.0",
+    description="Offline-first DepEd school portal API — authentication, LMS, AI tutor, and system health.",
+    lifespan=lifespan,
+    openapi_tags=[
+        {"name": "health", "description": "Service and AI health checks"},
+        {"name": "auth", "description": "Authentication and password management"},
+        {"name": "dashboard", "description": "Role-aware dashboard data"},
+        {"name": "content", "description": "Lesson modules and content tree"},
+        {"name": "grades", "description": "Student grade records"},
+        {"name": "ai", "description": "AI tutor (DANILO) — chat, sessions, streaming"},
+        {"name": "admin", "description": "School admin — users, courses, sections, system"},
+        {"name": "teacher", "description": "Faculty — courses, gradebook, insights, quizzes"},
+        {"name": "student", "description": "Learner — courses, assignments, quiz attempts"},
+        {"name": "classes", "description": "Shared classroom endpoints (teacher + student)"},
+    ],
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -1006,6 +1241,7 @@ def serialize_user(user: User) -> dict:
         "sectionName": user.section_name,
         "departmentId": user.department_id,
         "isActive": user.is_active,
+        "forcePasswordChange": bool(getattr(user, "force_password_change", False)),
     }
 
 
@@ -1163,11 +1399,12 @@ def validate_assessment_type(value: str | None) -> str | None:
 
 
 def get_user_class(db: Session, user: User, course_id: int) -> Course:
+    """Return a course if the user is its assigned teacher or an enrolled student.
+    Admin accounts use dedicated /admin/courses/* endpoints and are intentionally
+    excluded here to enforce strict role separation."""
     course = db.get(Course, course_id)
     if not course or not course.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Class not found")
-    if user.role == "admin":
-        return course
     if user.role == "teacher" and course.teacher_id == user.id:
         return course
     if user.role == "student" and db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == user.id, Enrollment.status == "active")):
@@ -1427,6 +1664,9 @@ def build_content_tree(db: Session, *, user: User | None = None, query: str | No
         stmt = stmt.where(Module.quarter == quarter)
     if subject:
         stmt = stmt.where(Module.subject == subject)
+    # Admin sees no classroom content here; admin uses /admin/courses/* for oversight
+    if user and user.role == "admin":
+        return []
     if user and user.role == "teacher":
         stmt = stmt.where(Course.teacher_id == user.id)
     if user and user.role == "student":
@@ -1808,31 +2048,38 @@ def save_ai_conversation(
 
 
 async def ask_ollama(prompt: str, mode: str, memory: list[dict] | None = None) -> tuple[str, dict]:
+    # Check response cache first (no semaphore needed for cache hits)
+    cached = _cache_get(prompt, mode)
+    if cached:
+        ai_logger.info("AI cache hit mode=%s prompt_len=%s", mode, len(prompt))
+        return cached, {"model": OLLAMA_MODEL, "mode": mode, "duration_ms": 0, "cache": True}
+
+    sem = _AI_SEMAPHORE or asyncio.Semaphore(_AI_MAX_CONCURRENT)
     payload = ollama_chat_payload(prompt, mode, stream=False, memory=memory)
     started = time.perf_counter()
     prompt_tokens = estimate_prompt_tokens(prompt)
     timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS, connect=5.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
-        response.raise_for_status()
-        body = response.json()
-        duration_ms = int((time.perf_counter() - started) * 1000)
-        metrics = {
-            "model": body.get("model", OLLAMA_MODEL),
-            "mode": tutor_mode(mode),
-            "duration_ms": duration_ms,
-            "prompt_tokens": body.get("prompt_eval_count") or prompt_tokens,
-            "response_tokens": body.get("eval_count"),
-        }
-        logger.info(
-            "AI tutor completed model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s",
-            metrics["model"],
-            metrics["mode"],
-            metrics["prompt_tokens"],
-            metrics["response_tokens"],
-            metrics["duration_ms"],
-        )
-        return body.get("message", {}).get("content", "").strip(), metrics
+    async with sem:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
+            response.raise_for_status()
+            body = response.json()
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    metrics = {
+        "model": body.get("model", OLLAMA_MODEL),
+        "mode": tutor_mode(mode),
+        "duration_ms": duration_ms,
+        "prompt_tokens": body.get("prompt_eval_count") or prompt_tokens,
+        "response_tokens": body.get("eval_count"),
+    }
+    result = body.get("message", {}).get("content", "").strip()
+    ai_logger.info(
+        "AI tutor completed model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s",
+        metrics["model"], metrics["mode"], metrics["prompt_tokens"],
+        metrics["response_tokens"], metrics["duration_ms"],
+    )
+    _cache_set(prompt, mode, result)
+    return result, metrics
 
 
 def build_student_insights_prompt(analysis: dict) -> str:
@@ -1876,37 +2123,41 @@ async def stream_ollama(prompt: str, mode: str, memory: list[dict] | None = None
     started = time.perf_counter()
     prompt_tokens = estimate_prompt_tokens(prompt)
     timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS, connect=5.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if not line:
-                    continue
-                body = json.loads(line)
-                content = body.get("message", {}).get("content", "")
-                if content:
-                    yield {"content": content, "done": False}
-                if body.get("done"):
-                    duration_ms = int((time.perf_counter() - started) * 1000)
-                    metrics = {
-                        "model": body.get("model", OLLAMA_MODEL),
-                        "mode": tutor_mode(mode),
-                        "duration_ms": duration_ms,
-                        "prompt_tokens": body.get("prompt_eval_count") or prompt_tokens,
-                        "response_tokens": body.get("eval_count"),
-                    }
-                    logger.info(
-                        "AI tutor streamed model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s",
-                        metrics["model"],
-                        metrics["mode"],
-                        metrics["prompt_tokens"],
-                        metrics["response_tokens"],
-                        metrics["duration_ms"],
-                    )
-                    yield {"content": "", "done": True, "metrics": metrics}
+    sem = _AI_SEMAPHORE or asyncio.Semaphore(_AI_MAX_CONCURRENT)
+    async with sem:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
+                response.raise_for_status()
+                full_parts: list[str] = []
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    body = json.loads(line)
+                    content = body.get("message", {}).get("content", "")
+                    if content:
+                        full_parts.append(content)
+                        yield {"content": content, "done": False}
+                    if body.get("done"):
+                        duration_ms = int((time.perf_counter() - started) * 1000)
+                        metrics = {
+                            "model": body.get("model", OLLAMA_MODEL),
+                            "mode": tutor_mode(mode),
+                            "duration_ms": duration_ms,
+                            "prompt_tokens": body.get("prompt_eval_count") or prompt_tokens,
+                            "response_tokens": body.get("eval_count"),
+                        }
+                        ai_logger.info(
+                            "AI tutor streamed model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s",
+                            metrics["model"], metrics["mode"], metrics["prompt_tokens"],
+                            metrics["response_tokens"], metrics["duration_ms"],
+                        )
+                        full_response = "".join(full_parts).strip()
+                        if full_response:
+                            _cache_set(prompt, mode, full_response)
+                        yield {"content": "", "done": True, "metrics": metrics}
 
 
-@router.get("/health")
+@router.get("/health", tags=["health"])
 def health() -> dict:
     return {
         "status": "ok",
@@ -1917,7 +2168,49 @@ def health() -> dict:
     }
 
 
-@router.post("/auth/login")
+@ai_router.get("/ai/status", tags=["health"])
+def ai_status() -> dict:
+    """Public endpoint to check AI readiness without authentication.
+    Used by the frontend to display AI availability before login."""
+    ollama_ok = False
+    model_loaded = False
+    available_models: list[str] = []
+    error_message = ""
+
+    try:
+        r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=4.0)
+        if r.status_code == 200:
+            ollama_ok = True
+            available_models = [m.get("name", "") for m in (r.json().get("models") or [])]
+            model_loaded = any(
+                name == OLLAMA_MODEL or name == f"{OLLAMA_MODEL}:latest"
+                for name in available_models
+            )
+    except Exception as exc:
+        error_message = str(exc)[:120]
+
+    ram_available_mb: float | None = None
+    if _psutil:
+        try:
+            vm = _psutil.virtual_memory()
+            ram_available_mb = round(vm.available / 1024 / 1024, 1)
+        except Exception:
+            pass
+
+    return {
+        "ollamaOnline": ollama_ok,
+        "modelLoaded": model_loaded,
+        "modelName": OLLAMA_MODEL,
+        "availableModels": available_models,
+        "ramAvailableMb": ram_available_mb,
+        "queueSlots": _AI_MAX_CONCURRENT,
+        "status": "ready" if (ollama_ok and model_loaded) else ("degraded" if ollama_ok else "offline"),
+        "errorMessage": error_message or None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/auth/login", tags=["auth"])
 def login(payload: dict = Body(default={}), db: Session = Depends(get_db)) -> dict:
     username = str(payload.get("username") or "").strip()
     password = str(payload.get("password") or "")
@@ -1944,6 +2237,7 @@ def login(payload: dict = Body(default={}), db: Session = Depends(get_db)) -> di
             "accessToken": token,
             "tokenType": "Bearer",
             "user": serialize_user(user),
+            "forcePasswordChange": bool(user.force_password_change),
         }
     except HTTPException:
         raise
@@ -1952,13 +2246,33 @@ def login(payload: dict = Body(default={}), db: Session = Depends(get_db)) -> di
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login service is temporarily unavailable") from exc
 
 
-@router.get("/me")
+@router.get("/me", tags=["auth"])
 def me(current_user: User = Depends(get_current_user)) -> dict:
     logger.info("/api/me accessed by user_id=%s role=%s", current_user.id, current_user.role)
     return serialize_user(current_user)
 
 
-@router.get("/dashboard")
+@router.post("/auth/change-password", tags=["auth"])
+def change_password(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    """Allow any authenticated user to change their own password. Clears force_password_change flag."""
+    current_password = str(payload.get("currentPassword") or "")
+    new_password = str(payload.get("newPassword") or "")
+    if not current_password or not new_password:
+        raise HTTPException(status_code=400, detail="currentPassword and newPassword are required")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    if not verify_password(current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+    current_user.password_hash = hash_password(new_password)
+    current_user.password_salt = ""
+    current_user.force_password_change = False
+    log_action(db, current_user, "change_password", "user", current_user.id)
+    db.commit()
+    logger.info("Password changed for user_id=%s username=%s", current_user.id, current_user.username)
+    return {"ok": True, "message": "Password changed successfully"}
+
+
+@router.get("/dashboard", tags=["dashboard"])
 def dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     logger.info("/api/dashboard accessed by user_id=%s role=%s", current_user.id, current_user.role)
     try:
@@ -2005,12 +2319,12 @@ def dashboard(current_user: User = Depends(get_current_user), db: Session = Depe
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Dashboard could not be loaded") from exc
 
 
-@router.get("/stream")
+@router.get("/stream", tags=["dashboard"])
 def stream(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     return build_stream(db, current_user)
 
 
-@router.get("/content")
+@router.get("/content", tags=["content"])
 def content(
     query: str | None = None,
     quarter: str | None = None,
@@ -2021,20 +2335,20 @@ def content(
     return build_content_tree(db, user=current_user, query=query, quarter=quarter, subject=subject)
 
 
-@router.get("/content/workflow")
+@router.get("/content/workflow", tags=["content"])
 def content_workflow(current_user: User = Depends(get_current_user)) -> dict:
     _ = current_user
     return build_content_workflow_status()
 
 
-@router.get("/grades")
+@router.get("/grades", tags=["grades"])
 def grades(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     if current_user.role != "student":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Grades are only available to student accounts")
     return build_grade_summary(db, current_user.id)
 
 
-@router.get("/admin/overview")
+@admin_router.get("/admin/overview")
 def admin_overview(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     learner_count = db.query(User).filter(User.role == "student").count()
@@ -2087,7 +2401,7 @@ def admin_overview(current_user: User = Depends(get_current_user), db: Session =
     }
 
 
-@router.get("/admin/users")
+@admin_router.get("/admin/users")
 def admin_users(role: str | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
     stmt = select(User).order_by(User.role.asc(), User.full_name.asc())
@@ -2096,7 +2410,7 @@ def admin_users(role: str | None = None, current_user: User = Depends(get_curren
     return [serialize_user(user) for user in db.scalars(stmt).all()]
 
 
-@router.post("/admin/users")
+@admin_router.post("/admin/users")
 def admin_create_user(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     role = clean_text(payload.get("role"), max_length=20)
@@ -2141,7 +2455,7 @@ def admin_create_user(payload: dict = Body(default={}), current_user: User = Dep
     return serialize_user(user)
 
 
-@router.put("/admin/users/{user_id}")
+@admin_router.put("/admin/users/{user_id}")
 def admin_update_user(user_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     user = db.get(User, user_id)
@@ -2167,7 +2481,7 @@ def admin_update_user(user_id: int, payload: dict = Body(default={}), current_us
     return serialize_user(user)
 
 
-@router.delete("/admin/users/{user_id}")
+@admin_router.delete("/admin/users/{user_id}")
 def admin_delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     if user_id == current_user.id:
@@ -2181,7 +2495,7 @@ def admin_delete_user(user_id: int, current_user: User = Depends(get_current_use
     return {"ok": True}
 
 
-@router.post("/admin/users/{user_id}/reset-password")
+@admin_router.post("/admin/users/{user_id}/reset-password")
 def admin_reset_password(user_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     user = db.get(User, user_id)
@@ -2195,7 +2509,7 @@ def admin_reset_password(user_id: int, payload: dict = Body(default={}), current
     return {"ok": True, "message": "Password reset"}
 
 
-@router.delete("/admin/users/{user_id}/permanent")
+@admin_router.delete("/admin/users/{user_id}/permanent")
 def admin_permanent_delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     if user_id == current_user.id:
@@ -2223,7 +2537,7 @@ def admin_permanent_delete_user(user_id: int, current_user: User = Depends(get_c
     return {"ok": True}
 
 
-@router.get("/admin/sections")
+@admin_router.get("/admin/sections")
 def admin_sections(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
     sections = db.scalars(select(Section).where(Section.is_active == True).order_by(Section.grade_level.asc(), Section.name.asc())).all()
@@ -2240,7 +2554,7 @@ def admin_sections(current_user: User = Depends(get_current_user), db: Session =
     return result
 
 
-@router.post("/admin/sections")
+@admin_router.post("/admin/sections")
 def admin_create_section(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     education_level, grade_level, strand = validate_grade_path(
@@ -2264,7 +2578,7 @@ def admin_create_section(payload: dict = Body(default={}), current_user: User = 
     return {"ok": True, "id": section.id}
 
 
-@router.put("/admin/sections/{section_id}")
+@admin_router.put("/admin/sections/{section_id}")
 def admin_update_section(section_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     section = db.get(Section, section_id)
@@ -2290,7 +2604,7 @@ def admin_update_section(section_id: int, payload: dict = Body(default={}), curr
     return {"ok": True}
 
 
-@router.delete("/admin/sections/{section_id}")
+@admin_router.delete("/admin/sections/{section_id}")
 def admin_delete_section(section_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     section = db.get(Section, section_id)
@@ -2302,7 +2616,7 @@ def admin_delete_section(section_id: int, current_user: User = Depends(get_curre
     return {"ok": True}
 
 
-@router.post("/admin/sections/{section_id}/assign-students")
+@admin_router.post("/admin/sections/{section_id}/assign-students")
 def admin_assign_students_to_section(section_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     section = db.get(Section, section_id)
@@ -2321,13 +2635,13 @@ def admin_assign_students_to_section(section_id: int, payload: dict = Body(defau
     return {"ok": True, "updated": updated}
 
 
-@router.get("/admin/courses")
+@admin_router.get("/admin/courses")
 def admin_courses(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
     return build_admin_course_cards(db)
 
 
-@router.post("/admin/courses")
+@admin_router.post("/admin/courses")
 def admin_create_course(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     teacher_id = parse_int(payload.get("teacherId") or payload.get("teacher_id"), "Faculty", required=False, minimum=1)
@@ -2349,7 +2663,7 @@ def admin_create_course(payload: dict = Body(default={}), current_user: User = D
     return serialize_course(course)
 
 
-@router.put("/admin/courses/{course_id}")
+@admin_router.put("/admin/courses/{course_id}")
 def admin_update_course(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     course = db.get(Course, course_id)
@@ -2381,7 +2695,7 @@ def admin_update_course(course_id: int, payload: dict = Body(default={}), curren
     return {"ok": True}
 
 
-@router.delete("/admin/courses/{course_id}")
+@admin_router.delete("/admin/courses/{course_id}")
 def admin_delete_course(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     course = db.get(Course, course_id)
@@ -2393,7 +2707,7 @@ def admin_delete_course(course_id: int, current_user: User = Depends(get_current
     return {"ok": True}
 
 
-@router.delete("/admin/courses/{course_id}/permanent")
+@admin_router.delete("/admin/courses/{course_id}/permanent")
 def admin_permanent_delete_course(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     course = db.get(Course, course_id)
@@ -2415,7 +2729,7 @@ def admin_permanent_delete_course(course_id: int, current_user: User = Depends(g
     return {"ok": True}
 
 
-@router.post("/admin/courses/{course_id}/enroll")
+@admin_router.post("/admin/courses/{course_id}/enroll")
 def admin_enroll_student(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     student_id = parse_int(payload.get("studentId") or payload.get("student_id"), "Student", minimum=1)
@@ -2431,7 +2745,7 @@ def admin_enroll_student(course_id: int, payload: dict = Body(default={}), curre
     return {"ok": True}
 
 
-@router.delete("/admin/courses/{course_id}/enroll/{student_id}")
+@admin_router.delete("/admin/courses/{course_id}/enroll/{student_id}")
 def admin_unenroll_student(course_id: int, student_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     enrollment = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id))
@@ -2443,7 +2757,7 @@ def admin_unenroll_student(course_id: int, student_id: int, current_user: User =
     return {"ok": True}
 
 
-@router.post("/admin/courses/{course_id}/assign-teacher")
+@admin_router.post("/admin/courses/{course_id}/assign-teacher")
 def admin_assign_teacher(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     teacher_id = parse_int(payload.get("teacherId") or payload.get("teacher_id"), "Faculty", minimum=1)
@@ -2458,7 +2772,7 @@ def admin_assign_teacher(course_id: int, payload: dict = Body(default={}), curre
     return {"ok": True}
 
 
-@router.post("/admin/announcements")
+@admin_router.post("/admin/announcements")
 def admin_system_announcement(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     title = clean_text(payload.get("title"), max_length=255)
@@ -2471,7 +2785,7 @@ def admin_system_announcement(payload: dict = Body(default={}), current_user: Us
     return {"ok": True, "postedToClasses": len(courses)}
 
 
-@router.get("/admin/reports/roster")
+@admin_router.get("/admin/reports/roster")
 def admin_roster_report(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
     require_role(current_user, "admin")
     output = io.StringIO()
@@ -2484,7 +2798,7 @@ def admin_roster_report(current_user: User = Depends(get_current_user), db: Sess
     return Response(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-roster.csv"})
 
 
-@router.get("/admin/reports/grades")
+@admin_router.get("/admin/reports/grades")
 def admin_grades_report(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
     require_role(current_user, "admin")
     output = io.StringIO()
@@ -2496,7 +2810,7 @@ def admin_grades_report(current_user: User = Depends(get_current_user), db: Sess
     return Response(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-grades.csv"})
 
 
-@router.get("/teacher/dashboard")
+@teacher_router.get("/teacher/dashboard")
 def teacher_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "teacher")
     courses = build_teacher_course_cards(db, current_user.id)
@@ -2515,20 +2829,20 @@ def teacher_dashboard(current_user: User = Depends(get_current_user), db: Sessio
     }
 
 
-@router.get("/teacher/courses")
+@teacher_router.get("/teacher/courses")
 def teacher_courses(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "teacher")
     return build_teacher_course_cards(db, current_user.id)
 
 
-@router.get("/teacher/courses/{course_id}/students")
+@teacher_router.get("/teacher/courses/{course_id}/students")
 def teacher_course_students(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     ensure_teacher_course(db, current_user, course_id)
     rows = db.execute(select(User, Enrollment).join(Enrollment, Enrollment.student_id == User.id).where(Enrollment.course_id == course_id, Enrollment.status == "active").order_by(User.full_name)).all()
     return [{**serialize_user(student), "enrollmentStatus": enrollment.status} for student, enrollment in rows]
 
 
-@router.post("/teacher/courses/{course_id}/announcements")
+@teacher_router.post("/teacher/courses/{course_id}/announcements")
 def teacher_create_announcement(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     post = StreamPost(course_id=course.id, author_id=current_user.id, title=clean_text(payload.get("title"), max_length=255), body=clean_text(payload.get("body"), max_length=2000), post_type="announcement")
@@ -2537,7 +2851,7 @@ def teacher_create_announcement(course_id: int, payload: dict = Body(default={})
     return {"ok": True, "id": post.id}
 
 
-@router.post("/teacher/courses/{course_id}/modules")
+@teacher_router.post("/teacher/courses/{course_id}/modules")
 def teacher_create_module(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     module = Module(
@@ -2565,7 +2879,7 @@ def teacher_create_module(course_id: int, payload: dict = Body(default={}), curr
     return {"ok": True, "id": module.id}
 
 
-@router.post("/teacher/courses/{course_id}/materials/generate")
+@teacher_router.post("/teacher/courses/{course_id}/materials/generate")
 async def teacher_generate_lesson_from_material(course_id: int, material: UploadFile = File(...), save: bool = True, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     filename = clean_text(material.filename or "uploaded-material.txt", max_length=255)
@@ -2609,7 +2923,7 @@ async def teacher_generate_lesson_from_material(course_id: int, material: Upload
     }
 
 
-@router.put("/teacher/modules/{module_id}")
+@teacher_router.put("/teacher/modules/{module_id}")
 def teacher_update_module(module_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     module = db.get(Module, module_id)
     if not module:
@@ -2629,7 +2943,7 @@ def teacher_update_module(module_id: int, payload: dict = Body(default={}), curr
     return {"ok": True}
 
 
-@router.delete("/teacher/modules/{module_id}")
+@teacher_router.delete("/teacher/modules/{module_id}")
 def teacher_delete_module(module_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     module = db.get(Module, module_id)
     if not module:
@@ -2640,7 +2954,7 @@ def teacher_delete_module(module_id: int, current_user: User = Depends(get_curre
     return {"ok": True}
 
 
-@router.post("/teacher/courses/{course_id}/assignments")
+@teacher_router.post("/teacher/courses/{course_id}/assignments")
 def teacher_create_assignment(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     assignment = Assignment(course_id=course.id, title=clean_text(payload.get("title"), max_length=255), instructions=clean_text(payload.get("instructions"), max_length=4000), points=parse_float(payload.get("points") or 100, "Points", minimum=1), created_by=current_user.id)
@@ -2650,7 +2964,7 @@ def teacher_create_assignment(course_id: int, payload: dict = Body(default={}), 
     return {"ok": True, "id": assignment.id}
 
 
-@router.put("/teacher/assignments/{assignment_id}")
+@teacher_router.put("/teacher/assignments/{assignment_id}")
 def teacher_update_assignment(assignment_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
@@ -2667,7 +2981,7 @@ def teacher_update_assignment(assignment_id: int, payload: dict = Body(default={
     return {"ok": True}
 
 
-@router.delete("/teacher/assignments/{assignment_id}")
+@teacher_router.delete("/teacher/assignments/{assignment_id}")
 def teacher_delete_assignment(assignment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
@@ -2678,7 +2992,7 @@ def teacher_delete_assignment(assignment_id: int, current_user: User = Depends(g
     return {"ok": True}
 
 
-@router.post("/teacher/courses/{course_id}/quizzes")
+@teacher_router.post("/teacher/courses/{course_id}/quizzes")
 def teacher_create_quiz(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     quiz = Quiz(course_id=course.id, title=clean_text(payload.get("title") or "Class Quiz", max_length=255), instructions=clean_text(payload.get("instructions") or "Answer each question based on the current lesson.", max_length=2000), is_published=parse_bool(payload.get("isPublished"), "Published status", default=False), created_by=current_user.id)
@@ -2690,7 +3004,7 @@ def teacher_create_quiz(course_id: int, payload: dict = Body(default={}), curren
     return {"ok": True, "id": quiz.id}
 
 
-@router.get("/teacher/courses/{course_id}/gradebook")
+@teacher_router.get("/teacher/courses/{course_id}/gradebook")
 def teacher_gradebook(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     students = teacher_course_students(course_id, current_user, db)
@@ -2708,7 +3022,7 @@ def teacher_gradebook(course_id: int, current_user: User = Depends(get_current_u
     return {"course": serialize_course(course), "students": students, "entries": [{"id": grade.id, "studentId": student.id, "studentName": student.full_name, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade, student in grades], "grades": summaries}
 
 
-@router.get("/teacher/insights")
+@teacher_router.get("/teacher/insights")
 async def teacher_student_insights(
     class_id: int | None = None,
     subject: str | None = None,
@@ -2716,10 +3030,8 @@ async def teacher_student_insights(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    require_role(current_user, "teacher", "admin")
-    stmt = select(Course).where(Course.is_active == True)
-    if current_user.role == "teacher":
-        stmt = stmt.where(Course.teacher_id == current_user.id)
+    require_role(current_user, "teacher")
+    stmt = select(Course).where(Course.is_active == True, Course.teacher_id == current_user.id)
     if subject:
         stmt = stmt.where(Course.subject == subject)
     if class_id:
@@ -2754,7 +3066,7 @@ async def teacher_student_insights(
     return analysis
 
 
-@router.post("/teacher/courses/{course_id}/grades")
+@teacher_router.post("/teacher/courses/{course_id}/grades")
 def teacher_create_grade(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     ensure_teacher_course(db, current_user, course_id)
     student_id = parse_int(payload.get("studentId") or payload.get("student_id"), "Student", minimum=1)
@@ -2766,7 +3078,7 @@ def teacher_create_grade(course_id: int, payload: dict = Body(default={}), curre
     return {"ok": True, "id": grade.id}
 
 
-@router.put("/teacher/grades/{grade_id}")
+@teacher_router.put("/teacher/grades/{grade_id}")
 def teacher_update_grade(grade_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     grade = db.get(GradeEntry, grade_id)
     if not grade:
@@ -2786,7 +3098,7 @@ def teacher_update_grade(grade_id: int, payload: dict = Body(default={}), curren
     return {"ok": True}
 
 
-@router.delete("/teacher/grades/{grade_id}")
+@teacher_router.delete("/teacher/grades/{grade_id}")
 def teacher_delete_grade(grade_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     grade = db.get(GradeEntry, grade_id)
     if not grade:
@@ -2797,25 +3109,25 @@ def teacher_delete_grade(grade_id: int, current_user: User = Depends(get_current
     return {"ok": True}
 
 
-@router.get("/student/dashboard")
+@student_router.get("/student/dashboard")
 def student_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "student")
     return {"user": serialize_user(current_user), "courses": build_student_course_cards(db, current_user.id), "grades": build_grade_summary(db, current_user.id), "assignments": student_assignments(current_user, db)}
 
 
-@router.get("/student/courses")
+@student_router.get("/student/courses")
 def student_courses(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "student")
     return build_student_course_cards(db, current_user.id)
 
 
-@router.get("/student/grades")
+@student_router.get("/student/grades")
 def student_grades(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "student")
     return build_grade_summary(db, current_user.id)
 
 
-@router.get("/student/assignments")
+@student_router.get("/student/assignments")
 def student_assignments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "student")
     rows = db.execute(select(Assignment, Course).join(Course, Assignment.course_id == Course.id).join(Enrollment, Enrollment.course_id == Course.id).where(Enrollment.student_id == current_user.id, Enrollment.status == "active", Assignment.is_active == True).order_by(Assignment.created_at.desc())).all()
@@ -2823,7 +3135,7 @@ def student_assignments(current_user: User = Depends(get_current_user), db: Sess
     return [{"id": assignment.id, "courseId": course.id, "courseCode": course.code, "courseTitle": course.title, "title": assignment.title, "instructions": assignment.instructions, "points": assignment.points, "status": submissions.get(assignment.id).status if submissions.get(assignment.id) else "not_started", "responseText": submissions.get(assignment.id).response_text if submissions.get(assignment.id) else ""} for assignment, course in rows]
 
 
-@router.post("/student/assignments/{assignment_id}/submit")
+@student_router.post("/student/assignments/{assignment_id}/submit")
 def student_submit_assignment(assignment_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "student")
     assignment = db.get(Assignment, assignment_id)
@@ -2840,7 +3152,7 @@ def student_submit_assignment(assignment_id: int, payload: dict = Body(default={
     return {"ok": True, "submission": {"status": submission.status, "responseText": submission.response_text, "score": submission.score, "feedback": submission.feedback or ""}}
 
 
-@router.post("/student/assignments/{assignment_id}/complete")
+@student_router.post("/student/assignments/{assignment_id}/complete")
 def student_complete_assignment(assignment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "student")
     assignment = db.get(Assignment, assignment_id)
@@ -2856,7 +3168,7 @@ def student_complete_assignment(assignment_id: int, current_user: User = Depends
     return {"ok": True, "submission": {"status": submission.status, "responseText": submission.response_text or "", "score": submission.score, "feedback": submission.feedback or ""}}
 
 
-@router.post("/student/quizzes/{quiz_id}/submit")
+@student_router.post("/student/quizzes/{quiz_id}/submit")
 def student_submit_quiz(quiz_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "student")
     quiz = db.get(Quiz, quiz_id)
@@ -2914,20 +3226,20 @@ def student_submit_quiz(quiz_id: int, payload: dict = Body(default={}), current_
     }
 
 
-@router.get("/classes/{course_id}")
+@classes_router.get("/classes/{course_id}")
 def class_detail(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     return serialize_course(course)
 
 
-@router.get("/classes/{course_id}/stream")
+@classes_router.get("/classes/{course_id}/stream")
 def class_stream(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     course = get_user_class(db, current_user, course_id)
     rows = db.execute(select(StreamPost, User).join(User, StreamPost.author_id == User.id).where(StreamPost.course_id == course.id).order_by(StreamPost.created_at.desc())).all()
     return [{"id": post.id, "title": post.title, "body": post.body, "postType": post.post_type, "createdAt": post.created_at.isoformat() if post.created_at else "", "courseId": course.id, "courseCode": course.code, "courseTitle": course.title, "authorName": author.full_name} for post, author in rows]
 
 
-@router.get("/classes/{course_id}/classwork")
+@classes_router.get("/classes/{course_id}/classwork")
 def class_classwork(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     modules = build_content_tree(db, user=current_user)
@@ -2972,14 +3284,14 @@ def class_classwork(course_id: int, current_user: User = Depends(get_current_use
     return {"course": serialize_course(course), "modules": modules, "assignments": assignments, "quizzes": quizzes}
 
 
-@router.get("/classes/{course_id}/people")
+@classes_router.get("/classes/{course_id}/people")
 def class_people(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     rows = db.execute(select(User, Enrollment).join(Enrollment, Enrollment.student_id == User.id).where(Enrollment.course_id == course.id, Enrollment.status == "active").order_by(User.full_name.asc())).all()
     return {"teacher": serialize_user(course.teacher) if course.teacher else None, "students": [{**serialize_user(student), "enrollmentStatus": enrollment.status} for student, enrollment in rows]}
 
 
-@router.get("/classes/{course_id}/grades")
+@classes_router.get("/classes/{course_id}/grades")
 def class_grades(course_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     if current_user.role == "student":
@@ -2999,14 +3311,14 @@ def class_grades(course_id: int, current_user: User = Depends(get_current_user),
     return {"course": serialize_course(course), "entries": [{"id": grade.id, "studentId": student.id, "studentName": student.full_name, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade, student in grades], "grades": summaries}
 
 
-@router.get("/admin/enrollments")
+@admin_router.get("/admin/enrollments")
 def admin_enrollments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
     rows = db.execute(select(Enrollment, Course, User).join(Course, Enrollment.course_id == Course.id).join(User, Enrollment.student_id == User.id).order_by(Course.code.asc(), User.full_name.asc())).all()
     return [{"id": enrollment.id, "courseId": course.id, "courseCode": course.code, "courseTitle": course.title, "studentId": student.id, "studentName": student.full_name, "studentUsername": student.username, "status": enrollment.status} for enrollment, course, student in rows]
 
 
-@router.get("/admin/assignments")
+@admin_router.get("/admin/assignments")
 def admin_assignments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
     rows = db.execute(select(Assignment, Course).join(Course, Assignment.course_id == Course.id).order_by(Assignment.created_at.desc())).all()
@@ -3057,12 +3369,23 @@ def _save_chat_messages(db: Session, session_id: int, question: str, answer: str
     db.execute(text("UPDATE chat_sessions SET updated_at = NOW() WHERE id = :sid"), {"sid": session_id})
 
 
-@router.post("/ai/tutor")
+def _check_ai_rate_limit(user_id: int) -> None:
+    """Raise 429 if the user sent an AI request too recently."""
+    last = _AI_USER_LAST_REQUEST.get(user_id, 0.0)
+    elapsed = time.monotonic() - last
+    if elapsed < _AI_COOLDOWN_SECONDS:
+        wait = round(_AI_COOLDOWN_SECONDS - elapsed, 1)
+        raise HTTPException(status_code=429, detail=f"Please wait {wait}s before sending another question.")
+    _AI_USER_LAST_REQUEST[user_id] = time.monotonic()
+
+
+@ai_router.post("/ai/tutor")
 async def tutor(
     payload: TutorRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    _check_ai_rate_limit(current_user.id)
     if check_safety(payload.question):
         save_ai_conversation(db, user_id=current_user.id, course_id=None, module_id=None, question=payload.question, answer=SAFETY_REDIRECT)
         return {"answer": SAFETY_REDIRECT, "mode": "normal", "metrics": {}, "context": {"moduleTitle": None, "courseTitle": None, "gradeSignals": []}, "safety_filtered": True, "sessionId": None}
@@ -3111,12 +3434,13 @@ async def tutor(
     }
 
 
-@router.post("/ai/tutor/stream")
+@ai_router.post("/ai/tutor/stream")
 async def tutor_stream(
     payload: TutorRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _check_ai_rate_limit(current_user.id)
     if check_safety(payload.question):
         save_ai_conversation(db, user_id=current_user.id, course_id=None, module_id=None, question=payload.question, answer=SAFETY_REDIRECT)
         async def safe_redirect():
@@ -3170,14 +3494,14 @@ async def tutor_stream(
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-@router.get("/admin/departments")
+@admin_router.get("/admin/departments")
 def admin_list_departments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
     rows = db.scalars(select(Department).order_by(Department.name.asc())).all()
     return [{"id": d.id, "name": d.name, "code": d.code, "description": d.description, "headId": d.head_id, "isActive": d.is_active} for d in rows]
 
 
-@router.post("/admin/departments")
+@admin_router.post("/admin/departments")
 def admin_create_department(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     name = clean_text(payload.get("name"), max_length=120)
@@ -3194,7 +3518,7 @@ def admin_create_department(payload: dict = Body(default={}), current_user: User
     return {"ok": True, "id": dept.id, "name": dept.name, "code": dept.code}
 
 
-@router.put("/admin/departments/{dept_id}")
+@admin_router.put("/admin/departments/{dept_id}")
 def admin_update_department(dept_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     dept = db.get(Department, dept_id)
@@ -3215,7 +3539,7 @@ def admin_update_department(dept_id: int, payload: dict = Body(default={}), curr
     return {"ok": True}
 
 
-@router.delete("/admin/departments/{dept_id}")
+@admin_router.delete("/admin/departments/{dept_id}")
 def admin_delete_department(dept_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     dept = db.get(Department, dept_id)
@@ -3226,7 +3550,7 @@ def admin_delete_department(dept_id: int, current_user: User = Depends(get_curre
     return {"ok": True}
 
 
-@router.post("/admin/courses/{course_id}/enroll-section")
+@admin_router.post("/admin/courses/{course_id}/enroll-section")
 def admin_enroll_section(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     course = db.get(Course, course_id)
@@ -3261,7 +3585,7 @@ def admin_enroll_section(course_id: int, payload: dict = Body(default={}), curre
     return {"ok": True, "enrolled": enrolled, "skipped": skipped, "total": len(learners)}
 
 
-@router.get("/admin/system")
+@admin_router.get("/admin/system")
 def admin_system_status(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     try:
@@ -3276,6 +3600,7 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
     except Exception:
         ollama_status = "offline"
         ollama_models = []
+    uptime_seconds: float | None = None
     if _psutil:
         try:
             cpu_pct = _psutil.cpu_percent(interval=0.3)
@@ -3287,12 +3612,17 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
             disk_total_gb = round(disk.total / 1024 / 1024 / 1024, 1)
             disk_used_gb = round(disk.used / 1024 / 1024 / 1024, 1)
             disk_pct = disk.percent
+            uptime_seconds = round(time.time() - _psutil.boot_time(), 0)
         except Exception:
             cpu_pct = ram_pct = disk_pct = None
             ram_total_mb = ram_used_mb = disk_total_gb = disk_used_gb = None
     else:
         cpu_pct = ram_pct = disk_pct = None
         ram_total_mb = ram_used_mb = disk_total_gb = disk_used_gb = None
+
+    # Active users = distinct users with JWT activity in the last 15 minutes.
+    # We approximate using the AI cooldown dict as a proxy for recent activity.
+    active_user_count = len(_AI_USER_LAST_REQUEST)
     return {
         "database": db_status,
         "ollama": ollama_status,
@@ -3301,6 +3631,10 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
         "portalUrl": f"http://{PORTAL_DOMAIN}",
         "wifiSsid": SSID,
         "mode": "LAN offline-first",
+        "uptimeSeconds": uptime_seconds,
+        "activeAiUsers": active_user_count,
+        "aiQueueSlots": _AI_MAX_CONCURRENT,
+        "aiCacheSize": len(_ai_response_cache),
         "hardware": {
             "cpuPercent": cpu_pct,
             "ramPercent": ram_pct,
@@ -3324,7 +3658,7 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
     }
 
 
-@router.get("/ai/sessions")
+@ai_router.get("/ai/sessions")
 def list_chat_sessions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     sessions = db.scalars(
         select(ChatSession)
@@ -3335,7 +3669,7 @@ def list_chat_sessions(current_user: User = Depends(get_current_user), db: Sessi
     return [{"id": s.id, "title": s.title, "createdAt": s.created_at.isoformat(), "updatedAt": s.updated_at.isoformat(), "messageCount": len(s.messages)} for s in sessions]
 
 
-@router.post("/ai/sessions")
+@ai_router.post("/ai/sessions")
 def create_chat_session(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     title = clean_text(payload.get("title") or "New Conversation", max_length=255)
     session = ChatSession(user_id=current_user.id, title=title, is_active=True)
@@ -3368,7 +3702,7 @@ def delete_chat_session(session_id: int, current_user: User = Depends(get_curren
     return {"ok": True}
 
 
-@router.get("/ai/sessions/{session_id}/messages")
+@ai_router.get("/ai/sessions/{session_id}/messages")
 def get_session_messages(session_id: int, offset: int = 0, limit: int = 60, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
     if not session:
@@ -3390,6 +3724,11 @@ def get_session_messages(session_id: int, offset: int = 0, limit: int = 60, curr
 
 
 app.include_router(router)
+app.include_router(admin_router)
+app.include_router(teacher_router)
+app.include_router(student_router)
+app.include_router(ai_router)
+app.include_router(classes_router)
 EOF
 }
 
@@ -3398,6 +3737,9 @@ validate_backend_files() {
 
   validate_generated_file "${APP_ROOT}/backend/requirements.txt" "backend requirements file"
   validate_generated_file "${APP_ROOT}/backend/Dockerfile" "backend Dockerfile"
+  validate_generated_file "${APP_ROOT}/backend/alembic.ini" "Alembic config"
+  validate_generated_file "${APP_ROOT}/backend/alembic/env.py" "Alembic env"
+  validate_generated_file "${APP_ROOT}/backend/alembic/versions/0001_initial_schema.py" "Alembic initial migration"
   validate_generated_file "${APP_ROOT}/backend/app/__init__.py" "backend package marker"
   validate_generated_file "${APP_ROOT}/backend/app/main.py" "backend main API file"
   validate_generated_file "${APP_ROOT}/backend/app/database.py" "backend database file"

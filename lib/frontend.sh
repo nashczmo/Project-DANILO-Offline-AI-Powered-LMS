@@ -526,6 +526,104 @@ input, select, textarea { font-family: inherit; }
   .dn-status-dot-pulse {
     animation: pulseDot 2s ease-in-out infinite;
   }
+
+  /* ---- Tables ---- */
+  .dn-table-wrap {
+    @apply overflow-x-auto rounded-2xl border border-slate-200/60 bg-white shadow-sm;
+  }
+  .dn-table {
+    @apply w-full text-sm border-collapse;
+  }
+  .dn-table thead th {
+    @apply text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/80 border-b border-slate-200/60 whitespace-nowrap;
+  }
+  .dn-table tbody td {
+    @apply px-4 py-3 text-slate-700 border-b border-slate-100/60;
+  }
+  .dn-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .dn-table tbody tr:hover td {
+    @apply bg-slate-50/60;
+  }
+
+  /* ---- Modal / Dialog ---- */
+  .dn-modal-backdrop {
+    @apply fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4;
+  }
+  .dn-modal {
+    @apply bg-white rounded-2xl shadow-xl border border-slate-200/80 w-full max-w-lg overflow-hidden animate-scale-in;
+  }
+  .dn-modal-header {
+    @apply px-5 py-4 border-b border-slate-100 flex items-center justify-between;
+  }
+  .dn-modal-body {
+    @apply px-5 py-5;
+  }
+  .dn-modal-footer {
+    @apply px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2;
+  }
+
+  /* ---- Topbar ---- */
+  .dn-topbar {
+    @apply hidden lg:flex items-center justify-between h-14 px-6 border-b border-slate-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-30;
+  }
+
+  /* ---- Page layout ---- */
+  .dn-page {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5;
+  }
+  .dn-page-narrow {
+    @apply max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-5;
+  }
+
+  /* ---- Search ---- */
+  .dn-search {
+    @apply w-full bg-white px-3.5 py-2 pl-9 text-sm text-slate-900 outline-none rounded-lg border border-slate-200;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    background-size: 16px;
+  }
+  .dn-search:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+  }
+
+  /* ---- Quick action ---- */
+  .dn-quick-action {
+    @apply dn-card p-4 flex items-center gap-3 cursor-pointer transition-all;
+  }
+  .dn-quick-action:hover {
+    @apply shadow-md border-primary-200;
+  }
+
+  /* ---- Form validation ---- */
+  .dn-input-error {
+    @apply border-danger-300 focus:border-danger-500;
+    box-shadow: 0 0 0 3px rgba(225,29,72,0.12);
+  }
+  .dn-field-error {
+    @apply text-xs text-danger-600 mt-1;
+  }
+
+  /* ---- Pagination ---- */
+  .dn-pagination {
+    @apply flex items-center gap-1;
+  }
+  .dn-pagination button {
+    @apply h-8 w-8 inline-flex items-center justify-center rounded-lg text-sm font-medium text-slate-600 border border-slate-200 bg-white transition-all;
+  }
+  .dn-pagination button:hover:not(:disabled) {
+    @apply bg-slate-50 border-slate-300;
+  }
+  .dn-pagination button.active {
+    @apply bg-primary-600 text-white border-primary-600;
+  }
+  .dn-pagination button:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
 }
 
 /* ========================================================================
@@ -765,7 +863,7 @@ export default function LoginView({ form, onChange, onSubmit, loading, error }) 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <p className="text-[10px] text-slate-400 mb-3 font-bold uppercase tracking-widest">System Roles</p>
           <div className="flex items-center justify-center gap-2.5">
-            <span className="px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold tracking-wide">Admin</span>
+            <span className="px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold tracking-wide">School Admin</span>
             <span className="px-3 py-1 rounded-full bg-warm-50 border border-warm-200 text-warm-700 text-xs font-semibold tracking-wide">Faculty</span>
             <span className="px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 text-xs font-semibold tracking-wide">Learner</span>
           </div>
@@ -1398,6 +1496,153 @@ export function GradeCascade({ value, onChange }) {
   );
 }
 
+export function PageHeader({ title, subtitle, children }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div>
+        <h1 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    </div>
+  );
+}
+
+export function DataTable({ columns, rows, keyField = "id", emptyTitle = "No data", emptyBody = "" }) {
+  if (!rows || rows.length === 0) {
+    return <Empty title={emptyTitle} body={emptyBody} />;
+  }
+  return (
+    <div className="dn-table-wrap">
+      <table className="dn-table">
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th key={col.key} style={col.width ? { width: col.width } : undefined}>{col.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row[keyField] ?? row._key}>
+              {columns.map((col) => (
+                <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PaginatedTable({ columns, rows, keyField = "id", pageSize = 10, searchFields = [], emptyTitle = "No data", emptyBody = "" }) {
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? rows.filter((r) => searchFields.some((f) => String(r[f] ?? "").toLowerCase().includes(q)))
+    : rows;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageRows = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+  return (
+    <div className="space-y-3">
+      {searchFields.length > 0 && (
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setPage(0); }}
+            placeholder="Search..."
+            className="dn-search max-w-xs"
+            aria-label="Search table"
+          />
+          <span className="text-xs text-slate-400">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
+        </div>
+      )}
+      <DataTable columns={columns} rows={pageRows} keyField={keyField} emptyTitle={emptyTitle} emptyBody={emptyBody} />
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">Page {currentPage + 1} of {totalPages}</span>
+          <div className="dn-pagination">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={currentPage === 0} aria-label="Previous page">&larr;</button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button key={i} onClick={() => setPage(i)} className={i === currentPage ? "active" : ""} aria-label={`Page ${i + 1}`}>{i + 1}</button>
+            ))}
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={currentPage === totalPages - 1} aria-label="Next page">&rarr;</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Modal({ open, onClose, title, children, footer }) {
+  if (!open) return null;
+  return (
+    <div className="dn-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="dn-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="dn-modal-header">
+          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center transition" aria-label="Close">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="dn-modal-body">{children}</div>
+        {footer && <div className="dn-modal-footer">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+export function QuickAction({ icon, title, description, onClick, tone = "primary" }) {
+  const toneMap = {
+    primary: "text-primary-600 bg-primary-50",
+    accent:  "text-accent-600 bg-accent-50",
+    warm:    "text-warm-600 bg-warm-50",
+    danger:  "text-danger-600 bg-danger-50",
+  };
+  return (
+    <button type="button" onClick={onClick} className="dn-quick-action text-left w-full">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${toneMap[tone] || toneMap.primary}`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-slate-900">{title}</p>
+        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+      </div>
+    </button>
+  );
+}
+
+export function SummaryCard({ label, value, icon, tone = "primary" }) {
+  const toneMap = {
+    primary: "text-primary-600 bg-primary-50",
+    accent:  "text-accent-600 bg-accent-50",
+    warm:    "text-warm-600 bg-warm-50",
+    success: "text-success-600 bg-success-50",
+    danger:  "text-danger-600 bg-danger-50",
+  };
+  return (
+    <div className="dn-card p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${toneMap[tone] || toneMap.primary}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-lg font-bold text-slate-900 tracking-tight">{value ?? "0"}</p>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+export function InlineError({ message }) {
+  if (!message) return null;
+  return <p className="dn-field-error">{message}</p>;
+}
+
 export async function downloadReport(path, filename, token) {
   const response = await fetch(`/api${path}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error("Report export failed");
@@ -1421,7 +1666,7 @@ const defaultUserForm = {
   educationLevel: "Junior High School", gradeLevel: "Grade 7", strand: "", sectionName: "", departmentId: "",
 };
 
-const ROLE_DISPLAY = { student: "Learner", teacher: "Faculty", admin: "Admin" };
+const ROLE_DISPLAY = { student: "Learner", teacher: "Faculty", admin: "School Admin" };
 const ROLE_BADGE_TONE = { admin: "blue", teacher: "gold", student: "green" };
 
 function makeUsername(fullName, role, sectionName) {
@@ -1472,11 +1717,11 @@ export function AdminUsersView({ token, users, reload }) {
   }
 
   return (
-    <section className="space-y-5 dn-page-enter" aria-label="User Management">
+    <section className="space-y-5 dn-page-enter" aria-label="People Management">
       <div className="dn-card p-5">
         <SectionHeader
           title={edit ? "Edit User" : "New User"}
-          subtitle={edit ? `Editing ${edit.fullName}` : "Add Faculty, Learners, or Admin accounts"}
+          subtitle={edit ? `Editing ${edit.fullName}` : "Add Faculty, Learners, or School Admin accounts"}
         />
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-3">
           <Field label="Role">
@@ -1535,12 +1780,12 @@ export function AdminUsersView({ token, users, reload }) {
       </div>
 
       <div className="dn-card p-5">
-        <SectionHeader title="User Accounts" subtitle={users.length ? `${users.length} total accounts` : "No users yet"}>
+        <SectionHeader title="Learners & Faculty" subtitle={users.length ? `${users.length} total accounts` : "No accounts yet"}>
           <select className="dn-input w-auto" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="">All Roles</option>
             <option value="student">Learners</option>
             <option value="teacher">Faculty</option>
-            <option value="admin">Admins</option>
+            <option value="admin">School Admins</option>
           </select>
         </SectionHeader>
         {visible.length ? (
@@ -1615,7 +1860,7 @@ export function AdminClassesView({ token, users, courses, reload }) {
   }
 
   return (
-    <section className="space-y-5 dn-page-enter" aria-label="Class Management">
+    <section className="space-y-5 dn-page-enter" aria-label="Subject Management">
       <div className="dn-card p-5">
         <SectionHeader title="Create Subject" subtitle="Set up a new subject and assign faculty" />
         <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-3">
@@ -1939,7 +2184,7 @@ export function AdminAnnouncementsView({ token, reload }) {
   return (
     <section className="dn-page-enter" aria-label="System Announcements">
       <form className="dn-card p-5" onSubmit={handleSubmit}>
-        <SectionHeader title="System Announcement" subtitle="Broadcast a message to all active classes" />
+        <SectionHeader title="System Announcement" subtitle="Broadcast a message to all active subjects" />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Title">
             <input className="dn-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
@@ -1973,7 +2218,7 @@ export function ReportsView({ token, dashboard }) {
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Stat label="Learners" value={t.learners ?? t.students} accent />
           <Stat label="Faculty" value={t.faculty ?? t.teachers} />
-          <Stat label="Classes" value={t.classes} />
+          <Stat label="Subjects" value={t.classes} />
           <Stat label="Enrollments" value={t.enrollments} />
           <Stat label="Modules" value={t.modules} />
           <Stat label="Grade Entries" value={t.grades} />
@@ -2139,7 +2384,7 @@ export function SystemView({ token, addToast, dismissToast }) {
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <Stat label="Learners" value={t.learners} accent />
             <Stat label="Faculty" value={t.faculty} />
-            <Stat label="Active Classes" value={t.classes} />
+            <Stat label="Active Subjects" value={t.classes} />
             <Stat label="Sections" value={t.sections} />
             <Stat label="Departments" value={t.departments} />
             <Stat label="Enrollments" value={t.enrollments} />
@@ -2168,9 +2413,9 @@ export function SystemView({ token, addToast, dismissToast }) {
 
 export function AdminAssignmentsView({ assignments }) {
   return (
-    <section className="dn-page-enter" aria-label="Assignments">
+    <section className="dn-page-enter" aria-label="Assessments">
       <div className="dn-card p-5">
-        <SectionHeader title="All Assignments" subtitle={`${(assignments || []).length} assignments across all classes`} />
+        <SectionHeader title="All Assessments" subtitle={`${(assignments || []).length} assessments across all subjects`} />
         {assignments?.length ? (
           <div className="space-y-2">
             {assignments.map((a) => (
@@ -2191,7 +2436,7 @@ export function AdminAssignmentsView({ assignments }) {
             ))}
           </div>
         ) : (
-          <Empty title="No assignments" body="Assignments appear here once teachers create them." />
+          <Empty title="No assessments" body="Assessments appear here once faculty create them." />
         )}
       </div>
     </section>
@@ -2350,9 +2595,9 @@ export function TeacherAnnouncementsView({ token, courses, reload }) {
   return (
     <section className="dn-page-enter" aria-label="Announcements">
       <form className="dn-card p-5" onSubmit={handleSubmit}>
-        <SectionHeader title="Post Announcement" subtitle="Send a message to your class" />
+        <SectionHeader title="Post Announcement" subtitle="Send a message to your subject" />
         <div className="grid gap-3">
-          <Field label="Class">
+          <Field label="Subject">
             <select className="dn-input" value={courseId} onChange={(e) => setCourseId(e.target.value)}>
               {courses.map((c) => <option key={c.id} value={c.id}>{c.code} - {c.title}</option>)}
             </select>
@@ -2449,6 +2694,10 @@ const Icons = {
   system:   I("M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"),
   announce: I("M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 008.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46"),
   assign:   I("M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"),
+  sync:     I("M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"),
+  settings: I("M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"),
+  people:   I("M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"),
+  section:  I("M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"),
 };
 
 
@@ -2458,29 +2707,26 @@ const Icons = {
 
 const NAV = {
   student: [
-    { path: "/overview",    label: "Home",       icon: Icons.home,    page: "overview" },
-    { path: "/my-classes",  label: "My Classes", icon: Icons.classes, page: "my-classes" },
-    { path: "/grades",      label: "Grades",     icon: Icons.grades,  page: "grades" },
-    { path: "/ai-tutor",   label: "AI Tutor",   icon: Icons.tutor,   page: "ai-tutor" },
+    { path: "/overview",    label: "Dashboard",    icon: Icons.home,    page: "overview" },
+    { path: "/my-classes",  label: "My Subjects", icon: Icons.classes, page: "my-classes" },
+    { path: "/grades",      label: "Progress",   icon: Icons.grades,  page: "grades" },
+    { path: "/ai-tutor",    label: "AI Assistant", icon: Icons.tutor,   page: "ai-tutor" },
   ],
   teacher: [
-    { path: "/overview",     label: "Overview",      icon: Icons.home,     page: "overview" },
-    { path: "/my-classes",   label: "My Classes",    icon: Icons.classes,  page: "my-classes" },
-    { path: "/grades",       label: "Gradebook",     icon: Icons.grades,   page: "grades" },
-    { path: "/announcements", label: "Announce",     icon: Icons.announce, page: "announcements" },
-    { path: "/ai-tutor",    label: "AI Assistant",  icon: Icons.tutor,    page: "ai-tutor" },
+    { path: "/overview",      label: "Dashboard",      icon: Icons.home,     page: "overview" },
+    { path: "/my-classes",    label: "My Subjects",    icon: Icons.classes,  page: "my-classes" },
+    { path: "/grades",        label: "Progress",       icon: Icons.grades,   page: "grades" },
+    { path: "/announcements",  label: "Announcements",  icon: Icons.announce,  page: "announcements" },
+    { path: "/ai-tutor",      label: "AI Assistant",   icon: Icons.tutor,    page: "ai-tutor" },
   ],
   admin: [
-    { path: "/overview",     label: "Overview",     icon: Icons.home,    page: "overview" },
-    { path: "/users",        label: "Users",        icon: Icons.users,   page: "users" },
-    { path: "/classes",      label: "Subjects",     icon: Icons.classes, page: "classes" },
-    { path: "/enrollments",  label: "Enrollments",  icon: Icons.enroll,  page: "enrollments" },
-    { path: "/assignments",  label: "Assignments",  icon: Icons.assign,  page: "assignments" },
-    { path: "/grades",       label: "Grades",       icon: Icons.grades,  page: "grades" },
-    { path: "/departments",  label: "Departments",  icon: Icons.users,   page: "departments" },
-    { path: "/reports",      label: "Reports",      icon: Icons.reports, page: "reports" },
-    { path: "/system",       label: "System",       icon: Icons.system,  page: "system" },
-    { path: "/ai-tutor",    label: "AI Tutor",     icon: Icons.tutor,   page: "ai-tutor" },
+    { path: "/overview",     label: "Dashboard",       icon: Icons.home,    page: "overview" },
+    { path: "/users",        label: "Learners",        icon: Icons.users,   page: "users" },
+    { path: "/classes",       label: "Subjects",        icon: Icons.classes, page: "classes" },
+    { path: "/sections",      label: "Sections",        icon: Icons.section, page: "sections" },
+    { path: "/departments",   label: "Departments",     icon: Icons.people,  page: "departments" },
+    { path: "/system",        label: "System Status",   icon: Icons.system,  page: "system" },
+    { path: "/ai-tutor",      label: "AI Assistant",    icon: Icons.tutor,   page: "ai-tutor" },
   ],
 };
 const getNav = (role) => NAV[role] || NAV.student;
@@ -2490,6 +2736,7 @@ const ALLOWED = {
   teacher: ["overview", "my-classes", "grades", "announcements", "ai-tutor", "class-detail", "not-found"],
   student: ["overview", "my-classes", "grades", "ai-tutor", "class-detail", "not-found"],
 };
+const ROLE_LABEL = { admin: "School Admin", teacher: "Faculty", student: "Learner" };
 function isAllowed(role, page) {
   return (ALLOWED[role] || ALLOWED.student).includes(page);
 }
@@ -2583,7 +2830,7 @@ function Sidebar({ user, currentPage, navigate, onLogout, dashboard }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">{user.fullName}</p>
-              <p className="text-[11px] text-slate-400 capitalize">{user.role}</p>
+              <p className="text-[11px] text-slate-400">{ROLE_LABEL[user.role] || user.role}</p>
             </div>
           </div>
           <button type="button" onClick={onLogout}
@@ -2594,6 +2841,51 @@ function Sidebar({ user, currentPage, navigate, onLogout, dashboard }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+
+/* ========================================================================
+   DESKTOP TOPBAR
+   ======================================================================== */
+
+function TopBar({ user, currentPage, onLogout }) {
+  const tabs = getNav(user.role);
+  const currentTab = tabs.find((t) => t.page === currentPage);
+  const initials = getInitials(user.fullName);
+  const roleTone = { admin: "bg-primary-600", teacher: "bg-warm-500", student: "bg-accent-600" };
+
+  return (
+    <header className="dn-topbar">
+      <div className="flex items-center gap-3">
+        <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center">
+          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900 tracking-tight">{currentTab ? currentTab.label : "DANILO"}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-1.5 rounded-full px-2.5 py-1 bg-success-50 border border-success-200">
+          <span className="dn-status-dot" style={{ width: 5, height: 5 }} />
+          <span className="text-[11px] font-medium text-success-600">Online</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-full ${roleTone[user.role] || roleTone.student} flex items-center justify-center`}>
+            <span className="text-[11px] font-bold text-white">{initials}</span>
+          </div>
+          <div className="hidden md:block text-right">
+            <p className="text-sm font-medium text-slate-900 leading-none">{user.fullName}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{ROLE_LABEL[user.role] || user.role}</p>
+          </div>
+        </div>
+        <button type="button" onClick={onLogout} className="h-8 w-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center transition" aria-label="Sign Out">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+        </button>
+      </div>
+    </header>
   );
 }
 
@@ -2671,7 +2963,7 @@ function MobileDrawer({ open, user, currentPage, navigate, onClose, onLogout, da
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 truncate">{user.fullName}</p>
-              <p className="text-xs text-slate-400 capitalize">{user.role}</p>
+              <p className="text-xs text-slate-400">{ROLE_LABEL[user.role] || user.role}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="h-10 w-10 rounded-lg text-slate-500 active:scale-95 active:bg-slate-100 transition" aria-label="Close">
@@ -2878,7 +3170,7 @@ function HomeView({ user, dashboard, onNavigate }) {
 function MyClassesView({ courses, navigate }) {
   const COLORS = ["from-primary-500 to-primary-600", "from-purple-500 to-purple-600", "from-accent-500 to-accent-600", "from-warm-500 to-warm-600", "from-danger-500 to-danger-600"];
   return (
-    <section className="animate-fade-in" aria-label="My Classes">
+    <section className="animate-fade-in" aria-label="My Subjects">
       <div className="mb-5">
         <h2 className="dn-title">My Subjects</h2>
         <p className="dn-subtitle mt-0.5">Your enrolled subjects. Tap a card to open.</p>
@@ -3090,13 +3382,13 @@ function InsightsPanel({ insights, loading, error, token, classId, onRefresh }) 
   }
 
   if (loading && !insights) {
-    return React.createElement("div", { className: "dn-card p-4 text-sm text-slate-500 animate-pulse" }, "Loading student insights...");
+    return React.createElement("div", { className: "dn-card p-4 text-sm text-slate-500 animate-pulse" }, "Loading learner insights...");
   }
   if (error && !insights) {
     return React.createElement("div", { className: "rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm font-medium text-danger-600" }, error);
   }
   if (!insights || !insights.course) {
-    return React.createElement(Empty, { icon: Icons.classes, title: "No insights available", body: "Insights will appear once students have grades, quiz attempts, or assignment submissions." });
+    return React.createElement(Empty, { icon: Icons.classes, title: "No insights available", body: "Insights will appear once learners have grades, quiz attempts, or assessment submissions." });
   }
 
   const stats = insights.stats || {};
@@ -3139,7 +3431,7 @@ function InsightsPanel({ insights, loading, error, token, classId, onRefresh }) 
       )
     ),
     struggling.length > 0 && React.createElement("div", { className: "mb-5" },
-      React.createElement(SectionHeader, { title: "Struggling Students", subtitle: `${struggling.length} student${struggling.length !== 1 ? "s" : ""} need${struggling.length === 1 ? "s" : ""} attention` }),
+      React.createElement(SectionHeader, { title: "Struggling Learners", subtitle: `${struggling.length} learner${struggling.length !== 1 ? "s" : ""} need${struggling.length === 1 ? "s" : ""} attention` }),
       React.createElement("div", { className: "space-y-3" },
         struggling.map(function(s) {
           return React.createElement("div", { key: s.studentId, className: "dn-card p-4" },
@@ -3184,8 +3476,8 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
   const [classSubject, setClassSubject] = useState("");
   const TABS = [
     { id: "stream", label: "Stream", path: `/class/${classId}/stream` },
-    { id: "classwork", label: "Classwork", path: `/class/${classId}/classwork` },
-    { id: "people", label: "People", path: `/class/${classId}/people` },
+    { id: "classwork", label: "Materials", path: `/class/${classId}/classwork` },
+    { id: "people", label: "Learners", path: `/class/${classId}/people` },
     { id: "grades", label: "Grades", path: `/class/${classId}/grades` },
     ...(user.role === "teacher" ? [{ id: "insights", label: "Insights", path: `/class/${classId}/insights` }] : []),
   ];
@@ -3239,9 +3531,9 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
     return (
       <section className="animate-fade-in text-center py-16">
         <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">{Icons.classes}</div>
-        <h2 className="text-lg font-semibold text-slate-900">Class not found</h2>
-        <p className="text-sm text-slate-400 mt-1">This class does not exist or you are not enrolled.</p>
-        <button onClick={() => navigate("/my-classes")} className="mt-4 dn-btn-primary">Back to My Classes</button>
+        <h2 className="text-lg font-semibold text-slate-900">Subject not found</h2>
+        <p className="text-sm text-slate-400 mt-1">This subject does not exist or you are not enrolled.</p>
+        <button onClick={() => navigate("/my-classes")} className="mt-4 dn-btn-primary">Back to My Subjects</button>
       </section>
     );
   }
@@ -3258,7 +3550,7 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
     <section className="animate-fade-in">
       <button onClick={() => navigate("/my-classes")} className="flex items-center gap-1 text-sm text-primary-600 font-medium mb-4 hover:text-primary-700 transition-colors">
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
-        My Classes
+        My Subjects
       </button>
       <div className="dn-card p-4 mb-4">
         <h2 className="text-base font-semibold text-slate-900 tracking-tight">{course.title}</h2>
@@ -3284,16 +3576,16 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
         <>
           <ContentView items={content} search={classSearch} onSearchChange={setClassSearch} quarter={classQuarter} onQuarterChange={setClassQuarter} subject={classSubject} onSubjectChange={setClassSubject} workflow={null} />
           <div className="mt-4 dn-card p-5">
-            <h3 className="font-semibold text-slate-900 mb-3">Assignments</h3>
+            <h3 className="font-semibold text-slate-900 mb-3">Assessments</h3>
             {assignments.length ? assignments.map((a) => (
               <AssignmentCard key={a.id} token={token} assignment={a} canSubmit={user.role === "student"} onSaved={refreshClass} />
-            )) : <Empty title="No assignments" body="Assignments for this class will appear here." />}
+            )) : <Empty title="No assessments" body="Assessments for this subject will appear here." />}
           </div>
           <div className="mt-4 dn-card p-5">
             <h3 className="font-semibold text-slate-900 mb-3">Quizzes</h3>
             {quizzes.length ? quizzes.map((q) => (
               <QuizCard key={q.id} token={token} quiz={q} canSubmit={user.role === "student"} onSaved={refreshClass} />
-            )) : <Empty title="No quizzes" body="Published quizzes for this class will appear here." />}
+            )) : <Empty title="No quizzes" body="Published quizzes for this subject will appear here." />}
           </div>
         </>
       )}
@@ -3886,7 +4178,8 @@ export default function App() {
       <MobileDrawer open={mobileMenuOpen} user={user} currentPage={page} navigate={navigate} onClose={() => setMobileMenuOpen(false)} onLogout={handleLogout} dashboard={dashboard} />
 
       <main className="lg:pl-[260px]">
-        <div className="min-h-screen pt-[56px] lg:pt-0 pb-[80px] lg:pb-8 px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-5xl mx-auto">
+        <TopBar user={user} currentPage={page} onLogout={handleLogout} />
+        <div className="min-h-screen pt-[56px] lg:pt-0 pb-[80px] lg:pb-8">
 
           <InstallBanner promptEvent={promptEvent} onInstall={installApp} onDismiss={() => setPromptEvent(null)} />
 

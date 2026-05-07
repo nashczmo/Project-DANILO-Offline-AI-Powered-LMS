@@ -190,11 +190,14 @@ services:
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
       OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
+      # Limit context window to reduce per-request VRAM/RAM usage (phi3:mini default 4096)
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-1024}
     deploy:
       resources:
         limits:
-          cpus: "2.5"
-          memory: 4096M
+          cpus: "2.0"
+          # phi3:mini weighs ~2.3 GB; 2816 MB leaves headroom for KV cache and OS
+          memory: 2816M
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -241,7 +244,7 @@ write_project_docs() {
   cat > "${APP_ROOT}/.env.example" <<'EOF'
 # Project DANILO local/deployment configuration
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=ProjectDANILO2026!
+ADMIN_PASSWORD=
 SECRET_KEY=change-me
 JWT_SECRET=change-me
 DATABASE_URL=
@@ -253,8 +256,8 @@ POSTGRES_USER=danilo
 POSTGRES_PASSWORD=change-me
 JWT_EXPIRE_MINUTES=720
 OLLAMA_URL=http://ollama:11434
-DANILO_OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_S
-OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_S
+DANILO_OLLAMA_MODEL=phi3:mini
+OLLAMA_MODEL=phi3:mini
 OLLAMA_NUM_PARALLEL=1
 OLLAMA_MAX_LOADED_MODELS=1
 OLLAMA_KEEP_ALIVE=10m
@@ -276,10 +279,10 @@ Project DANILO is an offline-first DepEd school portal packaged with FastAPI, Re
 The backend creates or repairs the first administrator during startup:
 
 - Username: `admin`
-- Password: `ProjectDANILO2026!`
+- Password: Auto-generated on first install and shown only in the final installer summary. Change it via Settings > Account immediately after first login.
 - Role: `admin`
 
-Passwords are stored only as bcrypt hashes in `users.password_hash`. The plaintext password is read from local environment configuration and is printed only in the final installer summary.
+Passwords are stored only as bcrypt hashes in `users.password_hash`. The plaintext password is printed only once in the final installer summary and is never stored in plain text or logged.
 
 ## Install, Update, And Verify
 
@@ -328,10 +331,11 @@ Copy `.env.example` to `.env` for manual deployments and override secrets before
 
 ## Low-Power AI Defaults
 
-DANILO defaults to `llama3.1:8b-instruct-q4_K_S` for Beelink/Intel N95 class devices with 8GB RAM. To reinstall with the lightweight model and hardware-safe Ollama settings:
+DANILO defaults to `phi3:mini` (Microsoft Phi-3 Mini, ~2.3GB RAM) optimised for 8GB RAM school servers with many concurrent learners. This provides low latency and high stability over raw capability.
 
 ```bash
-sudo DANILO_OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_S bash danilo.sh --install --clean-build
+# Override model if desired
+sudo DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
 ```
 
 Recommended Intel N95 settings are `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_KEEP_ALIVE=10m`, `OLLAMA_NUM_CTX=1024`, and the default answer mode `normal`. Use Short mode for fastest student help and Detailed only when a longer explanation is needed.
