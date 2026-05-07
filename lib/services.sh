@@ -253,8 +253,8 @@ POSTGRES_USER=danilo
 POSTGRES_PASSWORD=change-me
 JWT_EXPIRE_MINUTES=720
 OLLAMA_URL=http://ollama:11434
-DANILO_OLLAMA_MODEL=qwen2.5:1.5b-instruct-q4_K_M
-OLLAMA_MODEL=qwen2.5:1.5b-instruct-q4_K_M
+DANILO_OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_S
+OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_S
 OLLAMA_NUM_PARALLEL=1
 OLLAMA_MAX_LOADED_MODELS=1
 OLLAMA_KEEP_ALIVE=10m
@@ -328,10 +328,10 @@ Copy `.env.example` to `.env` for manual deployments and override secrets before
 
 ## Low-Power AI Defaults
 
-DANILO defaults to `qwen2.5:1.5b-instruct-q4_K_M` for Beelink/Intel N95 class devices with 8GB RAM. To reinstall with the lightweight model and hardware-safe Ollama settings:
+DANILO defaults to `llama3.1:8b-instruct-q4_K_S` for Beelink/Intel N95 class devices with 8GB RAM. To reinstall with the lightweight model and hardware-safe Ollama settings:
 
 ```bash
-sudo DANILO_OLLAMA_MODEL=qwen2.5:1.5b-instruct-q4_K_M bash danilo.sh --install --clean-build
+sudo DANILO_OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_S bash danilo.sh --install --clean-build
 ```
 
 Recommended Intel N95 settings are `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_KEEP_ALIVE=10m`, `OLLAMA_NUM_CTX=1024`, and the default answer mode `normal`. Use Short mode for fastest student help and Detailed only when a longer explanation is needed.

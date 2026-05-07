@@ -798,6 +798,7 @@ def analyze_student_performance(db: Session, class_id: int) -> dict:
 EOF
 
   cat > "${APP_ROOT}/backend/app/main.py" <<'EOF'
+import csv
 import io
 import json
 import os
@@ -1026,6 +1027,52 @@ def clean_text(value, *, required: bool = True, max_length: int = 255) -> str | 
     return text_value or None
 
 
+def parse_int(value, field: str, *, required: bool = True, minimum: int | None = None) -> int | None:
+    if value in (None, ""):
+        if required:
+            raise HTTPException(status_code=400, detail=f"{field} is required")
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"{field} must be a whole number") from exc
+    if minimum is not None and parsed < minimum:
+        raise HTTPException(status_code=400, detail=f"{field} must be at least {minimum}")
+    return parsed
+
+
+def parse_float(value, field: str, *, required: bool = True, minimum: float | None = None, maximum: float | None = None) -> float | None:
+    if value in (None, ""):
+        if required:
+            raise HTTPException(status_code=400, detail=f"{field} is required")
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"{field} must be a number") from exc
+    if minimum is not None and parsed < minimum:
+        raise HTTPException(status_code=400, detail=f"{field} must be at least {minimum}")
+    if maximum is not None and parsed > maximum:
+        raise HTTPException(status_code=400, detail=f"{field} must be at most {maximum}")
+    return parsed
+
+
+def parse_bool(value, field: str, *, default: bool | None = None) -> bool:
+    if value in (None, ""):
+        if default is not None:
+            return default
+        raise HTTPException(status_code=400, detail=f"{field} is required")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "y"}:
+            return True
+        if lowered in {"false", "0", "no", "n"}:
+            return False
+    raise HTTPException(status_code=400, detail=f"{field} must be true or false")
+
+
 EDUCATION_LEVELS = {
     "Kinder": ["Kinder"],
     "Elementary": [f"Grade {grade}" for grade in range(1, 7)],
@@ -1142,8 +1189,52 @@ def serialize_course(course: Course) -> dict:
         "description": course.description,
         "teacherId": course.teacher_id,
         "teacherName": course.teacher.full_name if course.teacher else "Unassigned",
+        "departmentId": course.department_id,
+        "departmentName": course.department.name if course.department else "",
         "isActive": course.is_active,
     }
+
+
+def summarize_grade_entries(course: Course, rows: list[GradeEntry], student_name: str | None = None) -> list[dict]:
+    buckets: dict[str, dict] = {}
+    for grade in rows:
+        bucket = buckets.setdefault(
+            grade.quarter,
+            {
+                "courseId": course.id,
+                "courseCode": course.code,
+                "courseTitle": course.title,
+                "subject": course.subject,
+                "quarter": grade.quarter,
+                "teacher": course.teacher.full_name if course.teacher else "",
+                "studentName": student_name,
+                "components": [],
+                "weightedScore": 0.0,
+                "weightTotal": 0.0,
+            },
+        )
+        normalized = (grade.score / grade.max_score) * 100.0 if grade.max_score else 0.0
+        bucket["components"].append(
+            {
+                "id": grade.id,
+                "component": grade.component,
+                "score": grade.score,
+                "maxScore": grade.max_score,
+                "weight": grade.weight,
+                "remarks": grade.remarks or "",
+                "percentage": round(normalized, 2),
+            }
+        )
+        bucket["weightedScore"] += normalized * grade.weight
+        bucket["weightTotal"] += grade.weight
+    summary = []
+    for bucket in buckets.values():
+        total = bucket["weightedScore"] / bucket["weightTotal"] if bucket["weightTotal"] else 0.0
+        bucket["finalGrade"] = round(total, 2)
+        bucket.pop("weightedScore")
+        bucket.pop("weightTotal")
+        summary.append(bucket)
+    return sorted(summary, key=lambda item: item["quarter"])
 
 
 def log_action(db: Session, actor: User | None, action: str, entity_type: str, entity_id: int | None = None, details: str | None = None) -> None:
@@ -2024,7 +2115,10 @@ def admin_create_user(payload: dict = Body(default={}), current_user: User = Dep
     if db.scalar(select(User).where(or_(func.lower(User.username) == username.lower(), func.lower(User.email) == email.lower()))):
         raise HTTPException(status_code=409, detail="Username or email already exists")
     password = clean_text(payload.get("password") or "danilo123", max_length=255)
-    user = User(role=role, username=username, email=email, full_name=full_name, education_level=education_level, grade_level=grade_level, strand=strand, section_name=section_name_val, password_salt="", password_hash=hash_password(password), is_active=bool(payload.get("isActive", True)))
+    department_id = parse_int(payload.get("departmentId") or payload.get("department_id"), "Department", required=False, minimum=1)
+    if department_id and not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True)):
+        raise HTTPException(status_code=400, detail="Department not found")
+    user = User(role=role, username=username, email=email, full_name=full_name, education_level=education_level, grade_level=grade_level, strand=strand, section_name=section_name_val, department_id=department_id, password_salt="", password_hash=hash_password(password), is_active=parse_bool(payload.get("isActive"), "Active status", default=True))
     db.add(user)
     db.flush()
     if user.role == "student" and section_name_val:
@@ -2058,10 +2152,15 @@ def admin_update_user(user_id: int, payload: dict = Body(default={}), current_us
     for attr, key, limit in [("username", "username", 120), ("email", "email", 255), ("full_name", "fullName", 255), ("education_level", "educationLevel", 40), ("grade_level", "gradeLevel", 50), ("strand", "strand", 80), ("section_name", "sectionName", 120)]:
         if key in payload:
             setattr(user, attr, clean_text(payload.get(key), required=attr not in {"education_level", "grade_level", "strand", "section_name"}, max_length=limit))
+    if "departmentId" in payload or "department_id" in payload:
+        department_id = parse_int(payload.get("departmentId") or payload.get("department_id"), "Department", required=False, minimum=1)
+        if department_id and not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True)):
+            raise HTTPException(status_code=400, detail="Department not found")
+        user.department_id = department_id
     if {"educationLevel", "gradeLevel", "strand"} & set(payload.keys()):
         user.education_level, user.grade_level, user.strand = validate_grade_path(user.education_level, user.grade_level, user.strand)
     if "isActive" in payload:
-        user.is_active = bool(payload["isActive"])
+        user.is_active = parse_bool(payload["isActive"], "Active status")
     log_action(db, current_user, "update_user", "user", user.id)
     db.commit()
     db.refresh(user)
@@ -2104,6 +2203,8 @@ def admin_permanent_delete_user(user_id: int, current_user: User = Depends(get_c
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    db.execute(text("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE user_id = :uid)"), {"uid": user_id})
+    db.execute(text("DELETE FROM chat_sessions WHERE user_id = :uid"), {"uid": user_id})
     db.execute(text("DELETE FROM ai_conversations WHERE student_id = :uid"), {"uid": user_id})
     db.execute(text("DELETE FROM grade_entries WHERE student_id = :uid"), {"uid": user_id})
     db.execute(text("UPDATE grade_entries SET recorded_by = :admin_id WHERE recorded_by = :uid"), {"admin_id": current_user.id, "uid": user_id})
@@ -2147,14 +2248,14 @@ def admin_create_section(payload: dict = Body(default={}), current_user: User = 
         clean_text(payload.get("gradeLevel") or "Grade 7", max_length=50),
         clean_text(payload.get("strand"), required=False, max_length=80),
     )
-    adviser_id = payload.get("adviserId") or payload.get("adviser_id")
-    if adviser_id and not db.scalar(select(User).where(User.id == int(adviser_id), User.role == "teacher")):
+    adviser_id = parse_int(payload.get("adviserId") or payload.get("adviser_id"), "Adviser", required=False, minimum=1)
+    if adviser_id and not db.scalar(select(User).where(User.id == adviser_id, User.role == "teacher")):
         raise HTTPException(status_code=400, detail="Adviser must be a teacher account")
     section = Section(
         name=clean_text(payload.get("name"), max_length=120),
         grade_level=grade_level, education_level=education_level, strand=strand,
         school_year=clean_text(payload.get("schoolYear") or "2026-2027", max_length=20),
-        adviser_id=int(adviser_id) if adviser_id else None, is_active=True,
+        adviser_id=adviser_id, is_active=True,
     )
     db.add(section)
     log_action(db, current_user, "create_section", "section", None, section.name)
@@ -2178,12 +2279,12 @@ def admin_update_section(section_id: int, payload: dict = Body(default={}), curr
             clean_text(payload.get("strand") or section.strand, required=False, max_length=80),
         )
     if "adviserId" in payload:
-        adviser_id = payload["adviserId"]
-        if adviser_id and not db.scalar(select(User).where(User.id == int(adviser_id), User.role == "teacher")):
+        adviser_id = parse_int(payload["adviserId"], "Adviser", required=False, minimum=1)
+        if adviser_id and not db.scalar(select(User).where(User.id == adviser_id, User.role == "teacher")):
             raise HTTPException(status_code=400, detail="Adviser must be a teacher account")
-        section.adviser_id = int(adviser_id) if adviser_id else None
+        section.adviser_id = adviser_id
     if "isActive" in payload:
-        section.is_active = bool(payload["isActive"])
+        section.is_active = parse_bool(payload["isActive"], "Active status")
     log_action(db, current_user, "update_section", "section", section.id)
     db.commit()
     return {"ok": True}
@@ -2210,7 +2311,8 @@ def admin_assign_students_to_section(section_id: int, payload: dict = Body(defau
     student_ids = payload.get("studentIds") or payload.get("student_ids") or []
     updated = 0
     for sid in student_ids:
-        student = db.get(User, int(sid))
+        student_id = parse_int(sid, "Student", minimum=1)
+        student = db.get(User, student_id)
         if student and student.role == "student":
             student.section_name = section.name
             updated += 1
@@ -2228,15 +2330,18 @@ def admin_courses(current_user: User = Depends(get_current_user), db: Session = 
 @router.post("/admin/courses")
 def admin_create_course(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
-    teacher_id = payload.get("teacherId") or payload.get("teacher_id")
-    if teacher_id and not db.scalar(select(User).where(User.id == int(teacher_id), User.role == "teacher")):
+    teacher_id = parse_int(payload.get("teacherId") or payload.get("teacher_id"), "Faculty", required=False, minimum=1)
+    if teacher_id and not db.scalar(select(User).where(User.id == teacher_id, User.role == "teacher")):
         raise HTTPException(status_code=400, detail="Teacher account not found")
+    department_id = parse_int(payload.get("departmentId") or payload.get("department_id"), "Department", required=False, minimum=1)
+    if department_id and not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True)):
+        raise HTTPException(status_code=400, detail="Department not found")
     education_level, grade_level, strand = validate_grade_path(
         clean_text(payload.get("educationLevel") or payload.get("education_level") or "Junior High School", max_length=40),
         clean_text(payload.get("gradeLevel") or payload.get("grade_level") or "Grade 7", max_length=50),
         clean_text(payload.get("strand"), required=False, max_length=80),
     )
-    course = Course(code=clean_text(payload.get("code"), max_length=50), title=clean_text(payload.get("title"), max_length=255), subject=validate_deped_subject(payload.get("subject")), education_level=education_level, grade_level=grade_level, strand=strand, quarter=validate_quarter(payload.get("quarter")), school_year=clean_text(payload.get("schoolYear") or payload.get("school_year") or "2026-2027", max_length=20), description=clean_text(payload.get("description") or "Offline-ready DANILO class.", max_length=1000), teacher_id=int(teacher_id) if teacher_id else None, is_active=True)
+    course = Course(code=clean_text(payload.get("code"), max_length=50), title=clean_text(payload.get("title"), max_length=255), subject=validate_deped_subject(payload.get("subject")), education_level=education_level, grade_level=grade_level, strand=strand, quarter=validate_quarter(payload.get("quarter")), school_year=clean_text(payload.get("schoolYear") or payload.get("school_year") or "2026-2027", max_length=20), description=clean_text(payload.get("description") or "Offline-ready DANILO class.", max_length=1000), teacher_id=teacher_id, department_id=department_id, is_active=True)
     db.add(course)
     db.flush()
     log_action(db, current_user, "create_course", "course", course.id)
@@ -2257,10 +2362,20 @@ def admin_update_course(course_id: int, payload: dict = Body(default={}), curren
         course.subject = validate_deped_subject(payload.get("subject"))
     if "quarter" in payload:
         course.quarter = validate_quarter(payload.get("quarter"))
+    if "teacherId" in payload or "teacher_id" in payload:
+        teacher_id = parse_int(payload.get("teacherId") or payload.get("teacher_id"), "Faculty", required=False, minimum=1)
+        if teacher_id and not db.scalar(select(User).where(User.id == teacher_id, User.role == "teacher")):
+            raise HTTPException(status_code=400, detail="Teacher account not found")
+        course.teacher_id = teacher_id
+    if "departmentId" in payload or "department_id" in payload:
+        department_id = parse_int(payload.get("departmentId") or payload.get("department_id"), "Department", required=False, minimum=1)
+        if department_id and not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True)):
+            raise HTTPException(status_code=400, detail="Department not found")
+        course.department_id = department_id
     if {"educationLevel", "gradeLevel", "strand"} & set(payload.keys()):
         course.education_level, course.grade_level, course.strand = validate_grade_path(course.education_level, course.grade_level, course.strand)
     if "isActive" in payload:
-        course.is_active = bool(payload["isActive"])
+        course.is_active = parse_bool(payload["isActive"], "Active status")
     log_action(db, current_user, "update_course", "course", course.id)
     db.commit()
     return {"ok": True}
@@ -2288,8 +2403,8 @@ def admin_permanent_delete_course(course_id: int, current_user: User = Depends(g
     db.execute(text("DELETE FROM grade_entries WHERE course_id = :cid"), {"cid": course_id})
     db.execute(text("DELETE FROM submissions WHERE assignment_id IN (SELECT id FROM assignments WHERE course_id = :cid)"), {"cid": course_id})
     db.execute(text("DELETE FROM assignments WHERE course_id = :cid"), {"cid": course_id})
-    db.execute(text("DELETE FROM quiz_questions WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = :cid)"), {"cid": course_id})
     db.execute(text("DELETE FROM quiz_attempts WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = :cid)"), {"cid": course_id})
+    db.execute(text("DELETE FROM quiz_questions WHERE quiz_id IN (SELECT id FROM quizzes WHERE course_id = :cid)"), {"cid": course_id})
     db.execute(text("DELETE FROM quizzes WHERE course_id = :cid"), {"cid": course_id})
     db.execute(text("DELETE FROM enrollments WHERE course_id = :cid"), {"cid": course_id})
     db.execute(text("DELETE FROM stream_posts WHERE course_id = :cid"), {"cid": course_id})
@@ -2303,7 +2418,7 @@ def admin_permanent_delete_course(course_id: int, current_user: User = Depends(g
 @router.post("/admin/courses/{course_id}/enroll")
 def admin_enroll_student(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
-    student_id = int(payload.get("studentId") or payload.get("student_id") or 0)
+    student_id = parse_int(payload.get("studentId") or payload.get("student_id"), "Student", minimum=1)
     if not db.scalar(select(User).where(User.id == student_id, User.role == "student")):
         raise HTTPException(status_code=400, detail="Student account not found")
     enrollment = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id))
@@ -2331,7 +2446,7 @@ def admin_unenroll_student(course_id: int, student_id: int, current_user: User =
 @router.post("/admin/courses/{course_id}/assign-teacher")
 def admin_assign_teacher(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
-    teacher_id = int(payload.get("teacherId") or payload.get("teacher_id") or 0)
+    teacher_id = parse_int(payload.get("teacherId") or payload.get("teacher_id"), "Faculty", minimum=1)
     if not db.scalar(select(User).where(User.id == teacher_id, User.role == "teacher")):
         raise HTTPException(status_code=400, detail="Teacher account not found")
     course = db.get(Course, course_id)
@@ -2359,22 +2474,26 @@ def admin_system_announcement(payload: dict = Body(default={}), current_user: Us
 @router.get("/admin/reports/roster")
 def admin_roster_report(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
     require_role(current_user, "admin")
-    rows = ["course_code,course_title,teacher,student_username,student_name,status"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["course_code", "course_title", "teacher", "student_username", "student_name", "status"])
     data = db.execute(select(Course, Enrollment, User).join(Enrollment, Enrollment.course_id == Course.id).join(User, Enrollment.student_id == User.id).order_by(Course.code, User.full_name)).all()
     for course, enrollment, student in data:
         teacher = course.teacher.full_name if course.teacher else "Unassigned"
-        rows.append(f"{course.code},{course.title},{teacher},{student.username},{student.full_name},{enrollment.status}")
-    return Response("\n".join(rows), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-roster.csv"})
+        writer.writerow([course.code, course.title, teacher, student.username, student.full_name, enrollment.status])
+    return Response(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-roster.csv"})
 
 
 @router.get("/admin/reports/grades")
 def admin_grades_report(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
     require_role(current_user, "admin")
-    rows = ["course_code,student_username,student_name,quarter,component,score,max_score,weight,remarks"]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["course_code", "student_username", "student_name", "quarter", "component", "score", "max_score", "weight", "remarks"])
     data = db.execute(select(GradeEntry, Course, User).join(Course, GradeEntry.course_id == Course.id).join(User, GradeEntry.student_id == User.id).order_by(Course.code, User.full_name)).all()
     for grade, course, student in data:
-        rows.append(f"{course.code},{student.username},{student.full_name},{grade.quarter},{grade.component},{grade.score},{grade.max_score},{grade.weight},{grade.remarks or ''}")
-    return Response("\n".join(rows), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-grades.csv"})
+        writer.writerow([course.code, student.username, student.full_name, grade.quarter, grade.component, grade.score, grade.max_score, grade.weight, grade.remarks or ""])
+    return Response(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-grades.csv"})
 
 
 @router.get("/teacher/dashboard")
@@ -2430,8 +2549,8 @@ def teacher_create_module(course_id: int, payload: dict = Body(default={}), curr
         grade_level=course.grade_level,
         subject=course.subject,
         quarter=validate_quarter(payload.get("quarter") or course.quarter),
-        week=int(payload.get("week") or 1),
-        sequence_order=int(payload.get("sequenceOrder") or payload.get("sequence_order") or 1),
+        week=parse_int(payload.get("week") or 1, "Week", minimum=1),
+        sequence_order=parse_int(payload.get("sequenceOrder") or payload.get("sequence_order") or 1, "Sequence order", minimum=1),
         folder_name=clean_text(payload.get("folderName") or payload.get("folder_name") or f"{course.code}/Lessons", max_length=255),
         title=clean_text(payload.get("title"), max_length=255),
         summary=clean_text(payload.get("summary") or "Teacher-created lesson module.", max_length=2000),
@@ -2505,7 +2624,7 @@ def teacher_update_module(module_id: int, payload: dict = Body(default={}), curr
         module.assessment_type = validate_assessment_type(payload.get("assessmentType"))
     for attr, key in [("week", "week"), ("sequence_order", "sequenceOrder")]:
         if key in payload:
-            setattr(module, attr, int(payload.get(key)))
+            setattr(module, attr, parse_int(payload.get(key), "Sequence field", minimum=1))
     db.commit()
     return {"ok": True}
 
@@ -2524,7 +2643,7 @@ def teacher_delete_module(module_id: int, current_user: User = Depends(get_curre
 @router.post("/teacher/courses/{course_id}/assignments")
 def teacher_create_assignment(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
-    assignment = Assignment(course_id=course.id, title=clean_text(payload.get("title"), max_length=255), instructions=clean_text(payload.get("instructions"), max_length=4000), points=float(payload.get("points") or 100), created_by=current_user.id)
+    assignment = Assignment(course_id=course.id, title=clean_text(payload.get("title"), max_length=255), instructions=clean_text(payload.get("instructions"), max_length=4000), points=parse_float(payload.get("points") or 100, "Points", minimum=1), created_by=current_user.id)
     db.add(assignment)
     db.add(StreamPost(course_id=course.id, author_id=current_user.id, title=assignment.title, body=assignment.instructions, post_type="assignment"))
     db.commit()
@@ -2541,9 +2660,9 @@ def teacher_update_assignment(assignment_id: int, payload: dict = Body(default={
         if key in payload:
             setattr(assignment, attr, clean_text(payload.get(key), max_length=limit))
     if "points" in payload:
-        assignment.points = float(payload.get("points"))
+        assignment.points = parse_float(payload.get("points"), "Points", minimum=1)
     if "isActive" in payload:
-        assignment.is_active = bool(payload.get("isActive"))
+        assignment.is_active = parse_bool(payload.get("isActive"), "Active status")
     db.commit()
     return {"ok": True}
 
@@ -2562,11 +2681,11 @@ def teacher_delete_assignment(assignment_id: int, current_user: User = Depends(g
 @router.post("/teacher/courses/{course_id}/quizzes")
 def teacher_create_quiz(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
-    quiz = Quiz(course_id=course.id, title=clean_text(payload.get("title") or "Class Quiz", max_length=255), instructions=clean_text(payload.get("instructions") or "Answer each question based on the current lesson.", max_length=2000), is_published=bool(payload.get("isPublished", False)), created_by=current_user.id)
+    quiz = Quiz(course_id=course.id, title=clean_text(payload.get("title") or "Class Quiz", max_length=255), instructions=clean_text(payload.get("instructions") or "Answer each question based on the current lesson.", max_length=2000), is_published=parse_bool(payload.get("isPublished"), "Published status", default=False), created_by=current_user.id)
     db.add(quiz)
     db.flush()
     for item in payload.get("questions") or []:
-        db.add(QuizQuestion(quiz_id=quiz.id, question_text=clean_text(item.get("questionText") or item.get("question"), max_length=2000), choices_json=clean_text(item.get("choicesJson"), required=False, max_length=4000), answer_key=clean_text(item.get("answerKey"), required=False, max_length=1000), points=float(item.get("points") or 1)))
+        db.add(QuizQuestion(quiz_id=quiz.id, question_text=clean_text(item.get("questionText") or item.get("question"), max_length=2000), choices_json=clean_text(item.get("choicesJson"), required=False, max_length=4000), answer_key=clean_text(item.get("answerKey"), required=False, max_length=1000), points=parse_float(item.get("points") or 1, "Question points", minimum=1)))
     db.commit()
     return {"ok": True, "id": quiz.id}
 
@@ -2576,7 +2695,17 @@ def teacher_gradebook(course_id: int, current_user: User = Depends(get_current_u
     course = ensure_teacher_course(db, current_user, course_id)
     students = teacher_course_students(course_id, current_user, db)
     grades = db.execute(select(GradeEntry, User).join(User, GradeEntry.student_id == User.id).where(GradeEntry.course_id == course_id).order_by(User.full_name, GradeEntry.created_at)).all()
-    return {"course": {"id": course.id, "code": course.code, "title": course.title}, "students": students, "grades": [{"id": grade.id, "studentId": student.id, "studentName": student.full_name, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade, student in grades]}
+    by_student: dict[int, list[GradeEntry]] = {}
+    names: dict[int, str] = {}
+    for grade, student in grades:
+        by_student.setdefault(student.id, []).append(grade)
+        names[student.id] = student.full_name
+    summaries = []
+    for student_id, rows in by_student.items():
+        for item in summarize_grade_entries(course, rows, names.get(student_id)):
+            item["studentId"] = student_id
+            summaries.append(item)
+    return {"course": serialize_course(course), "students": students, "entries": [{"id": grade.id, "studentId": student.id, "studentName": student.full_name, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade, student in grades], "grades": summaries}
 
 
 @router.get("/teacher/insights")
@@ -2628,10 +2757,10 @@ async def teacher_student_insights(
 @router.post("/teacher/courses/{course_id}/grades")
 def teacher_create_grade(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     ensure_teacher_course(db, current_user, course_id)
-    student_id = int(payload.get("studentId") or payload.get("student_id") or 0)
+    student_id = parse_int(payload.get("studentId") or payload.get("student_id"), "Student", minimum=1)
     if not db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id, Enrollment.status == "active")):
         raise HTTPException(status_code=400, detail="Student is not enrolled in this class")
-    grade = GradeEntry(student_id=student_id, course_id=course_id, quarter=clean_text(payload.get("quarter") or "Q1", max_length=2), component=clean_text(payload.get("component"), max_length=80), score=float(payload.get("score")), max_score=float(payload.get("maxScore") or payload.get("max_score") or 100), weight=float(payload.get("weight") or 1), remarks=clean_text(payload.get("remarks"), required=False, max_length=1000), recorded_by=current_user.id)
+    grade = GradeEntry(student_id=student_id, course_id=course_id, quarter=validate_quarter(payload.get("quarter") or "Q1"), component=clean_text(payload.get("component"), max_length=80), score=parse_float(payload.get("score"), "Score", minimum=0), max_score=parse_float(payload.get("maxScore") or payload.get("max_score") or 100, "Max score", minimum=1), weight=parse_float(payload.get("weight") or 1, "Weight", minimum=0), remarks=clean_text(payload.get("remarks"), required=False, max_length=1000), recorded_by=current_user.id)
     db.add(grade)
     db.commit()
     return {"ok": True, "id": grade.id}
@@ -2645,10 +2774,14 @@ def teacher_update_grade(grade_id: int, payload: dict = Body(default={}), curren
     ensure_teacher_course(db, current_user, grade.course_id)
     for attr, key in [("quarter", "quarter"), ("component", "component"), ("remarks", "remarks")]:
         if key in payload:
-            setattr(grade, attr, clean_text(payload.get(key), required=attr != "remarks", max_length=1000 if attr == "remarks" else 80))
+            if attr == "quarter":
+                grade.quarter = validate_quarter(payload.get(key))
+            else:
+                setattr(grade, attr, clean_text(payload.get(key), required=attr != "remarks", max_length=1000 if attr == "remarks" else 80))
     for attr, key in [("score", "score"), ("max_score", "maxScore"), ("weight", "weight")]:
         if key in payload:
-            setattr(grade, attr, float(payload.get(key)))
+            minimum = 1 if attr == "max_score" else 0
+            setattr(grade, attr, parse_float(payload.get(key), key, minimum=minimum))
     db.commit()
     return {"ok": True}
 
@@ -2704,7 +2837,7 @@ def student_submit_assignment(assignment_id: int, payload: dict = Body(default={
     submission.response_text = clean_text(payload.get("responseText") or payload.get("response_text"), max_length=6000)
     submission.status = "submitted"
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "submission": {"status": submission.status, "responseText": submission.response_text, "score": submission.score, "feedback": submission.feedback or ""}}
 
 
 @router.post("/student/assignments/{assignment_id}/complete")
@@ -2720,7 +2853,7 @@ def student_complete_assignment(assignment_id: int, current_user: User = Depends
         db.add(submission)
     submission.status = "completed"
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "submission": {"status": submission.status, "responseText": submission.response_text or "", "score": submission.score, "feedback": submission.feedback or ""}}
 
 
 @router.post("/student/quizzes/{quiz_id}/submit")
@@ -2800,8 +2933,43 @@ def class_classwork(course_id: int, current_user: User = Depends(get_current_use
     modules = build_content_tree(db, user=current_user)
     modules = [item for item in modules if item["courseId"] == course.id]
     assignment_rows = db.scalars(select(Assignment).where(Assignment.course_id == course.id, Assignment.is_active == True).order_by(Assignment.created_at.desc())).all()
-    assignments = [{"id": item.id, "courseId": course.id, "title": item.title, "instructions": item.instructions, "points": item.points, "dueAt": item.due_at.isoformat() if item.due_at else None, "createdAt": item.created_at.isoformat() if item.created_at else ""} for item in assignment_rows]
-    return {"course": serialize_course(course), "modules": modules, "assignments": assignments}
+    submissions_by_assignment = {}
+    if current_user.role == "student":
+        submissions = db.scalars(select(Submission).join(Assignment, Submission.assignment_id == Assignment.id).where(Assignment.course_id == course.id, Submission.student_id == current_user.id)).all()
+        submissions_by_assignment = {item.assignment_id: item for item in submissions}
+    assignments = []
+    for item in assignment_rows:
+        submission = submissions_by_assignment.get(item.id)
+        assignments.append({
+            "id": item.id,
+            "courseId": course.id,
+            "title": item.title,
+            "instructions": item.instructions,
+            "points": item.points,
+            "dueAt": item.due_at.isoformat() if item.due_at else None,
+            "createdAt": item.created_at.isoformat() if item.created_at else "",
+            "submission": {"status": submission.status, "responseText": submission.response_text or "", "score": submission.score, "feedback": submission.feedback or ""} if submission else None,
+        })
+    quiz_rows = db.scalars(select(Quiz).where(Quiz.course_id == course.id, Quiz.is_published == True).order_by(Quiz.created_at.desc())).all()
+    attempts_by_quiz = {}
+    if current_user.role == "student":
+        attempts = db.scalars(select(QuizAttempt).join(Quiz, QuizAttempt.quiz_id == Quiz.id).where(Quiz.course_id == course.id, QuizAttempt.student_id == current_user.id).order_by(QuizAttempt.submitted_at.desc())).all()
+        for attempt in attempts:
+            attempts_by_quiz.setdefault(attempt.quiz_id, attempt)
+    quizzes = []
+    for quiz in quiz_rows:
+        questions = db.scalars(select(QuizQuestion).where(QuizQuestion.quiz_id == quiz.id).order_by(QuizQuestion.id.asc())).all()
+        attempt = attempts_by_quiz.get(quiz.id)
+        quizzes.append({
+            "id": quiz.id,
+            "courseId": course.id,
+            "title": quiz.title,
+            "instructions": quiz.instructions,
+            "createdAt": quiz.created_at.isoformat() if quiz.created_at else "",
+            "attempt": {"id": attempt.id, "score": attempt.score, "submittedAt": attempt.submitted_at.isoformat() if attempt.submitted_at else ""} if attempt else None,
+            "questions": [{"id": question.id, "questionText": question.question_text, "choicesJson": question.choices_json or "", "points": question.points} for question in questions],
+        })
+    return {"course": serialize_course(course), "modules": modules, "assignments": assignments, "quizzes": quizzes}
 
 
 @router.get("/classes/{course_id}/people")
@@ -2816,9 +2984,19 @@ def class_grades(course_id: int, current_user: User = Depends(get_current_user),
     course = get_user_class(db, current_user, course_id)
     if current_user.role == "student":
         grades = db.scalars(select(GradeEntry).where(GradeEntry.course_id == course.id, GradeEntry.student_id == current_user.id).order_by(GradeEntry.created_at.asc())).all()
-        return {"course": serialize_course(course), "grades": [{"id": grade.id, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade in grades]}
+        return {"course": serialize_course(course), "entries": [{"id": grade.id, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade in grades], "grades": summarize_grade_entries(course, grades)}
     grades = db.execute(select(GradeEntry, User).join(User, GradeEntry.student_id == User.id).where(GradeEntry.course_id == course.id).order_by(User.full_name.asc(), GradeEntry.created_at.asc())).all()
-    return {"course": serialize_course(course), "grades": [{"id": grade.id, "studentId": student.id, "studentName": student.full_name, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade, student in grades]}
+    by_student: dict[int, list[GradeEntry]] = {}
+    names: dict[int, str] = {}
+    for grade, student in grades:
+        by_student.setdefault(student.id, []).append(grade)
+        names[student.id] = student.full_name
+    summaries = []
+    for student_id, rows in by_student.items():
+        for item in summarize_grade_entries(course, rows, names.get(student_id)):
+            item["studentId"] = student_id
+            summaries.append(item)
+    return {"course": serialize_course(course), "entries": [{"id": grade.id, "studentId": student.id, "studentName": student.full_name, "quarter": grade.quarter, "component": grade.component, "score": grade.score, "maxScore": grade.max_score, "weight": grade.weight, "remarks": grade.remarks or ""} for grade, student in grades], "grades": summaries}
 
 
 @router.get("/admin/enrollments")
@@ -3006,7 +3184,10 @@ def admin_create_department(payload: dict = Body(default={}), current_user: User
     code = clean_text(payload.get("code"), max_length=20).upper()
     if db.scalar(select(Department).where(func.lower(Department.code) == code.lower())):
         raise HTTPException(status_code=409, detail="Department code already exists")
-    dept = Department(name=name, code=code, description=clean_text(payload.get("description"), required=False, max_length=500), head_id=payload.get("headId") or None, is_active=True)
+    head_id = parse_int(payload.get("headId") or payload.get("head_id"), "Department head", required=False, minimum=1)
+    if head_id and not db.scalar(select(User).where(User.id == head_id, User.role == "teacher")):
+        raise HTTPException(status_code=400, detail="Department head must be a teacher account")
+    dept = Department(name=name, code=code, description=clean_text(payload.get("description"), required=False, max_length=500), head_id=head_id, is_active=True)
     db.add(dept)
     db.commit()
     db.refresh(dept)
@@ -3024,9 +3205,12 @@ def admin_update_department(dept_id: int, payload: dict = Body(default={}), curr
             val = clean_text(payload.get(key), required=attr not in {"description"}, max_length=limit)
             setattr(dept, attr, val.upper() if attr == "code" else val)
     if "headId" in payload:
-        dept.head_id = payload.get("headId") or None
+        head_id = parse_int(payload.get("headId"), "Department head", required=False, minimum=1)
+        if head_id and not db.scalar(select(User).where(User.id == head_id, User.role == "teacher")):
+            raise HTTPException(status_code=400, detail="Department head must be a teacher account")
+        dept.head_id = head_id
     if "isActive" in payload:
-        dept.is_active = bool(payload["isActive"])
+        dept.is_active = parse_bool(payload["isActive"], "Active status")
     db.commit()
     return {"ok": True}
 
@@ -3051,7 +3235,7 @@ def admin_enroll_section(course_id: int, payload: dict = Body(default={}), curre
     section_id = payload.get("sectionId")
     section_name = payload.get("sectionName")
     if section_id:
-        section = db.get(Section, int(section_id))
+        section = db.get(Section, parse_int(section_id, "Section", minimum=1))
         if not section:
             raise HTTPException(status_code=404, detail="Section not found")
         learners = db.scalars(select(User).where(func.lower(User.section_name) == section.name.lower(), User.role == "student", User.is_active == True)).all()
@@ -3169,7 +3353,7 @@ def update_chat_session(session_id: int, payload: dict = Body(default={}), curre
     if "title" in payload:
         session.title = clean_text(payload["title"], max_length=255)
     if "isActive" in payload:
-        session.is_active = bool(payload["isActive"])
+        session.is_active = parse_bool(payload["isActive"], "Active status")
     db.commit()
     return {"ok": True}
 

@@ -1091,6 +1091,14 @@ export default function TutorView({ token, modules, form, onChange, onSubmit, lo
   const [sessionMessages, setSessionMessages] = useState(null);
   const [isWarmingUp, setIsWarmingUp] = useState(false);
 
+  function refreshSessions() {
+    if (!token) return;
+    fetch("/api/ai/sessions", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setSessions(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }
+
   useEffect(() => {
     let timeout;
     if (loading) {
@@ -1106,12 +1114,16 @@ export default function TutorView({ token, modules, form, onChange, onSubmit, lo
   }, [messages, sessionMessages, loading]);
 
   useEffect(() => {
-    if (!token) return;
-    fetch("/api/ai/sessions", { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => setSessions(Array.isArray(data) ? data : []))
-      .catch(() => {});
+    refreshSessions();
   }, [token, messages]);
+
+  useEffect(() => {
+    const latest = messages?.[messages.length - 1];
+    if (!latest?.sessionId) return;
+    setActiveSessionId(latest.sessionId);
+    setSessionMessages(null);
+    refreshSessions();
+  }, [messages]);
 
   async function loadSession(id) {
     setActiveSessionId(id);
@@ -1202,21 +1214,19 @@ export default function TutorView({ token, modules, form, onChange, onSubmit, lo
           </div>
         </div>
 
-        {sessionMessages === null && (
-          <div className="flex-shrink-0 mb-3">
-            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-              <select name="moduleId" value={form.moduleId} onChange={onChange} className="dn-input text-sm" aria-label="Select lesson context">
-                <option value="">{hasModules ? "Select lesson context (optional)" : "No modules available"}</option>
-                {(modules || []).map((m) => <option key={m.id} value={m.id}>{m.subject} · {m.title}</option>)}
-              </select>
-              <select name="responseMode" value={form.responseMode} onChange={onChange} className="dn-input sm:w-28 text-sm" aria-label="Response mode">
-                <option value="short">Short</option>
-                <option value="normal">Normal</option>
-                <option value="detailed">Detailed</option>
-              </select>
-            </div>
+        <div className="flex-shrink-0 mb-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <select name="moduleId" value={form.moduleId} onChange={onChange} className="dn-input text-sm" aria-label="Select lesson context">
+              <option value="">{hasModules ? "Select lesson context (optional)" : "No modules available"}</option>
+              {(modules || []).map((m) => <option key={m.id} value={m.id}>{m.subject} · {m.title}</option>)}
+            </select>
+            <select name="responseMode" value={form.responseMode} onChange={onChange} className="dn-input sm:w-28 text-sm" aria-label="Response mode">
+              <option value="short">Short</option>
+              <option value="normal">Normal</option>
+              <option value="detailed">Detailed</option>
+            </select>
           </div>
-        )}
+        </div>
 
         <div className="flex-1 overflow-y-auto bg-slate-50 rounded-xl border border-slate-200 p-3 sm:p-4 space-y-3 min-h-0 overscroll-contain" role="log" aria-live="polite">
           {displayMessages.length === 0 && !loading && (
@@ -1241,8 +1251,7 @@ export default function TutorView({ token, modules, form, onChange, onSubmit, lo
           <div ref={endRef} />
         </div>
 
-        {sessionMessages === null && (
-          <form onSubmit={onSubmit} className="flex-shrink-0 mt-3 pb-safe-chat">
+        <form onSubmit={(e) => onSubmit(e, activeSessionId, sessionMessages)} className="flex-shrink-0 mt-3 pb-safe-chat">
             <div className="flex gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
               <input
                 name="question" value={form.question} onChange={onChange}
@@ -1258,8 +1267,7 @@ export default function TutorView({ token, modules, form, onChange, onSubmit, lo
                 )}
               </button>
             </div>
-          </form>
-        )}
+        </form>
       </div>
     </section>
   );
@@ -1404,13 +1412,13 @@ export async function downloadReport(path, filename, token) {
 EOF
 
   cat > "${APP_ROOT}/frontend/src/components/AdminPages.jsx" <<'EOF'
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../api";
 import { ASSESSMENT_TYPES, DEPED_SUBJECTS, Badge, Empty, Field, GradeCascade, SectionHeader, Stat, downloadReport } from "./shared";
 
 const defaultUserForm = {
   role: "student", fullName: "", username: "", password: "danilo123",
-  educationLevel: "Junior High School", gradeLevel: "Grade 7", strand: "", sectionName: "",
+  educationLevel: "Junior High School", gradeLevel: "Grade 7", strand: "", sectionName: "", departmentId: "",
 };
 
 const ROLE_DISPLAY = { student: "Learner", teacher: "Faculty", admin: "Admin" };
@@ -1431,10 +1439,12 @@ export function AdminUsersView({ token, users, reload }) {
   const [edit, setEdit] = useState(null);
   const [filter, setFilter] = useState("");
   const [sections, setSections] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const visible = users.filter((u) => !filter || u.role === filter);
 
   useEffect(() => {
     apiRequest("/admin/sections", { token }).then((d) => setSections(Array.isArray(d) ? d : [])).catch(() => {});
+    apiRequest("/admin/departments", { token }).then((d) => setDepartments(Array.isArray(d) ? d.filter((x) => x.isActive !== false) : [])).catch(() => {});
   }, [token]);
 
   async function handleSubmit(e) {
@@ -1457,7 +1467,7 @@ export function AdminUsersView({ token, users, reload }) {
     setForm({
       role: u.role, fullName: u.fullName, username: u.username, password: "",
       educationLevel: u.educationLevel || "Junior High School",
-      gradeLevel: u.gradeLevel || "Grade 7", strand: u.strand || "", sectionName: u.sectionName || "",
+      gradeLevel: u.gradeLevel || "Grade 7", strand: u.strand || "", sectionName: u.sectionName || "", departmentId: u.departmentId || "",
     });
   }
 
@@ -1506,6 +1516,12 @@ export function AdminUsersView({ token, users, reload }) {
             ) : (
               <input className="dn-input bg-slate-50 text-slate-400" value="No sections yet — create sections first" readOnly />
             )}
+          </Field>
+          <Field label="Department">
+            <select className="dn-input" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
+              <option value="">No department</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
           </Field>
           <div className="flex items-end gap-2">
             <button className="dn-btn-primary w-full">{edit ? "Save Changes" : "Create User"}</button>
@@ -1579,12 +1595,17 @@ export function AdminUsersView({ token, users, reload }) {
 
 const defaultCourseForm = {
   code: "", title: "", subject: "", educationLevel: "Junior High School",
-  gradeLevel: "Grade 7", strand: "", quarter: "Q1", teacherId: "", description: "",
+  gradeLevel: "Grade 7", strand: "", quarter: "Q1", teacherId: "", departmentId: "", description: "",
 };
 
 export function AdminClassesView({ token, users, courses, reload }) {
   const teachers = users.filter((u) => u.role === "teacher" && u.isActive !== false);
   const [form, setForm] = useState(defaultCourseForm);
+  const [departments, setDepartments] = useState([]);
+
+  useEffect(() => {
+    apiRequest("/admin/departments", { token }).then((d) => setDepartments(Array.isArray(d) ? d.filter((x) => x.isActive !== false) : [])).catch(() => {});
+  }, [token]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -1618,6 +1639,12 @@ export function AdminClassesView({ token, users, courses, reload }) {
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
             </select>
           </Field>
+          <Field label="Department">
+            <select className="dn-input" value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
+              <option value="">No department</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </Field>
           <Field label="Description" className="sm:col-span-2">
             <input className="dn-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
@@ -1642,11 +1669,140 @@ export function AdminClassesView({ token, users, courses, reload }) {
                 <p className="text-xs text-slate-400 mt-2">
                   {c.teacherName || "Unassigned"} &middot; {c.studentTotal ?? 0} learners &middot; {c.moduleTotal ?? 0} modules
                 </p>
+                {c.departmentName && <p className="text-xs text-slate-400 mt-1">Department: {c.departmentName}</p>}
               </div>
             ))}
           </div>
         ) : (
           <Empty title="No subjects" body="Create a subject, assign faculty, then enroll learners." />
+        )}
+      </div>
+    </section>
+  );
+}
+
+
+const defaultSectionForm = { name: "", educationLevel: "Junior High School", gradeLevel: "Grade 7", strand: "", schoolYear: "2026-2027", adviserId: "" };
+
+export function AdminSectionsView({ token, users, reload }) {
+  const teachers = users.filter((u) => u.role === "teacher" && u.isActive !== false);
+  const learners = users.filter((u) => u.role === "student" && u.isActive !== false);
+  const [sections, setSections] = useState([]);
+  const [form, setForm] = useState(defaultSectionForm);
+  const [edit, setEdit] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [assign, setAssign] = useState({});
+
+  async function loadSections() {
+    setLoading(true);
+    try {
+      const data = await apiRequest("/admin/sections", { token });
+      setSections(Array.isArray(data) ? data : []);
+    } catch (_) {
+      setSections([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadSections(); }, [token]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const payload = { ...form, adviserId: form.adviserId ? Number(form.adviserId) : null };
+    if (edit) {
+      await apiRequest(`/admin/sections/${edit.id}`, { method: "PUT", token, body: payload });
+      setEdit(null);
+    } else {
+      await apiRequest("/admin/sections", { method: "POST", token, body: payload });
+    }
+    setForm(defaultSectionForm);
+    await loadSections();
+    reload();
+  }
+
+  function startEdit(section) {
+    setEdit(section);
+    setForm({
+      name: section.name || "",
+      educationLevel: section.educationLevel || "Junior High School",
+      gradeLevel: section.gradeLevel || "Grade 7",
+      strand: section.strand || "",
+      schoolYear: section.schoolYear || "2026-2027",
+      adviserId: section.adviserId || "",
+    });
+  }
+
+  async function deactivate(id) {
+    await apiRequest(`/admin/sections/${id}`, { method: "DELETE", token });
+    await loadSections();
+    reload();
+  }
+
+  async function assignStudent(sectionId) {
+    const studentId = assign[sectionId];
+    if (!studentId) return;
+    await apiRequest(`/admin/sections/${sectionId}/assign-students`, { method: "POST", token, body: { studentIds: [Number(studentId)] } });
+    setAssign({ ...assign, [sectionId]: "" });
+    await loadSections();
+    reload();
+  }
+
+  return (
+    <section className="space-y-5 dn-page-enter" aria-label="Section Management">
+      <div className="dn-card p-5">
+        <SectionHeader title={edit ? "Edit Section" : "New Section"} subtitle="Create advisory sections and assign learners" />
+        <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-3">
+          <Field label="Section Name"><input className="dn-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Grade 7 - Mabini" required /></Field>
+          <GradeCascade value={form} onChange={setForm} />
+          <Field label="School Year"><input className="dn-input" value={form.schoolYear} onChange={(e) => setForm({ ...form, schoolYear: e.target.value })} required /></Field>
+          <Field label="Adviser">
+            <select className="dn-input" value={form.adviserId} onChange={(e) => setForm({ ...form, adviserId: e.target.value })}>
+              <option value="">Unassigned</option>
+              {teachers.map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+            </select>
+          </Field>
+          <div className="flex items-end gap-2">
+            <button className="dn-btn-primary w-full">{edit ? "Save Changes" : "Create Section"}</button>
+            {edit && <button type="button" className="dn-btn-secondary" onClick={() => { setEdit(null); setForm(defaultSectionForm); }}>Cancel</button>}
+          </div>
+        </form>
+      </div>
+
+      <div className="dn-card p-5">
+        <SectionHeader title="Sections" subtitle={sections.length ? `${sections.length} active sections` : "No sections yet"} />
+        {loading ? (
+          <div className="text-center py-6 text-sm text-slate-400">Loading...</div>
+        ) : sections.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sections.map((s) => (
+              <article key={s.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 hover:bg-white hover:shadow-sm transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge tone="blue">{s.gradeLevel}</Badge>
+                  {s.strand && <Badge>{s.strand}</Badge>}
+                </div>
+                <h3 className="font-semibold text-slate-900 tracking-tight">{s.name}</h3>
+                <p className="text-xs text-slate-400 mt-1">{s.educationLevel} &middot; SY {s.schoolYear}</p>
+                <p className="text-xs text-slate-400 mt-1">Adviser: {s.adviserName || "Unassigned"}</p>
+                <p className="text-xs text-slate-400 mt-1">{s.studentCount ?? 0} learners</p>
+                <div className="mt-3 grid gap-2">
+                  <div className="flex gap-2">
+                    <select className="dn-input text-xs" value={assign[s.id] || ""} onChange={(e) => setAssign({ ...assign, [s.id]: e.target.value })}>
+                      <option value="">Assign learner...</option>
+                      {learners.map((l) => <option key={l.id} value={l.id}>{l.fullName}</option>)}
+                    </select>
+                    <button type="button" className="dn-btn-secondary text-xs px-2 py-1 min-h-[34px]" onClick={() => assignStudent(s.id)}>Add</button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" className="dn-btn-secondary text-xs py-1 px-2 min-h-[30px]" onClick={() => startEdit(s)}>Edit</button>
+                    <button type="button" className="dn-btn-danger text-xs py-1 px-2 min-h-[30px]" onClick={() => deactivate(s.id)}>Deactivate</button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <Empty title="No sections" body="Create sections before assigning learners to advisory groups." />
         )}
       </div>
     </section>
@@ -1832,7 +1988,7 @@ export function SystemView({ token, addToast, dismissToast }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState(null);
-  const ramToastId = React.useRef(null);
+  const ramToastId = useRef(null);
 
   async function load() {
     setLoading(true);
@@ -2048,6 +2204,7 @@ export function DepartmentsView({ token, users, reload }) {
   const [form, setForm] = useState({ name: "", code: "", description: "", headId: "" });
   const [edit, setEdit] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [assign, setAssign] = useState({});
 
   const faculty = users.filter((u) => u.role === "teacher" && u.isActive !== false);
 
@@ -2078,6 +2235,18 @@ export function DepartmentsView({ token, users, reload }) {
   async function deactivate(id) {
     await apiRequest(`/admin/departments/${id}`, { method: "DELETE", token });
     loadDepts();
+    reload();
+  }
+
+  async function assignFaculty(departmentId) {
+    const facultyId = assign[departmentId];
+    if (!facultyId) return;
+    const facultyMember = faculty.find((f) => String(f.id) === String(facultyId));
+    if (!facultyMember) return;
+    await apiRequest(`/admin/users/${facultyId}`, { method: "PUT", token, body: { ...facultyMember, departmentId } });
+    setAssign({ ...assign, [departmentId]: "" });
+    loadDepts();
+    reload();
   }
 
   function startEdit(d) {
@@ -2138,6 +2307,13 @@ export function DepartmentsView({ token, users, reload }) {
                     Head: {faculty.find((f) => f.id === d.headId)?.fullName || `ID ${d.headId}`}
                   </p>
                 )}
+                <div className="flex gap-2 mt-3">
+                  <select className="dn-input text-xs" value={assign[d.id] || ""} onChange={(e) => setAssign({ ...assign, [d.id]: e.target.value })}>
+                    <option value="">Assign faculty...</option>
+                    {faculty.map((f) => <option key={f.id} value={f.id}>{f.fullName}</option>)}
+                  </select>
+                  <button type="button" className="dn-btn-secondary text-xs px-2 py-1 min-h-[34px]" onClick={() => assignFaculty(d.id)}>Add</button>
+                </div>
                 <div className="flex gap-1.5 mt-3">
                   <button className="dn-btn-secondary text-xs py-1 px-2 min-h-[28px]" onClick={() => startEdit(d)}>Edit</button>
                   {d.isActive && (
@@ -2199,8 +2375,8 @@ EOF
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiRequest, apiUpload } from "./api";
-import { AdminAssignmentsView, AdminAnnouncementsView, AdminClassesView, AdminEnrollmentsView, AdminUsersView, DepartmentsView, ReportsView, SystemView, TeacherAnnouncementsView } from "./components/AdminPages";
-import { ASSESSMENT_TYPES, Empty, Field } from "./components/shared";
+import { AdminAssignmentsView, AdminAnnouncementsView, AdminClassesView, AdminEnrollmentsView, AdminSectionsView, AdminUsersView, DepartmentsView, ReportsView, SystemView, TeacherAnnouncementsView } from "./components/AdminPages";
+import { ASSESSMENT_TYPES, Badge, Empty, Field } from "./components/shared";
 import ContentView from "./components/ContentView";
 import GradesView from "./components/GradesView";
 import InstallBanner from "./components/InstallBanner";
@@ -2737,6 +2913,7 @@ function MyClassesView({ courses, navigate }) {
 function TeacherQuickTools({ token, user, course, tab, people, reload }) {
   const [moduleForm, setModuleForm] = useState({ title: "", melcCode: "", learningCompetency: "", lessonObjectives: "", assessmentType: "", quarter: course.quarter || "Q1", week: 1, summary: "" });
   const [assignmentForm, setAssignmentForm] = useState({ title: "", instructions: "", points: 100 });
+  const [quizForm, setQuizForm] = useState({ title: "", instructions: "", questionText: "", choicesText: "", answerKey: "", points: 1, isPublished: true });
   const [gradeForm, setGradeForm] = useState({ studentId: "", quarter: course.quarter || "Q1", component: "", score: "", maxScore: 100, weight: 1, remarks: "" });
   const [uploadState, setUploadState] = useState({ file: null, saving: false, error: "", success: "" });
 
@@ -2753,6 +2930,27 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
     e.preventDefault();
     await apiRequest(`/teacher/courses/${course.id}/assignments`, { method: "POST", token, body: assignmentForm });
     setAssignmentForm({ title: "", instructions: "", points: 100 });
+    reload();
+  }
+
+  async function createQuiz(e) {
+    e.preventDefault();
+    await apiRequest(`/teacher/courses/${course.id}/quizzes`, {
+      method: "POST",
+      token,
+      body: {
+        title: quizForm.title,
+        instructions: quizForm.instructions,
+        isPublished: quizForm.isPublished,
+        questions: [{
+          questionText: quizForm.questionText,
+          choicesJson: JSON.stringify(quizForm.choicesText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)),
+          answerKey: quizForm.answerKey,
+          points: quizForm.points,
+        }],
+      },
+    });
+    setQuizForm({ title: "", instructions: "", questionText: "", choicesText: "", answerKey: "", points: 1, isPublished: true });
     reload();
   }
 
@@ -2804,6 +3002,24 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
             <Field label="Instructions"><textarea className="dn-input" rows={5} value={assignmentForm.instructions} onChange={(e) => setAssignmentForm({ ...assignmentForm, instructions: e.target.value })} required /></Field>
             <Field label="Points"><input className="dn-input" type="number" min="1" value={assignmentForm.points} onChange={(e) => setAssignmentForm({ ...assignmentForm, points: e.target.value })} /></Field>
             <button className="dn-btn-warm">Create Assignment</button>
+          </div>
+        </form>
+        <form className="dn-card p-5 lg:col-span-2" onSubmit={createQuiz}>
+          <h3 className="font-semibold text-slate-900 mb-3">Create Quiz</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Quiz Title"><input className="dn-input" value={quizForm.title} onChange={(e) => setQuizForm({ ...quizForm, title: e.target.value })} required /></Field>
+            <Field label="Instructions"><input className="dn-input" value={quizForm.instructions} onChange={(e) => setQuizForm({ ...quizForm, instructions: e.target.value })} required /></Field>
+            <Field label="Question" className="sm:col-span-2"><textarea className="dn-input" rows={2} value={quizForm.questionText} onChange={(e) => setQuizForm({ ...quizForm, questionText: e.target.value })} required /></Field>
+            <Field label="Choices (one per line)"><textarea className="dn-input" rows={4} value={quizForm.choicesText} onChange={(e) => setQuizForm({ ...quizForm, choicesText: e.target.value })} /></Field>
+            <div className="grid gap-3">
+              <Field label="Answer Key"><input className="dn-input" value={quizForm.answerKey} onChange={(e) => setQuizForm({ ...quizForm, answerKey: e.target.value })} required /></Field>
+              <Field label="Points"><input className="dn-input" type="number" min="1" value={quizForm.points} onChange={(e) => setQuizForm({ ...quizForm, points: e.target.value })} /></Field>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={quizForm.isPublished} onChange={(e) => setQuizForm({ ...quizForm, isPublished: e.target.checked })} />
+                Publish immediately
+              </label>
+            </div>
+            <button className="dn-btn-warm sm:col-span-2">Create Quiz</button>
           </div>
         </form>
         <form className="dn-card p-5 lg:col-span-2" onSubmit={generateLesson}>
@@ -3034,7 +3250,8 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
   const classwork = classData.classwork || {};
   const content = classwork.modules || (dashboard?.contentFolders || []).filter((f) => f.courseId === classId);
   const assignments = classwork.assignments || [];
-  const grades = (dashboard?.grades || []).filter((g) => g.courseId === classId);
+  const quizzes = classwork.quizzes || [];
+  const grades = normalizeGradeRows(classData.grades?.grades || (dashboard?.grades || []).filter((g) => g.courseId === classId));
   const people = classData.people || { teacher: course.teacherName ? { fullName: course.teacherName } : null, students: [] };
 
   return (
@@ -3069,12 +3286,14 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
           <div className="mt-4 dn-card p-5">
             <h3 className="font-semibold text-slate-900 mb-3">Assignments</h3>
             {assignments.length ? assignments.map((a) => (
-              <article key={a.id} className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 mb-2">
-                <p className="font-medium text-slate-900">{a.title}</p>
-                <p className="text-sm text-slate-500 mt-0.5">{a.instructions}</p>
-                <p className="text-xs text-slate-400 mt-1">{a.points} pts</p>
-              </article>
+              <AssignmentCard key={a.id} token={token} assignment={a} canSubmit={user.role === "student"} onSaved={refreshClass} />
             )) : <Empty title="No assignments" body="Assignments for this class will appear here." />}
+          </div>
+          <div className="mt-4 dn-card p-5">
+            <h3 className="font-semibold text-slate-900 mb-3">Quizzes</h3>
+            {quizzes.length ? quizzes.map((q) => (
+              <QuizCard key={q.id} token={token} quiz={q} canSubmit={user.role === "student"} onSaved={refreshClass} />
+            )) : <Empty title="No quizzes" body="Published quizzes for this class will appear here." />}
           </div>
         </>
       )}
@@ -3161,6 +3380,144 @@ function ToastContainer({ toasts, onDismiss }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function normalizeGradeRows(grades) {
+  return (grades || []).map((grade, index) => {
+    const finalGrade = Number(grade.finalGrade ?? grade.score ?? 0);
+    return {
+      ...grade,
+      courseId: grade.courseId ?? grade.id ?? index,
+      quarter: grade.quarter || "",
+      subject: grade.subject || grade.courseTitle || "Class",
+      courseTitle: grade.courseTitle || grade.studentName || "Grade record",
+      courseCode: grade.courseCode || "",
+      finalGrade,
+      components: grade.components || [{
+        component: grade.component || "Recorded score",
+        score: grade.score ?? finalGrade,
+        maxScore: grade.maxScore ?? 100,
+        weight: grade.weight ?? 1,
+        percentage: grade.percentage ?? finalGrade,
+        remarks: grade.remarks || "",
+      }],
+    };
+  });
+}
+
+function parseChoices(choicesJson) {
+  if (!choicesJson) return [];
+  try {
+    const parsed = JSON.parse(choicesJson);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === "object") return Object.values(parsed);
+  } catch (_) {
+    return String(choicesJson).split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function AssignmentCard({ token, assignment, canSubmit, onSaved }) {
+  const [responseText, setResponseText] = useState(assignment.submission?.responseText || "");
+  const [saving, setSaving] = useState(false);
+  const status = assignment.submission?.status || "not_started";
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await apiRequest(`/student/assignments/${assignment.id}/submit`, { method: "POST", token, body: { responseText } });
+      await onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function complete() {
+    setSaving(true);
+    try {
+      await apiRequest(`/student/assignments/${assignment.id}/complete`, { method: "POST", token });
+      await onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 mb-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-medium text-slate-900">{assignment.title}</p>
+          <p className="text-sm text-slate-500 mt-0.5 whitespace-pre-wrap">{assignment.instructions}</p>
+          <p className="text-xs text-slate-400 mt-1">{assignment.points} pts</p>
+        </div>
+        <Badge tone={status === "submitted" || status === "completed" ? "green" : "gold"}>{status.replace("_", " ")}</Badge>
+      </div>
+      {assignment.submission?.feedback && <p className="mt-2 text-xs text-primary-600">Feedback: {assignment.submission.feedback}</p>}
+      {assignment.submission?.score != null && <p className="mt-1 text-xs text-slate-500">Score: {assignment.submission.score}/{assignment.points}</p>}
+      {canSubmit && (
+        <form onSubmit={submit} className="mt-3 grid gap-2">
+          <textarea className="dn-input" rows={4} value={responseText} onChange={(e) => setResponseText(e.target.value)} placeholder="Type your answer or completion notes..." required />
+          <div className="flex flex-wrap gap-2">
+            <button disabled={saving || !responseText.trim()} className="dn-btn-primary text-xs py-1.5">Submit Answer</button>
+            <button type="button" disabled={saving} onClick={complete} className="dn-btn-secondary text-xs py-1.5">Mark Complete</button>
+          </div>
+        </form>
+      )}
+    </article>
+  );
+}
+
+function QuizCard({ token, quiz, canSubmit, onSaved }) {
+  const [answers, setAnswers] = useState({});
+  const [result, setResult] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = await apiRequest(`/student/quizzes/${quiz.id}/submit`, { method: "POST", token, body: { answers } });
+      setResult(payload);
+      await onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <article className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 mb-3">
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+        <div>
+          <p className="font-medium text-slate-900">{quiz.title}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{quiz.instructions}</p>
+        </div>
+        {quiz.attempt && <Badge tone="green">{quiz.attempt.score}%</Badge>}
+      </div>
+      {result && <div className="rounded-lg bg-primary-50 border border-primary-100 text-primary-700 text-sm p-3 mb-3">Score: {result.score}% ({result.earnedPoints}/{result.totalPoints} pts)</div>}
+      {canSubmit && !quiz.attempt && (
+        <form onSubmit={submit} className="grid gap-3">
+          {(quiz.questions || []).map((q, index) => {
+            const choices = parseChoices(q.choicesJson);
+            return (
+              <Field key={q.id} label={`${index + 1}. ${q.questionText}`}>
+                {choices.length ? (
+                  <select className="dn-input" value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} required>
+                    <option value="">Choose answer...</option>
+                    {choices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+                  </select>
+                ) : (
+                  <input className="dn-input" value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Your answer" required />
+                )}
+              </Field>
+            );
+          })}
+          <button disabled={saving || !(quiz.questions || []).length} className="dn-btn-warm text-xs py-1.5">Submit Quiz</button>
+        </form>
+      )}
+      {canSubmit && quiz.attempt && <p className="text-xs text-slate-400">Submitted {quiz.attempt.submittedAt ? new Date(quiz.attempt.submittedAt).toLocaleString() : ""}</p>}
+    </article>
   );
 }
 
@@ -3388,19 +3745,23 @@ export default function App() {
     }, { confirmLabel: "Sign Out", variant: "danger" });
   };
 
-  const handleTutorSubmit = async (e) => {
+  const handleTutorSubmit = async (e, activeSessionId = null, sessionMessages = null) => {
     e.preventDefault();
     if (!token || !tutorForm.question.trim()) return;
     const userMsg = { id: nextMsgId++, role: "user", content: tutorForm.question };
-    setTutorMessages((prev) => [...prev, userMsg]);
+    if (sessionMessages !== null) {
+      setTutorMessages([...(sessionMessages || []), userMsg]);
+    } else {
+      setTutorMessages((prev) => [...prev, userMsg]);
+    }
     setTutorForm((f) => ({ ...f, question: "" }));
     setTutorLoading(true);
     try {
       const response = await apiRequest("/ai/tutor", {
         method: "POST", token,
-        body: { question: userMsg.content, module_id: tutorForm.moduleId ? Number(tutorForm.moduleId) : null, response_mode: tutorForm.responseMode || "normal" },
+        body: { question: userMsg.content, session_id: activeSessionId || null, module_id: tutorForm.moduleId ? Number(tutorForm.moduleId) : null, response_mode: tutorForm.responseMode || "normal" },
       });
-      setTutorMessages((prev) => [...prev, { id: nextMsgId++, role: "ai", content: response.answer, context: response.context }]);
+      setTutorMessages((prev) => [...prev, { id: nextMsgId++, role: "ai", content: response.answer, context: response.context, sessionId: response.sessionId }]);
     } catch (error) {
       setTutorMessages((prev) => [...prev, { id: nextMsgId++, role: "ai", content: error.message, context: {} }]);
     } finally {
@@ -3494,6 +3855,8 @@ export default function App() {
         return <AdminUsersView token={token} users={adminUsers} reload={reloadData} />;
       case "classes":
         return <AdminClassesView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
+      case "sections":
+        return <AdminSectionsView token={token} users={adminUsers} reload={reloadData} />;
       case "enrollments":
         return <AdminEnrollmentsView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
       case "departments":

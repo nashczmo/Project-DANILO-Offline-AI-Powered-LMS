@@ -89,7 +89,7 @@ Require-Text "lib\frontend.sh" "fetch\(request, \{ cache: `"no-store`" \}\)" "se
 Require-Text "lib\frontend.sh" "DANILO is offline" "service worker offline fallback UI"
 Require-Text "lib\frontend.sh" "Generate Lesson From Material" "teacher upload UI"
 Require-Text "lib\ai.sh" "danilo-custom" "custom GGUF model registration"
-Require-Text "lib\ai.sh" "qwen2.5:1.5b-instruct-q4_K_M" "default Ollama fallback model"
+Require-Text "lib\ai.sh" "llama3.1:8b-instruct-q4_K_S" "default Ollama fallback model"
 Require-Text "lib\verify.sh" "Admin login endpoint works" "admin login verification"
 Require-Text "lib\verify.sh" "\[PASS\]" "explicit PASS verification output"
 Require-Text "lib\verify.sh" "\[FAIL\]" "explicit FAIL verification output"

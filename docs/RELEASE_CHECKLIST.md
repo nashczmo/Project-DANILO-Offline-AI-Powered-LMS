@@ -57,4 +57,4 @@
 - Join the `PROJECT-DANILO` Wi-Fi AP.
 - Open `http://danilo.local`.
 - Confirm `/api/health` returns `status: ok`.
-- Confirm the AI model is `danilo-custom` when `models/*.gguf` exists, otherwise `qwen2.5:1.5b-instruct-q4_K_M`.
+- Confirm the AI model is `danilo-custom` when `models/*.gguf` exists, otherwise `llama3.1:8b-instruct-q4_K_S`.
