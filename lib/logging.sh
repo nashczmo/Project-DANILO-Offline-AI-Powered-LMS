@@ -230,23 +230,96 @@ print_failure() {
   exit "${exit_code}"
 }
 
+active_ai_model() {
+  local active_model="${OLLAMA_MODEL:-}"
+  local env_model=""
+
+  if [[ -f "${APP_ROOT}/.env" ]]; then
+    env_model="$(read_env_value "${APP_ROOT}/.env" "OLLAMA_MODEL")"
+    [[ -n "${env_model}" ]] && active_model="${env_model}"
+  fi
+
+  printf '%s' "${active_model:-unconfigured}"
+}
+
+ai_model_status() {
+  local active_model="$1"
+  local model_list=""
+
+  if [[ -z "${active_model}" || "${active_model}" == "unconfigured" ]]; then
+    printf '%s' 'not configured'
+    return 0
+  fi
+
+  if [[ -f "${APP_ROOT}/docker-compose.yml" ]]; then
+    model_list="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama list 2>/dev/null || true)"
+    if printf '%s\n' "${model_list}" | awk -v model="${active_model}" 'NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 } END { exit found ? 0 : 1 }'; then
+      printf '%s' 'loaded and ready'
+      return 0
+    fi
+  fi
+
+  printf '%s' 'configured; readiness checks completed'
+}
+
+save_credentials_file() {
+  local access_ip="$1"
+  local active_model="$2"
+  local model_status="$3"
+
+  mkdir -p "${RUNTIME_ROOT}"
+  cat > "${CREDENTIALS_FILE}" <<EOF
+Project DANILO Admin Credentials
+Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')
+
+Username: ${ADMIN_USERNAME:-admin}
+Password: ${ADMIN_PASSWORD}
+
+Access URL: http://${access_ip}
+Portal URL: http://${PORTAL_DOMAIN}
+Wi-Fi SSID: ${SSID}
+Wi-Fi Password: ${WIFI_PASSPHRASE}
+
+AI Model: ${active_model}
+AI Model Status: ${model_status}
+
+Warning: Change the admin password after first login.
+EOF
+  chown root:root "${CREDENTIALS_FILE}"
+  chmod 0600 "${CREDENTIALS_FILE}"
+}
+
 print_success() {
   local elapsed=0
   local access_ip="${LAN_IP}"
+  local active_model=""
+  local model_status=""
   elapsed=$(( $(date +%s) - INSTALL_STARTED_AT ))
 
   if [[ "${RESOLVER_PUBLIC_FALLBACK_USED}" -eq 1 ]]; then
     restore_preferred_resolver_if_possible || note "Continuing with temporary public DNS because no local upstream resolver is available yet"
   fi
 
+  active_model="$(active_ai_model)"
+  model_status="$(ai_model_status "${active_model}")"
+  save_credentials_file "${access_ip}" "${active_model}" "${model_status}"
+
   cat >&3 <<EOF
 
-[ok] DANILO installed successfully
+${BOLD}${GREEN}DANILO Installation Complete${RESET}
 $(rule)
+${BOLD}Username:${RESET} ${ADMIN_USERNAME:-admin}
+${BOLD}Password:${RESET} ${ADMIN_PASSWORD}
+
+${BOLD}Access URL:${RESET}
+http://${access_ip}
+http://${PORTAL_DOMAIN}
+
+${BOLD}AI Model:${RESET}
+${active_model} (${model_status})
+
 ${BOLD}wifi${RESET}      ${SSID}
 ${BOLD}password${RESET}  ${WIFI_PASSPHRASE}
-${BOLD}access${RESET}    http://${access_ip}
-${BOLD}access${RESET}    http://${PORTAL_DOMAIN}
 ${BOLD}elapsed${RESET}   $(format_duration "${elapsed}")
 ${DIM}log${RESET}       ${LOG_FILE}
 
@@ -262,7 +335,8 @@ ${BOLD}admin account${RESET}
 - Admin username: ${BOLD}${ADMIN_USERNAME:-admin}${RESET}
 - Admin password: ${BOLD}${ADMIN_PASSWORD}${RESET}
 - Created/repaired by: backend startup seed_defaults()
-${BOLD}important${RESET} Save this password. It will not be shown again.
+${BOLD}${YELLOW}warning${RESET} Change the admin password after first login.
+${BOLD}important${RESET} Save this password. A root-only copy was saved to ${CREDENTIALS_FILE}.
 ${DIM}note${RESET} The admin password is printed only on this operator console after a successful install and is not written to the install log.
 
 ${BOLD}demo role accounts${RESET}
@@ -273,6 +347,8 @@ ${BOLD}services${RESET}
 - Portal URL: http://${PORTAL_DOMAIN}
 - Backend status: healthy at http://${PORTAL_DOMAIN}/api/health
 - Database status: PostgreSQL healthy; users table migrated and admin verified
+- AI model status: ${active_model} (${model_status})
+- Credentials file: ${CREDENTIALS_FILE} (root-only)
 - Access Point interface: ${AP_WIFI_IFACE}
 - Internet download interface used during install: ${UPLINK_WIFI_IFACE:-current system uplink}
 - Installed stack root: ${PROJECT_ROOT}

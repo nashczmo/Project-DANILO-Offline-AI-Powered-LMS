@@ -8,6 +8,7 @@ APP_ROOT="${PROJECT_ROOT}/app"
 RUNTIME_ROOT="${PROJECT_ROOT}/runtime"
 CONTENT_ROOT="${APP_ROOT}/content"
 LOCAL_LESSONS_DIR="${SCRIPT_DIR}/lessons"
+CREDENTIALS_FILE="${RUNTIME_ROOT}/admin-credentials.txt"
 LOG_FILE="/var/log/danilo-install.log"
 BACKUP_ROOT="/var/backups/danilo"
 
@@ -64,6 +65,16 @@ secure_project_root() {
   if [[ -f "${APP_ROOT}/.env" ]]; then
     chown root:root "${APP_ROOT}/.env"
     chmod 0600 "${APP_ROOT}/.env"
+  fi
+
+  if [[ -d "${RUNTIME_ROOT}" ]]; then
+    chown root:root "${RUNTIME_ROOT}"
+    chmod 0700 "${RUNTIME_ROOT}"
+  fi
+
+  if [[ -f "${CREDENTIALS_FILE}" ]]; then
+    chown root:root "${CREDENTIALS_FILE}"
+    chmod 0600 "${CREDENTIALS_FILE}"
   fi
 
   if [[ -d "${CONTENT_ROOT}" ]]; then

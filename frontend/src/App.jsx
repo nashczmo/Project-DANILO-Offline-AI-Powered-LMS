@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiRequest, apiUpload } from "./api";
-import { AdminAssignmentsView, AdminClassesView, AdminEnrollmentsView, AdminSectionsView, AdminUsersView, DepartmentsView, ReportsView, SystemView, TeacherAnnouncementsView } from "./components/AdminPages";
+import { AdminAnnouncementsView, AdminAssignmentsView, AdminClassesView, AdminEnrollmentsView, AdminSectionsView, AdminUsersView, DepartmentsView, ReportsView, SystemView, TeacherAnnouncementsView } from "./components/AdminPages";
 import { ASSESSMENT_TYPES, Badge, Empty, Field, Modal, PageHeader, SummaryCard } from "./components/shared";
-import ContentView from "./components/ContentView";
 import GradesView from "./components/GradesView";
 import InstallBanner from "./components/InstallBanner";
 import LoginView from "./components/LoginView";
@@ -83,27 +82,28 @@ const Icons = {
 const NAV = {
   student: [
     { path: "/overview",    label: "Dashboard",     icon: Icons.home,       page: "overview" },
-    { path: "/my-classes",  label: "My Subjects", icon: Icons.subjects,   page: "my-classes" },
-    { path: "/assignments", label: "Assessments", icon: Icons.assessments,page: "assignments" },
-    { path: "/ai-tutor",    label: "AI Assistant",icon: Icons.ai,         page: "ai-tutor" },
-    { path: "/grades",      label: "Progress",    icon: Icons.progress,   page: "grades" },
+    { path: "/my-classes",  label: "My Subjects",   icon: Icons.subjects,   page: "my-classes" },
+    { path: "/assignments", label: "Assessments",   icon: Icons.assessments,page: "assignments" },
+    { path: "/ai-tutor",    label: "AI Assistant",  icon: Icons.ai,         page: "ai-tutor", shortLabel: "AI" },
+    { path: "/grades",      label: "Progress",      icon: Icons.progress,   page: "grades" },
   ],
   teacher: [
     { path: "/overview",      label: "Dashboard",      icon: Icons.home,       page: "overview" },
     { path: "/my-classes",    label: "My Subjects",    icon: Icons.subjects,   page: "my-classes" },
     { path: "/sections",      label: "Sections",       icon: Icons.sections,   page: "sections" },
-    { path: "/announcements", label: "Assessments",    icon: Icons.assessments,page: "announcements" },
-    { path: "/ai-tutor",      label: "AI Assistant",   icon: Icons.ai,         page: "ai-tutor" },
+    { path: "/announcements", label: "Announcements",  icon: Icons.announce,   page: "announcements" },
+    { path: "/ai-tutor",      label: "AI Assistant",   icon: Icons.ai,         page: "ai-tutor", shortLabel: "AI" },
     { path: "/grades",        label: "Progress",       icon: Icons.progress,   page: "grades" },
   ],
   admin: [
-    { path: "/overview",     label: "Dashboard",     icon: Icons.home,        page: "overview" },
-    { path: "/users",        label: "Learners & Faculty", icon: Icons.learners, page: "users" },
-    { path: "/classes",      label: "Subjects",      icon: Icons.subjects,    page: "classes" },
-    { path: "/sections",     label: "Sections",      icon: Icons.sections,    page: "sections" },
-    { path: "/departments",  label: "Departments",   icon: Icons.departments, page: "departments" },
-    { path: "/system",       label: "System Status", icon: Icons.system,      page: "system" },
-    { path: "/settings",     label: "Settings",      icon: Icons.settings,    page: "settings" },
+    { path: "/overview",      label: "Dashboard",          icon: Icons.home,        page: "overview" },
+    { path: "/users",         label: "Learners & Faculty", icon: Icons.learners,    page: "users", shortLabel: "People" },
+    { path: "/classes",       label: "Subjects",           icon: Icons.subjects,    page: "classes" },
+    { path: "/sections",      label: "Sections",           icon: Icons.sections,    page: "sections" },
+    { path: "/announcements", label: "Announcements",      icon: Icons.announce,    page: "announcements", shortLabel: "News" },
+    { path: "/departments",   label: "Departments",        icon: Icons.departments, page: "departments" },
+    { path: "/system",        label: "System Status",      icon: Icons.system,      page: "system", shortLabel: "System" },
+    { path: "/settings",      label: "Settings",           icon: Icons.settings,    page: "settings" },
   ],
 };
 const getNav = (role) => NAV[role] || NAV.student;
@@ -117,6 +117,16 @@ const ROLE_LABEL = { admin: "School Admin", teacher: "Faculty", student: "Learne
 
 function isAllowed(role, page) {
   return (ALLOWED[role] || ALLOWED.student).includes(page);
+}
+
+function isNavActive(currentPage, tabPage) {
+  if (currentPage === tabPage) return true;
+  if (currentPage === "class-detail" && tabPage === "my-classes") return true;
+  return false;
+}
+
+function findCurrentTab(role, currentPage) {
+  return getNav(role).find((tab) => isNavActive(currentPage, tab.page));
 }
 
 const initialLogin = { username: "", password: "" };
@@ -137,15 +147,15 @@ function Sidebar({ user, currentPage, navigate, onLogout }) {
   const roleTone = { admin: "bg-primary-600", teacher: "bg-slate-600", student: "bg-slate-500" };
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-[256px] lg:border-r lg:border-slate-200 bg-white">
-      <div className="flex flex-col h-full px-3 pt-6 pb-4">
-        <div className="flex items-center gap-3 mb-6 px-2">
+    <aside className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:z-40 md:w-[72px] lg:w-[256px] md:border-r md:border-slate-200 bg-white">
+      <div className="flex flex-col h-full px-2 lg:px-3 pt-6 pb-4">
+        <div className="flex items-center justify-center lg:justify-start gap-3 mb-6 px-2">
           <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
-          <div>
+          <div className="hidden lg:block">
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.15em]">Project</p>
             <p className="text-sm font-bold text-slate-900 tracking-tight mt-0.5">DANILO</p>
           </div>
@@ -153,33 +163,33 @@ function Sidebar({ user, currentPage, navigate, onLogout }) {
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto">
           {tabs.map((tab) => {
-            const isActive = currentPage === tab.page;
+            const isActive = isNavActive(currentPage, tab.page);
             return (
-              <button key={tab.path} type="button" onClick={() => navigate(tab.path)}
-                className={`group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+              <button key={tab.path} type="button" onClick={() => navigate(tab.path)} title={tab.label}
+                className={`group w-full flex items-center justify-center lg:justify-start gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
                   isActive ? "bg-primary-50 text-primary-700" : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                 }`}>
                 <span className={`transition-colors ${isActive ? "text-primary-500" : "text-slate-400 group-hover:text-slate-500"}`}>{tab.icon}</span>
-                {tab.label}
+                <span className="hidden lg:inline truncate">{tab.label}</span>
               </button>
             );
           })}
         </nav>
 
         <div className="border-t border-slate-100 pt-3 mt-2">
-          <div className="flex items-center gap-2.5 mb-3 px-2">
+          <div className="flex items-center justify-center lg:justify-start gap-2.5 mb-3 px-2">
             <div className={`w-8 h-8 rounded-full ${roleTone[user.role] || roleTone.student} flex items-center justify-center flex-shrink-0`}>
               <span className="text-[11px] font-bold text-white">{initials}</span>
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="hidden lg:block flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">{user.fullName}</p>
               <p className="text-[11px] text-slate-400">{ROLE_LABEL[user.role] || user.role}</p>
             </div>
           </div>
-          <button type="button" onClick={onLogout}
-            className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all">
+          <button type="button" onClick={onLogout} title="Sign Out"
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors">
             {Icons.logout}
-            Sign Out
+            <span className="hidden lg:inline">Sign Out</span>
           </button>
         </div>
       </div>
@@ -192,8 +202,7 @@ function Sidebar({ user, currentPage, navigate, onLogout }) {
    ======================================================================== */
 
 function TopBar({ user, currentPage }) {
-  const tabs = getNav(user.role);
-  const currentTab = tabs.find((t) => t.page === currentPage);
+  const currentTab = findCurrentTab(user.role, currentPage);
   const initials = getInitials(user.fullName);
   const roleTone = { admin: "bg-primary-600", teacher: "bg-slate-600", student: "bg-slate-500" };
 
@@ -233,13 +242,12 @@ function TopBar({ user, currentPage }) {
    ======================================================================== */
 
 function MobileTopBar({ user, currentPage, onMenuOpen }) {
-  const tabs = getNav(user.role);
-  const currentTab = tabs.find((t) => t.page === currentPage);
+  const currentTab = findCurrentTab(user.role, currentPage);
   const initials = getInitials(user.fullName);
   const roleTone = { admin: "bg-primary-600", teacher: "bg-slate-600", student: "bg-slate-500" };
 
   return (
-    <header className="lg:hidden fixed top-0 inset-x-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
+    <header className="md:hidden fixed top-0 inset-x-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
       <div className="flex items-center justify-between px-3 h-[56px]">
         <div className="flex items-center gap-2.5">
           <button type="button" onClick={onMenuOpen} className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 active:bg-slate-100 transition" aria-label="Open navigation menu">
@@ -279,7 +287,7 @@ function MobileDrawer({ open, user, currentPage, navigate, onClose, onLogout }) 
   if (!open) return null;
 
   return (
-    <div className="lg:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Navigation menu">
+    <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Navigation menu">
       <button type="button" className="absolute inset-0 bg-slate-900/30 backdrop-blur-[2px]" onClick={onClose} aria-label="Close navigation menu" />
       <aside className="absolute inset-y-0 left-0 w-[min(84vw,320px)] bg-white shadow-xl border-r border-slate-100 p-4 flex flex-col animate-fade-in">
         <div className="flex items-center justify-between mb-4">
@@ -299,7 +307,7 @@ function MobileDrawer({ open, user, currentPage, navigate, onClose, onLogout }) 
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pr-1">
           {tabs.map((tab) => {
-            const isActive = currentPage === tab.page;
+            const isActive = isNavActive(currentPage, tab.page);
             return (
               <button key={tab.path} type="button" onClick={() => choose(tab.path)}
                 className={`w-full min-h-[44px] flex items-center gap-3 rounded-xl px-3 text-sm font-medium active:scale-[0.99] transition ${
@@ -328,10 +336,10 @@ function MobileDrawer({ open, user, currentPage, navigate, onClose, onLogout }) 
 function MobileBottomNav({ currentPage, navigate, role }) {
   const tabs = getNav(role).slice(0, 5);
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200/80 bg-white/85 backdrop-blur-md">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200/80 bg-white/85 backdrop-blur-md">
       <div className="flex items-stretch justify-around pb-[env(safe-area-inset-bottom,0px)] pt-1">
         {tabs.map((tab) => {
-          const isActive = currentPage === tab.page;
+          const isActive = isNavActive(currentPage, tab.page);
           return (
             <button key={tab.path} type="button" onClick={() => navigate(tab.path)}
               className={`relative flex flex-col items-center gap-0.5 px-3 py-1.5 flex-1 transition-all duration-150 ${
@@ -339,7 +347,7 @@ function MobileBottomNav({ currentPage, navigate, role }) {
               }`}>
               {isActive && <span className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary-600" />}
               <span className="transition-transform">{tab.icon}</span>
-              <span className={`text-[10px] font-medium ${isActive ? "text-primary-600" : "text-slate-400"}`}>{tab.label}</span>
+              <span className={`max-w-[64px] truncate text-[10px] font-medium ${isActive ? "text-primary-600" : "text-slate-400"}`}>{tab.shortLabel || tab.label}</span>
             </button>
           );
         })}
@@ -1033,9 +1041,6 @@ export default function App() {
   const [dashboardError, setDashboardError] = useState("");
   const [loginForm, setLoginForm] = useState(initialLogin);
   const [promptEvent, setPromptEvent] = useState(null);
-  const [search, setSearch] = useState("");
-  const [quarter, setQuarter] = useState("");
-  const [subject, setSubject] = useState("");
   const [tutorForm, setTutorForm] = useState(initialTutor);
   const [tutorLoading, setTutorLoading] = useState(false);
   const [tutorMessages, setTutorMessages] = useState([]);
@@ -1127,13 +1132,6 @@ export default function App() {
     restoreSession();
     return () => { active = false; };
   }, [token]);
-
-  const filteredContent = (dashboard?.contentFolders || []).filter((item) => {
-    const matchesSearch = !search || [item.title, item.summary, item.folderName, item.subject].join(" ").toLowerCase().includes(search.toLowerCase());
-    const matchesQuarter = !quarter || item.quarter === quarter;
-    const matchesSubject = !subject || item.subject === subject;
-    return matchesSearch && matchesQuarter && matchesSubject;
-  });
 
   const handleLoginChange = (e) => { const { name, value } = e.target; setLoginForm((c) => ({ ...c, [name]: value })); };
   const handleTutorChange = (e) => { const { name, value } = e.target; setTutorForm((c) => ({ ...c, [name]: value })); };
@@ -1262,9 +1260,9 @@ export default function App() {
       <MobileTopBar user={user} currentPage={page} onMenuOpen={() => setMobileMenuOpen(true)} />
       <MobileDrawer open={mobileMenuOpen} user={user} currentPage={page} navigate={navigate} onClose={() => setMobileMenuOpen(false)} onLogout={handleLogout} />
 
-      <main className="lg:pl-[256px]">
+      <main className="md:pl-[72px] lg:pl-[256px]">
         <TopBar user={user} currentPage={page} />
-        <div className="min-h-screen pt-[56px] lg:pt-0 pb-[80px] lg:pb-8">
+        <div className="min-h-screen pt-[56px] md:pt-0 pb-[80px] md:pb-8">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
             <InstallBanner promptEvent={promptEvent} onInstall={installApp} onDismiss={() => setPromptEvent(null)} />
 
