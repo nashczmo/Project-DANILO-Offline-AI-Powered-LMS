@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { apiUrl } from "../api";
+
 export const GRADES = {
   Kinder: ["Kinder"],
   Elementary: ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
@@ -205,7 +207,7 @@ export function InlineError({ message }) {
 }
 
 export async function downloadReport(path, filename, token) {
-  const response = await fetch(`/api${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  const response = await fetch(apiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error("Report export failed");
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
+import { apiUrl } from "../api";
+
 const DANILO_ICON = (
   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
@@ -86,8 +88,8 @@ export default function TutorView({ token, modules, form, onChange, onSubmit: _o
   }
 
   function refreshSessions() {
-    fetch("/api/ai/sessions", { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
+    fetch(apiUrl("/ai/sessions"), { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => { if (!r.ok) throw new Error("Could not load conversations."); return r.json(); })
       .then((data) => { setSessions(Array.isArray(data.sessions) ? data.sessions : []); setSessionTotal(data.total || 0); })
       .catch(() => {});
   }
@@ -95,8 +97,8 @@ export default function TutorView({ token, modules, form, onChange, onSubmit: _o
   async function loadSession(id, offset = 0, append = false) {
     setSessionLoading(true);
     try {
-      const url = `/api/ai/sessions/${id}/messages?offset=${offset}&limit=${SESSION_PAGE_SIZE}`;
-      const data = await fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json());
+      const url = apiUrl(`/ai/sessions/${id}/messages?offset=${offset}&limit=${SESSION_PAGE_SIZE}`);
+      const data = await fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((r) => { if (!r.ok) throw new Error("Could not load conversation."); return r.json(); });
       const msgs = (data.messages || []).map((m) => ({ ...m, id: m.id || nextId() }));
       if (append) {
         setMessages((prev) => [...msgs, ...prev]);
@@ -131,7 +133,7 @@ export default function TutorView({ token, modules, form, onChange, onSubmit: _o
   async function deleteSession(id, e) {
     e?.stopPropagation();
     if (!window.confirm("Delete this conversation?")) return;
-    await fetch(`/api/ai/sessions/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    await fetch(apiUrl(`/ai/sessions/${id}`), { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     if (activeSessionId === id) newSession();
     refreshSessions();
   }
@@ -156,7 +158,7 @@ export default function TutorView({ token, modules, form, onChange, onSubmit: _o
     abortRef.current = controller;
 
     try {
-      const res = await fetch("/api/ai/tutor/stream", {
+      const res = await fetch(apiUrl("/ai/tutor/stream"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
