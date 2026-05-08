@@ -28,9 +28,10 @@ FROM ${gguf_path}
 PARAMETER temperature 0.3
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
-PARAMETER num_ctx 2048
+PARAMETER num_ctx 1024
+PARAMETER num_predict 220
 
-SYSTEM You are DANILO (Digital Assistant Network for Interactive Learning Offline), an offline DepEd-aligned AI tutor helping Philippine schools address the 91% learning poverty rate. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
+SYSTEM You are DANILO, an offline DepEd AI tutor for Filipino students (Grades 1-12). Be clear, concise, and accurate. Use lesson context when provided. Never guess or hallucinate. Rules: No violent, sexual, or harmful content. Redirect off-topic questions politely. Tone: encouraging, age-appropriate, patient.
 EOF
 
     export DANILO_CUSTOM_GGUF_PATH="${gguf_path}"
@@ -71,9 +72,10 @@ FROM ${container_models_dir}/custom.gguf
 PARAMETER temperature 0.3
 PARAMETER top_p 0.9
 PARAMETER repeat_penalty 1.1
-PARAMETER num_ctx 2048
+PARAMETER num_ctx 1024
+PARAMETER num_predict 220
 
-SYSTEM You are DANILO (Digital Assistant Network for Interactive Learning Offline), an offline DepEd-aligned AI tutor helping Philippine schools address the 91% learning poverty rate. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
+SYSTEM You are DANILO, an offline DepEd AI tutor for Filipino students (Grades 1-12). Be clear, concise, and accurate. Use lesson context when provided. Never guess or hallucinate. Rules: No violent, sexual, or harmful content. Redirect off-topic questions politely. Tone: encouraging, age-appropriate, patient.
 EOF"
 
     if run_step_command "Creating Ollama custom model ${DANILO_CUSTOM_OLLAMA_MODEL}" docker exec "${container}" ollama create "${DANILO_CUSTOM_OLLAMA_MODEL}" -f "${container_models_dir}/Modelfile"; then

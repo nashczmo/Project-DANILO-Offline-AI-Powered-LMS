@@ -1006,9 +1006,9 @@ JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "")
-OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "45"))
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
-OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "1800"))
+OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "60"))
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "1024"))
+OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "1600"))
 PORTAL_DOMAIN = os.getenv("PORTAL_DOMAIN", "")
 SSID = os.getenv("SSID", "")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip() or "admin"
@@ -1032,19 +1032,45 @@ if not SSID:
 
 # ---------------------------------------------------------------------------
 # AI scalability protections
-# Max 3 concurrent Ollama generations to protect 8 GB RAM environment.
-# Per-user cooldown of 5 s between requests (prevents rapid-fire button spam).
+# Max 2 concurrent Ollama generations (phi3:mini ~2.3 GB; 2 fits in 8 GB RAM).
+# Per-user cooldown of 4 s between requests (prevents rapid-fire button spam).
 # ---------------------------------------------------------------------------
-_AI_MAX_CONCURRENT = int(os.getenv("DANILO_AI_MAX_CONCURRENT", "3"))
+_AI_MAX_CONCURRENT = int(os.getenv("DANILO_AI_MAX_CONCURRENT", "2"))
 _AI_SEMAPHORE: asyncio.Semaphore | None = None  # created inside lifespan
-_AI_USER_LAST_REQUEST: dict[int, float] = {}  # user_id -> timestamp
-_AI_COOLDOWN_SECONDS = float(os.getenv("DANILO_AI_COOLDOWN_SECONDS", "5"))
+_AI_USER_LAST_REQUEST: dict[int, float] = {}  # user_id -> monotonic timestamp
+_AI_COOLDOWN_SECONDS = float(os.getenv("DANILO_AI_COOLDOWN_SECONDS", "4"))
+# How often (seconds) to evict stale entries from the cooldown dict to prevent
+# unbounded growth when many learners are active during the school day.
+_AI_CLEANUP_INTERVAL = 300.0  # 5 minutes
+_ai_last_cleanup: float = 0.0
+
+def _cleanup_stale_cooldowns() -> None:
+    """Remove cooldown entries older than 10 × cooldown window to cap dict size."""
+    global _ai_last_cleanup
+    now = time.monotonic()
+    if now - _ai_last_cleanup < _AI_CLEANUP_INTERVAL:
+        return
+    cutoff = now - max(_AI_COOLDOWN_SECONDS * 10, 60.0)
+    stale = [uid for uid, ts in _AI_USER_LAST_REQUEST.items() if ts < cutoff]
+    for uid in stale:
+        _AI_USER_LAST_REQUEST.pop(uid, None)
+    _ai_last_cleanup = now
+
+def _ai_queue_depth() -> int:
+    """Return an estimate of learners currently waiting for the semaphore."""
+    sem = _AI_SEMAPHORE
+    if sem is None:
+        return 0
+    # asyncio.Semaphore._value is the number of available slots
+    available = getattr(sem, "_value", _AI_MAX_CONCURRENT)
+    waiting = max(0, _AI_MAX_CONCURRENT - available)
+    return waiting
 
 # ---------------------------------------------------------------------------
-# Lightweight LRU response cache: cache the last 256 distinct prompts so that
+# Lightweight LRU response cache: cache the last 200 distinct prompts so that
 # students asking the same question get instant responses without loading the GPU.
 # ---------------------------------------------------------------------------
-_AI_CACHE_MAXSIZE = int(os.getenv("DANILO_AI_CACHE_SIZE", "256"))
+_AI_CACHE_MAXSIZE = int(os.getenv("DANILO_AI_CACHE_SIZE", "200"))
 _ai_response_cache: "OrderedDict[str, str]" = OrderedDict()
 
 def _cache_key(prompt: str, mode: str) -> str:
@@ -1841,18 +1867,11 @@ def build_pdf_document(title: str, lines: list[str]) -> bytes:
 
 
 SYSTEM_PROMPT = (
-    "You are DANILO (Digital Assistant Network for Interactive Learning Offline), an offline "
-    "DepEd-aligned AI tutor for Filipino students in Grades 1-12. "
-    "Project DANILO exists to help schools address the 91% learning poverty rate by making "
-    "safe lessons, remediation, and teacher support available without internet. "
-    "Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.\n\n"
-    "SAFETY RULES (STRICTLY ENFORCED — users are under 18):\n"
-    "- Never produce violent, sexual, explicit, or age-inappropriate content.\n"
-    "- Never provide instructions for weapons, drugs, self-harm, or illegal activities.\n"
-    "- If a question is harmful, off-topic, or inappropriate, respond with a polite educational redirect.\n"
-    "- Keep all responses respectful, age-appropriate, and focused on learning.\n"
-    "- When unsure, guide the learner back to their lesson or subject.\n\n"
-    "TONE: Encouraging, clear, patient, and age-appropriate at all times."
+    "You are DANILO, an offline DepEd AI tutor for Filipino students (Grades 1-12). "
+    "Be clear, concise, and accurate. Use lesson context when provided. Never guess or hallucinate.\n"
+    "Rules: No violent, sexual, or harmful content. No weapons, drugs, self-harm, or illegal info. "
+    "If off-topic or unsafe, redirect politely to the lesson. "
+    "Tone: encouraging, age-appropriate, patient."
 )
 SAFETY_KEYWORDS = {
     "kill", "suicide", "bomb", "weapon", "drug", "sex", "porn", "nude", "hack",
@@ -1863,11 +1882,11 @@ SAFETY_REDIRECT = (
     "I'm DANILO, your learning assistant. I can only help with school-related topics. "
     "Let's focus on your lessons — what subject would you like help with?"
 )
-ROLLING_MEMORY_LIMIT = int(os.getenv("DANILO_ROLLING_MEMORY", "5"))
+ROLLING_MEMORY_LIMIT = int(os.getenv("DANILO_ROLLING_MEMORY", "4"))
 RESPONSE_MODE_OPTIONS = {
-    "short": {"num_predict": 120, "instruction": "Answer briefly in 1 to 2 short paragraphs."},
-    "normal": {"num_predict": 280, "instruction": "Answer in 2 to 4 clear paragraphs with a learner-friendly tone."},
-    "detailed": {"num_predict": 600, "instruction": "Give a fuller ChatGPT-like explanation with steps and examples when helpful."},
+    "short":    {"num_predict": int(os.getenv("DANILO_TOKENS_SHORT",    "100")), "instruction": "Answer in 1-2 short paragraphs only."},
+    "normal":   {"num_predict": int(os.getenv("DANILO_TOKENS_NORMAL",   "220")), "instruction": "Answer in 2-3 clear paragraphs. Be concise."},
+    "detailed": {"num_predict": int(os.getenv("DANILO_TOKENS_DETAILED", "450")), "instruction": "Give a clear explanation with steps or examples. Stay focused."},
 }
 
 
@@ -1887,25 +1906,20 @@ def build_rolling_memory(db: Session, user_id: int, course_id: int | None, limit
     )
     rows = db.scalars(stmt).all()
     memory = []
-    
-    # Calculate rolling token budget. 
-    # Max ctx=2048. System prompt/context takes ~1000 tokens.
-    # Leave 500 for the response. We have ~548 tokens (approx 2000 chars) for memory.
-    char_budget = 2000 
+    # With OLLAMA_NUM_CTX=1024: system prompt ~80 tokens, context ~200 tokens,
+    # response ~220 tokens. Leave ~200 tokens (~800 chars) for rolling memory.
+    char_budget = int(os.getenv("DANILO_MEMORY_CHAR_BUDGET", "800"))
     current_chars = 0
 
-    for row in rows: # We iterate from newest to oldest
-        content = trim_text(row.content, 400)
+    for row in rows:  # newest to oldest
+        content = trim_text(row.content, 300)
         chars = len(content)
-        
-        # If adding this message exceeds the context safety budget, we stop loading history.
         if current_chars + chars > char_budget:
             break
-            
         current_chars += chars
         memory.append({"role": row.role if row.role in ("user", "assistant") else "user", "content": content})
-        
-    return list(reversed(memory)) # Return chronological order
+
+    return list(reversed(memory))  # chronological order
 
 
 def tutor_mode(value: str | None) -> str:
@@ -1960,20 +1974,26 @@ def build_tutor_prompt(
     if module and course and module.course_id != course.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Lesson context is not part of this class")
 
-    student_grades = build_grade_summary(db, current_user.id)[:3] if current_user.role == "student" else []
+    # Grades: only latest entry per course (1 line each), max 2 entries to save tokens
+    student_grades = build_grade_summary(db, current_user.id)[:2] if current_user.role == "student" else []
     grade_lines = [
-        f"{item['courseCode']} {item['quarter']}: final grade {item['finalGrade']}"
+        f"{item['courseCode']} {item['quarter']}: {item['finalGrade']}"
         for item in student_grades
-    ] or ["No recorded grades yet."]
+    ] or []
 
+    # Quiz: only most recent attempt for this course, show top 2 missed questions
     quiz_lines: list[str] = []
-    if current_user.role == "student":
-        quiz_query = select(QuizAttempt, Quiz).join(Quiz, QuizAttempt.quiz_id == Quiz.id).where(QuizAttempt.student_id == current_user.id)
-        if course:
-            quiz_query = quiz_query.where(Quiz.course_id == course.id)
-        recent_attempts = db.execute(quiz_query.order_by(QuizAttempt.submitted_at.desc()).limit(5)).all()
+    if current_user.role == "student" and course:
+        quiz_query = (
+            select(QuizAttempt, Quiz)
+            .join(Quiz, QuizAttempt.quiz_id == Quiz.id)
+            .where(QuizAttempt.student_id == current_user.id, Quiz.course_id == course.id)
+            .order_by(QuizAttempt.submitted_at.desc())
+            .limit(2)
+        )
+        recent_attempts = db.execute(quiz_query).all()
         for attempt, quiz in recent_attempts:
-            questions = db.scalars(select(QuizQuestion).where(QuizQuestion.quiz_id == quiz.id).order_by(QuizQuestion.id.asc())).all()
+            questions = db.scalars(select(QuizQuestion).where(QuizQuestion.quiz_id == quiz.id)).all()
             incorrect_qs = []
             try:
                 answers = json.loads(attempt.answers_json or "{}")
@@ -1983,46 +2003,41 @@ def build_tutor_prompt(
                 given = str(answers.get(str(q.id), "")).strip().lower()
                 expected = str(q.answer_key or "").strip().lower()
                 if expected and given != expected:
-                    incorrect_qs.append(q.question_text[:80])
+                    incorrect_qs.append(q.question_text[:60])
             quiz_lines.append(
-                f"Quiz \"{quiz.title}\": scored {attempt.score}%"
-                + (f" — missed: {'; '.join(incorrect_qs[:3])}" if incorrect_qs else " — all correct")
+                f"Quiz \"{trim_text(quiz.title, 40)}\": {attempt.score}%"
+                + (f" missed: {'; '.join(incorrect_qs[:2])}" if incorrect_qs else "")
             )
-        if not quiz_lines:
-            quiz_lines.append("No quiz attempts recorded yet.")
 
-    context_budget = max(600, OLLAMA_CONTEXT_CHARS)
+    # Lesson context: keep within OLLAMA_CONTEXT_CHARS budget
+    context_budget = max(400, OLLAMA_CONTEXT_CHARS)
     lesson_lines = []
     if course:
-        lesson_lines.append(f"Subject: {trim_text(course.title, 120)}")
+        lesson_lines.append(f"Subject: {trim_text(course.title, 80)}")
     if module:
         content_parts = [
-            f"Module: {module.title}",
+            f"Module: {trim_text(module.title, 60)}",
             f"MELC: {module.melc_code}",
-            f"Learning Competency: {module.learning_competency or 'Not specified'}",
-            f"Lesson Objectives: {module.lesson_objectives or 'Not specified'}",
-            f"Summary: {module.summary}",
-            f"Essential Question: {module.essential_question}",
-            f"Content: {module.content or ''}",
+            f"Competency: {trim_text(module.learning_competency or '', 120)}",
+            f"Summary: {trim_text(module.summary, 300)}",
         ]
+        if module.content:
+            content_parts.append(f"Content: {trim_text(module.content, 200)}")
         lesson_lines.append(trim_text(" | ".join(content_parts), context_budget))
 
-    prompt = "\n".join(
-        [
-            RESPONSE_MODE_OPTIONS[mode]["instruction"],
-            "Use Filipino when the learner asks in Filipino; otherwise use English.",
-            "Use only the lesson context when the question depends on lesson facts. If context is missing, say more information is needed.",
-            "Include one short example or practice task when useful. Never break character — always respond as a school tutor.",
-            f"Learner Grade Level: {current_user.grade_level or 'Not specified'}",
-            "Recorded Grades:",
-            *[f"- {line}" for line in grade_lines],
-            "Quiz Performance:",
-            *[f"- {line}" for line in quiz_lines],
-            "Lesson Context:",
-            *[f"- {line}" for line in (lesson_lines or ["No selected lesson."])],
-            f"Learner Question: {payload.question.strip()}",
-        ]
-    )
+    context_parts = [RESPONSE_MODE_OPTIONS[mode]["instruction"]]
+    context_parts.append("Use Filipino if the learner writes in Filipino; otherwise English.")
+    if current_user.grade_level:
+        context_parts.append(f"Grade: {current_user.grade_level}")
+    if grade_lines:
+        context_parts.append("Grades: " + "; ".join(grade_lines))
+    if quiz_lines:
+        context_parts.append("Recent quizzes: " + " | ".join(quiz_lines))
+    if lesson_lines:
+        context_parts.append("Lesson: " + " ".join(lesson_lines))
+    context_parts.append(f"Question: {payload.question.strip()}")
+
+    prompt = "\n".join(context_parts)
     return prompt, module, course, grade_lines, mode
 
 
@@ -2059,6 +2074,9 @@ async def ask_ollama(prompt: str, mode: str, memory: list[dict] | None = None) -
     started = time.perf_counter()
     prompt_tokens = estimate_prompt_tokens(prompt)
     timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS, connect=5.0)
+    queue_depth = _ai_queue_depth()
+    if queue_depth > 0:
+        ai_logger.info("AI queue depth=%s user will wait for semaphore", queue_depth)
     async with sem:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
@@ -2117,6 +2135,18 @@ def build_student_insights_prompt(analysis: dict) -> str:
 
 
 async def stream_ollama(prompt: str, mode: str, memory: list[dict] | None = None):
+    # Cache hit: stream the cached answer word-by-word so the UX stays consistent
+    cached = _cache_get(prompt, mode)
+    if cached:
+        ai_logger.info("AI stream cache hit mode=%s prompt_len=%s", mode, len(prompt))
+        words = cached.split(" ")
+        for i, word in enumerate(words):
+            chunk = word if i == 0 else " " + word
+            yield {"content": chunk, "done": False}
+            await asyncio.sleep(0)  # yield control to event loop between chunks
+        yield {"content": "", "done": True, "metrics": {"model": OLLAMA_MODEL, "mode": tutor_mode(mode), "duration_ms": 0, "cache": True}}
+        return
+
     payload = {
         **ollama_chat_payload(prompt, mode, stream=True, memory=memory),
     }
@@ -2124,6 +2154,10 @@ async def stream_ollama(prompt: str, mode: str, memory: list[dict] | None = None
     prompt_tokens = estimate_prompt_tokens(prompt)
     timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS, connect=5.0)
     sem = _AI_SEMAPHORE or asyncio.Semaphore(_AI_MAX_CONCURRENT)
+    # Emit queue position before waiting so the frontend can show feedback
+    queue_depth = _ai_queue_depth()
+    if queue_depth > 0:
+        yield {"queued": True, "position": queue_depth, "done": False}
     async with sem:
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
@@ -2204,6 +2238,8 @@ def ai_status() -> dict:
         "availableModels": available_models,
         "ramAvailableMb": ram_available_mb,
         "queueSlots": _AI_MAX_CONCURRENT,
+        "queueDepth": _ai_queue_depth(),
+        "cacheSize": len(_ai_response_cache),
         "status": "ready" if (ollama_ok and model_loaded) else ("degraded" if ollama_ok else "offline"),
         "errorMessage": error_message or None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -3370,7 +3406,8 @@ def _save_chat_messages(db: Session, session_id: int, question: str, answer: str
 
 
 def _check_ai_rate_limit(user_id: int) -> None:
-    """Raise 429 if the user sent an AI request too recently."""
+    """Raise 429 if the user sent an AI request too recently. Also evicts stale entries."""
+    _cleanup_stale_cooldowns()
     last = _AI_USER_LAST_REQUEST.get(user_id, 0.0)
     elapsed = time.monotonic() - last
     if elapsed < _AI_COOLDOWN_SECONDS:
@@ -3462,7 +3499,10 @@ async def tutor_stream(
         answer_parts: list[str] = []
         try:
             async for item in stream_ollama(prompt, mode, memory=memory):
-                if item.get("done"):
+                if item.get("queued"):
+                    # Let the learner know they're in queue
+                    yield f"event: queued\ndata: {json.dumps({'position': item.get('position', 1)})}\n\n"
+                elif item.get("done"):
                     answer = "".join(answer_parts).strip()
                     if answer:
                         stream_db = SessionLocal()
@@ -3491,7 +3531,15 @@ async def tutor_stream(
             logger.exception("Ollama stream failed while answering tutor request for user_id=%s", user_id)
             yield "event: error\ndata: {\"detail\":\"DANILO Tutor is offline or still getting ready. Check local Ollama, then try again.\"}\n\n"
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @admin_router.get("/admin/departments")

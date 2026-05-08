@@ -58,6 +58,27 @@ server {
 
   location = /kindle-wifi/wifistub.html       { return 302 http://${PORTAL_DOMAIN}/; }
 
+  # SSE streaming endpoint: disable all buffering so tokens reach the browser immediately
+  location = /api/ai/tutor/stream {
+    proxy_pass             http://danilo_backend/api/ai/tutor/stream;
+    proxy_http_version     1.1;
+    proxy_set_header       Connection          "";
+    proxy_set_header       Host               \$host;
+    proxy_set_header       X-Real-IP          \$remote_addr;
+    proxy_set_header       X-Forwarded-For    \$proxy_add_x_forwarded_for;
+    proxy_set_header       X-Forwarded-Proto  \$scheme;
+
+    proxy_read_timeout     90s;
+    proxy_send_timeout     90s;
+    proxy_connect_timeout  10s;
+
+    # Disable all buffering for Server-Sent Events
+    proxy_buffering        off;
+    proxy_cache            off;
+    proxy_buffer_size      1k;
+    add_header             X-Accel-Buffering "no" always;
+  }
+
   location /api/ {
     proxy_pass             http://danilo_backend/api/;
     proxy_http_version     1.1;
@@ -67,8 +88,8 @@ server {
     proxy_set_header       X-Forwarded-For    \$proxy_add_x_forwarded_for;
     proxy_set_header       X-Forwarded-Proto  \$scheme;
 
-    # AI tutor endpoint can take up to ~3 minutes on a cold Llama model
-    proxy_read_timeout     200s;
+    # Generous timeout for non-streaming AI requests on slow hardware
+    proxy_read_timeout     90s;
     proxy_send_timeout     60s;
     proxy_connect_timeout  10s;
 
@@ -187,17 +208,21 @@ services:
     image: ollama/ollama:latest
     restart: unless-stopped
     environment:
-      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+      # Concurrency: 2 parallel generations for phi3:mini on 8 GB RAM systems
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-2}
       OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
-      # Limit context window to reduce per-request VRAM/RAM usage (phi3:mini default 4096)
+      # Keep model in RAM for 5 min after last request — frees RAM during idle periods
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+      # Limit context window to reduce per-request RAM/KV-cache usage
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-1024}
+      # Flash attention reduces memory for KV cache on compatible hardware
+      OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-1}
     deploy:
       resources:
         limits:
           cpus: "2.0"
-          # phi3:mini weighs ~2.3 GB; 2816 MB leaves headroom for KV cache and OS
-          memory: 2816M
+          # phi3:mini ~2.3 GB + KV cache + 2 parallel slots; 3072 MB is safe for 8 GB hosts
+          memory: 3072M
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -258,12 +283,21 @@ JWT_EXPIRE_MINUTES=720
 OLLAMA_URL=http://ollama:11434
 DANILO_OLLAMA_MODEL=phi3:mini
 OLLAMA_MODEL=phi3:mini
-OLLAMA_NUM_PARALLEL=1
+OLLAMA_NUM_PARALLEL=2
 OLLAMA_MAX_LOADED_MODELS=1
-OLLAMA_KEEP_ALIVE=10m
-OLLAMA_TIMEOUT_SECONDS=120
+OLLAMA_KEEP_ALIVE=5m
+OLLAMA_FLASH_ATTENTION=1
+OLLAMA_TIMEOUT_SECONDS=60
 OLLAMA_NUM_CTX=1024
-OLLAMA_CONTEXT_CHARS=1800
+OLLAMA_CONTEXT_CHARS=1600
+DANILO_AI_MAX_CONCURRENT=2
+DANILO_AI_COOLDOWN_SECONDS=4
+DANILO_AI_CACHE_SIZE=200
+DANILO_ROLLING_MEMORY=4
+DANILO_MEMORY_CHAR_BUDGET=800
+DANILO_TOKENS_SHORT=100
+DANILO_TOKENS_NORMAL=220
+DANILO_TOKENS_DETAILED=450
 SSID=PROJECT-DANILO
 PORTAL_DOMAIN=danilo.local
 DANILO_SEED_DEMO=0
@@ -331,14 +365,30 @@ Copy `.env.example` to `.env` for manual deployments and override secrets before
 
 ## Low-Power AI Defaults
 
-DANILO defaults to `phi3:mini` (Microsoft Phi-3 Mini, ~2.3GB RAM) optimised for 8GB RAM school servers with many concurrent learners. This provides low latency and high stability over raw capability.
+DANILO defaults to `phi3:mini` (Microsoft Phi-3 Mini, ~2.3 GB RAM) optimised for 8 GB RAM school servers with many concurrent learners. This provides low latency and high stability over raw capability.
 
 ```bash
 # Override model if desired
 sudo DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
 ```
 
-Recommended Intel N95 settings are `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_KEEP_ALIVE=10m`, `OLLAMA_NUM_CTX=1024`, and the default answer mode `normal`. Use Short mode for fastest student help and Detailed only when a longer explanation is needed.
+### Performance Profile (8 GB school server)
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `OLLAMA_NUM_PARALLEL` | `2` | 2 concurrent generations fit in 8 GB RAM |
+| `OLLAMA_MAX_LOADED_MODELS` | `1` | Only phi3:mini loaded; frees RAM |
+| `OLLAMA_KEEP_ALIVE` | `5m` | Unloads model after 5 min idle |
+| `OLLAMA_NUM_CTX` | `1024` | Small context = fast, low RAM per request |
+| `OLLAMA_FLASH_ATTENTION` | `1` | Reduces KV cache memory usage |
+| `DANILO_AI_MAX_CONCURRENT` | `2` | Backend queue cap matches Ollama slots |
+| `DANILO_TOKENS_SHORT` | `100` | Short mode: fastest response |
+| `DANILO_TOKENS_NORMAL` | `220` | Normal mode: balanced |
+| `DANILO_TOKENS_DETAILED` | `450` | Detailed mode: fuller explanation |
+
+All AI responses stream token-by-token so learners see text immediately rather than waiting for completion. Repeated questions (e.g. "What is photosynthesis?") are served from an LRU cache without re-running inference.
+
+Use **Short** mode for fastest student help; **Detailed** only when a fuller explanation is needed.
 EOF
 }
 
