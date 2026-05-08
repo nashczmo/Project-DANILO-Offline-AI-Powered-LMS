@@ -1,0 +1,214 @@
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Inter-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Inter-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Inter-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Inter-Bold.woff2") format("woff2"); }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================================================
+   DANILO v5 DESIGN SYSTEM
+   Minimal, calm, organized — built for Philippine DepEd schools
+   ======================================================================== */
+
+:root {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  --sidebar-w: 256px;
+  --header-h: 56px;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: #f8fafc;
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
+}
+
+#root { min-height: 100dvh; }
+
+input, select, textarea { font-family: inherit; }
+
+::selection { background: #4f46e5; color: #fff; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.18); }
+
+@layer components {
+  /* ---- Cards ---- */
+  .dn-card {
+    @apply bg-white rounded-xl border border-slate-200/70 shadow-sm;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .dn-card-hover:hover {
+    @apply shadow-md border-slate-300/80;
+  }
+
+  /* ---- Typography ---- */
+  .dn-title {
+    @apply text-lg font-semibold text-slate-900 tracking-tight;
+  }
+  .dn-subtitle {
+    @apply text-sm text-slate-500;
+  }
+  .dn-overline {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+
+  /* ---- Inputs ---- */
+  .dn-input {
+    @apply w-full bg-white px-3 py-2 text-sm text-slate-900 outline-none rounded-lg;
+    border: 1px solid #e2e8f0;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .dn-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.10);
+  }
+  .dn-input::placeholder { @apply text-slate-400; }
+  .dn-input:disabled { @apply bg-slate-50 text-slate-400 cursor-not-allowed; }
+
+  /* ---- Buttons ---- */
+  .dn-btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .dn-btn:disabled { @apply opacity-40 cursor-not-allowed; }
+  .dn-btn:active:not(:disabled) { transform: scale(0.98); }
+
+  .dn-btn-primary {
+    @apply dn-btn bg-primary-600 text-white shadow-sm;
+  }
+  .dn-btn-primary:hover:not(:disabled) { @apply bg-primary-700; }
+  .dn-btn-secondary {
+    @apply dn-btn bg-white text-slate-700 border border-slate-200 shadow-sm;
+  }
+  .dn-btn-secondary:hover:not(:disabled) { @apply bg-slate-50 border-slate-300; }
+  .dn-btn-danger {
+    @apply dn-btn bg-danger-500 text-white shadow-sm;
+  }
+  .dn-btn-danger:hover:not(:disabled) { @apply bg-danger-600; }
+  .dn-btn-ghost {
+    @apply dn-btn bg-transparent text-slate-600;
+  }
+  .dn-btn-ghost:hover:not(:disabled) { @apply bg-slate-100 text-slate-900; }
+
+  /* ---- Badges ---- */
+  .dn-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  }
+
+  /* ---- Status dot ---- */
+  .dn-status-dot {
+    @apply inline-block w-2 h-2 rounded-full bg-success-500 flex-shrink-0;
+  }
+
+  /* ---- Tables ---- */
+  .dn-table-wrap {
+    @apply overflow-x-auto rounded-xl border border-slate-200/60 bg-white shadow-sm;
+  }
+  .dn-table {
+    @apply w-full text-sm border-collapse;
+  }
+  .dn-table thead th {
+    @apply text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50/80 border-b border-slate-200/60 whitespace-nowrap;
+  }
+  .dn-table tbody td {
+    @apply px-4 py-3 text-slate-700 border-b border-slate-100/60;
+  }
+  .dn-table tbody tr:last-child td { @apply border-b-0; }
+  .dn-table tbody tr:hover td { @apply bg-slate-50/60; }
+
+  /* ---- Modal ---- */
+  .dn-modal-backdrop {
+    @apply fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4;
+  }
+  .dn-modal {
+    @apply bg-white rounded-2xl shadow-xl border border-slate-200/80 w-full max-w-lg overflow-hidden;
+  }
+  .dn-modal-header {
+    @apply px-5 py-4 border-b border-slate-100 flex items-center justify-between;
+  }
+  .dn-modal-body { @apply px-5 py-5; }
+  .dn-modal-footer {
+    @apply px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2;
+  }
+
+  /* ---- Topbar ---- */
+  .dn-topbar {
+    @apply hidden lg:flex items-center justify-between h-14 px-6 border-b border-slate-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-30;
+  }
+
+  /* ---- Search ---- */
+  .dn-search {
+    @apply dn-input pl-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    background-position: 12px center;
+  }
+
+  /* ---- Pagination ---- */
+  .dn-pagination {
+    @apply inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm;
+  }
+  .dn-pagination button {
+    @apply h-8 min-w-[2rem] inline-flex items-center justify-center rounded-md text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .dn-pagination button.active {
+    @apply bg-primary-50 text-primary-700;
+  }
+}
+
+/* ========================================================================
+   LAYOUT HELPERS
+   ======================================================================== */
+
+.pb-safe-nav {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ========================================================================
+   REDUCED MOTION
+   ======================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================================================
+   FOCUS VISIBLE
+   ======================================================================== */
+
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ========================================================================
+   TOUCH ERGONOMICS
+   ======================================================================== */
+
+button, .dn-btn, .dn-input, select, input, textarea {
+  touch-action: manipulation;
+}
+
+button, .dn-btn {
+  min-height: 44px;
+}
+
+img { content-visibility: auto; }
