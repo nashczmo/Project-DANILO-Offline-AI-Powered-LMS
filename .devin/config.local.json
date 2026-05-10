@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Exec(find)",
+      "Exec(mkdir)",
+      "Exec(npm install)",
+      "Exec(ls)",
+      "Exec(python3)",
+      "Exec(python)",
+      "Exec(sed)",
+      "Exec(bash)",
+      "Exec(true)",
+      "Exec(command)",
+      "Exec(npm run)",
+      "Exec(where node)",
+      "Exec(cmd)",
+      "Exec(powershell)",
+      "Exec(git status)",
+      "Exec(git init)"
+    ]
+  }
+}

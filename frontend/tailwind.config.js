@@ -1,0 +1,138 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
+  theme: {
+    extend: {
+      colors: {
+        danilo: {
+          bg: "#0F172A",
+          surface: "#1E293B",
+          "surface-hover": "#243447",
+          "surface-active": "#2A3F56",
+          border: "#334155",
+          "border-subtle": "#1E293B",
+          "border-focus": "#2563EB",
+          primary: "#2563EB",
+          "primary-hover": "#1D4ED8",
+          "primary-subtle": "rgba(37,99,235,0.12)",
+          "primary-muted": "rgba(37,99,235,0.06)",
+          secondary: "#06B6D4",
+          "secondary-hover": "#0891B2",
+          "secondary-subtle": "rgba(6,182,212,0.12)",
+          text: "#F1F5F9",
+          "text-secondary": "#CBD5E1",
+          "text-muted": "#64748B",
+          "text-placeholder": "#475569",
+          success: "#22C55E",
+          "success-hover": "#16A34A",
+          "success-subtle": "rgba(34,197,94,0.12)",
+          warning: "#F59E0B",
+          "warning-subtle": "rgba(245,158,11,0.12)",
+          error: "#EF4444",
+          "error-subtle": "rgba(239,68,68,0.12)",
+          purple: "#A855F7",
+          "purple-subtle": "rgba(168,85,247,0.12)",
+        },
+      },
+      fontFamily: {
+        sans: [
+          "Inter",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: ["JetBrains Mono", "Fira Code", "Consolas", "monospace"],
+      },
+      fontSize: {
+        "2xs": ["10px", "14px"],
+      },
+      borderRadius: {
+        "2xl": "16px",
+        "3xl": "20px",
+        "4xl": "24px",
+      },
+      boxShadow: {
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.2)",
+        sm: "0 1px 4px 0 rgb(0 0 0 / 0.25)",
+        md: "0 4px 8px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2)",
+        lg: "0 10px 20px -3px rgb(0 0 0 / 0.4), 0 4px 8px -4px rgb(0 0 0 / 0.25)",
+        xl: "0 20px 40px -5px rgb(0 0 0 / 0.45), 0 8px 16px -8px rgb(0 0 0 / 0.3)",
+        glow: "0 0 20px rgba(37,99,235,0.18)",
+        "glow-sm": "0 0 10px rgba(37,99,235,0.12)",
+        "inner-sm": "inset 0 1px 2px rgba(0,0,0,0.15)",
+      },
+      spacing: {
+        13: "3.25rem",
+        15: "3.75rem",
+        18: "4.5rem",
+        22: "5.5rem",
+      },
+      transitionTimingFunction: {
+        spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        smooth: "cubic-bezier(0.4, 0, 0.2, 1)",
+      },
+      animation: {
+        "fade-in": "fadeIn 0.2s ease-out both",
+        "fade-in-fast": "fadeIn 0.12s ease-out both",
+        "slide-up": "slideUp 0.22s ease-out both",
+        "slide-down": "slideDown 0.22s ease-out both",
+        "slide-in-left": "slideInLeft 0.25s ease-out both",
+        "slide-in-right": "slideInRight 0.25s ease-out both",
+        pulse: "pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "pulse-fast": "pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        spin: "spin 0.9s linear infinite",
+        "bounce-dot": "bounceDot 1.2s ease-in-out infinite",
+        shimmer: "shimmer 2s linear infinite",
+        "scale-in": "scaleIn 0.15s ease-out both",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        slideUp: {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        slideDown: {
+          "0%": { opacity: "0", transform: "translateY(-10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        slideInLeft: {
+          "0%": { opacity: "0", transform: "translateX(-16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        slideInRight: {
+          "0%": { opacity: "0", transform: "translateX(16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        pulse: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.4" },
+        },
+        spin: {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        bounceDot: {
+          "0%, 80%, 100%": { transform: "scale(0.8)", opacity: "0.5" },
+          "40%": { transform: "scale(1.1)", opacity: "1" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        scaleIn: {
+          "0%": { opacity: "0", transform: "scale(0.95)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
