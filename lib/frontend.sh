@@ -1,7 +1,7 @@
 # Project DANILO installer module: frontend.sh
 
 write_frontend_files() {
-  mkdir -p "${APP_ROOT}/frontend/src/components" "${APP_ROOT}/frontend/public/icons" "${APP_ROOT}/frontend/public/fonts"
+  mkdir -p "${APP_ROOT}/frontend" "${APP_ROOT}/frontend/public/fonts"
 
   note "Installing DANILO frontend source files"
 
@@ -12,33 +12,18 @@ write_frontend_files() {
     exit 1
   fi
 
-  # Copy all tracked frontend source files
+  rm -rf "${APP_ROOT}/frontend/src" "${APP_ROOT}/frontend/public"
   cp -r "${src_dir}/package.json" "${APP_ROOT}/frontend/package.json"
   cp -r "${src_dir}/vite.config.js" "${APP_ROOT}/frontend/vite.config.js"
   cp -r "${src_dir}/postcss.config.js" "${APP_ROOT}/frontend/postcss.config.js"
   cp -r "${src_dir}/tailwind.config.js" "${APP_ROOT}/frontend/tailwind.config.js"
   cp -r "${src_dir}/index.html" "${APP_ROOT}/frontend/index.html"
-
-  cp -r "${src_dir}/public/manifest.webmanifest" "${APP_ROOT}/frontend/public/manifest.webmanifest"
-  cp -r "${src_dir}/public/offline.html" "${APP_ROOT}/frontend/public/offline.html"
-  cp -r "${src_dir}/public/sw.js" "${APP_ROOT}/frontend/public/sw.js"
-
-  cp -r "${src_dir}/src/main.jsx" "${APP_ROOT}/frontend/src/main.jsx"
-  cp -r "${src_dir}/src/index.css" "${APP_ROOT}/frontend/src/index.css"
-  cp -r "${src_dir}/src/api.js" "${APP_ROOT}/frontend/src/api.js"
-  cp -r "${src_dir}/src/App.jsx" "${APP_ROOT}/frontend/src/App.jsx"
-  cp -r "${src_dir}/src/components/shared.jsx" "${APP_ROOT}/frontend/src/components/shared.jsx"
-  cp -r "${src_dir}/src/components/LoginView.jsx" "${APP_ROOT}/frontend/src/components/LoginView.jsx"
-  cp -r "${src_dir}/src/components/InstallBanner.jsx" "${APP_ROOT}/frontend/src/components/InstallBanner.jsx"
-  cp -r "${src_dir}/src/components/StreamView.jsx" "${APP_ROOT}/frontend/src/components/StreamView.jsx"
-  cp -r "${src_dir}/src/components/ContentView.jsx" "${APP_ROOT}/frontend/src/components/ContentView.jsx"
-  cp -r "${src_dir}/src/components/GradesView.jsx" "${APP_ROOT}/frontend/src/components/GradesView.jsx"
-  cp -r "${src_dir}/src/components/TutorView.jsx" "${APP_ROOT}/frontend/src/components/TutorView.jsx"
-  cp -r "${src_dir}/src/components/AdminPages.jsx" "${APP_ROOT}/frontend/src/components/AdminPages.jsx"
+  cp -r "${src_dir}/src" "${APP_ROOT}/frontend/src"
+  cp -r "${src_dir}/public" "${APP_ROOT}/frontend/public"
 
   local font_dir="${APP_ROOT}/frontend/public/fonts"
   local source_font_dir="${SCRIPT_DIR}/assets/fonts"
-  local inter_files="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2"
+  local inter_files="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2"
   local missing_fonts=()
   local font_file=""
 
@@ -72,12 +57,24 @@ validate_frontend_files() {
   validate_generated_file "${APP_ROOT}/frontend/src/api.js" "frontend API client"
   validate_generated_file "${APP_ROOT}/frontend/src/components/shared.jsx" "frontend shared components"
   validate_generated_file "${APP_ROOT}/frontend/src/components/AdminPages.jsx" "frontend admin pages"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/LoginView.jsx" "frontend login view"
   validate_generated_file "${APP_ROOT}/frontend/src/components/InstallBanner.jsx" "frontend install banner"
   validate_generated_file "${APP_ROOT}/frontend/src/components/StreamView.jsx" "frontend stream view"
   validate_generated_file "${APP_ROOT}/frontend/src/components/ContentView.jsx" "frontend content view"
   validate_generated_file "${APP_ROOT}/frontend/src/components/GradesView.jsx" "frontend grades view"
   validate_generated_file "${APP_ROOT}/frontend/src/components/TutorView.jsx" "frontend tutor view"
+  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/ConfirmDialog.jsx" "frontend confirm dialog"
+  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/MarkdownRenderer.jsx" "frontend markdown renderer"
+  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/Skeleton.jsx" "frontend loading skeletons"
+  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/ToastContainer.jsx" "frontend toast container"
+  validate_generated_file "${APP_ROOT}/frontend/src/hooks/usePath.js" "frontend path hook"
+  validate_generated_file "${APP_ROOT}/frontend/src/layout/Sidebar.jsx" "frontend sidebar"
+  validate_generated_file "${APP_ROOT}/frontend/src/layout/TopBar.jsx" "frontend top bar"
+  validate_generated_file "${APP_ROOT}/frontend/src/layout/MobileDrawer.jsx" "frontend mobile drawer"
+  validate_generated_file "${APP_ROOT}/frontend/src/layout/MobileNav.jsx" "frontend mobile nav"
+  validate_generated_file "${APP_ROOT}/frontend/src/lib/utils.js" "frontend utilities"
+  validate_generated_file "${APP_ROOT}/frontend/src/pages/Dashboard.jsx" "frontend dashboard"
+  validate_generated_file "${APP_ROOT}/frontend/src/pages/LoginView.jsx" "frontend login page"
+  validate_generated_file "${APP_ROOT}/frontend/src/store/useAppStore.js" "frontend app store"
 }
 
 validate_frontend_dist() {
@@ -122,7 +119,7 @@ validate_frontend_dist() {
     return 1
   fi
 
-  for font_file in Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2; do
+  for font_file in Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2; do
     if [[ ! -s "${APP_ROOT}/frontend/dist/fonts/${font_file}" ]]; then
       echo "Frontend dist is missing bundled Inter font: ${font_file}"
       return 1

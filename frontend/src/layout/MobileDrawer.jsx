@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import {
   LayoutDashboard,
   BookOpen,
@@ -11,7 +11,6 @@ import {
   Building2,
   Settings,
   Cpu,
-  LogOut,
   X,
 } from "lucide-react";
 import { cn, getInitials } from "../lib/utils";

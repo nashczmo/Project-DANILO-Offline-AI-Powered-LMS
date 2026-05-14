@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiRequest } from "../api";
-import { ASSESSMENT_TYPES, DEPED_SUBJECTS, Badge, Empty, Field, GradeCascade, PageHeader, PaginatedTable, SectionHeader, Stat, downloadReport } from "./shared";
+import { DEPED_SUBJECTS, Badge, Empty, Field, GradeCascade, PageHeader, SectionHeader, downloadReport } from "./shared";
 
 const defaultUserForm = {
   role: "student", fullName: "", username: "", password: "danilo123",
