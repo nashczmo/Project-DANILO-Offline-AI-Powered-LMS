@@ -4,7 +4,6 @@ const STATIC_FILES = [
   "/icons/icon-192.svg", "/icons/icon-512.svg",
   "/fonts/Inter-Regular.woff2", "/fonts/Inter-Medium.woff2",
   "/fonts/Inter-SemiBold.woff2", "/fonts/Inter-Bold.woff2",
-  "/fonts/Inter-ExtraBold.woff2",
 ];
 
 const OFFLINE_HTML = `<!doctype html>

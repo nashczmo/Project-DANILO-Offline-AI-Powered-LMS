@@ -64,12 +64,11 @@ When running this as a non-root test harness, override root-only permission help
    python3 -m http.server 4173 --directory "$APP_ROOT/frontend/dist"
    ```
 2. Open `http://127.0.0.1:4173/` in Chrome and wait for `navigator.serviceWorker.ready`.
-3. Verify CacheStorage contains `danilo-static-v5` and all five fonts:
+3. Verify CacheStorage contains `danilo-static-v6` and all four bundled fonts:
    - `/fonts/Inter-Regular.woff2`
    - `/fonts/Inter-Medium.woff2`
    - `/fonts/Inter-SemiBold.woff2`
    - `/fonts/Inter-Bold.woff2`
-   - `/fonts/Inter-ExtraBold.woff2`
 4. Stop the static server and navigate to a same-origin path such as `/offline-proof`.
 5. Expected offline state:
    - Heading: `DANILO is offline`
