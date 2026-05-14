@@ -4,6 +4,7 @@ const STATIC_FILES = [
   "/icons/icon-192.svg", "/icons/icon-512.svg",
   "/fonts/Inter-Regular.woff2", "/fonts/Inter-Medium.woff2",
   "/fonts/Inter-SemiBold.woff2", "/fonts/Inter-Bold.woff2",
+  "/fonts/Inter-ExtraBold.woff2",
 ];
 
 const OFFLINE_HTML = `<!doctype html>
@@ -26,6 +27,12 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws")) return;
   event.respondWith(
     caches.match(request).then((cached) => {
+      if (["/icons/", "/assets/", "/fonts/"].some((prefix) => url.pathname.startsWith(prefix))) {
+        return cached || fetch(request).then((network) => {
+          if (network.ok) caches.open(CACHE_NAME).then((c) => c.put(request, network.clone()));
+          return network;
+        });
+      }
       const fetchPromise = fetch(request).then((network) => {
         if (network.ok) caches.open(CACHE_NAME).then((c) => c.put(request, network.clone()));
         return network;

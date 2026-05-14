@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from "lucide-react";
 import { cn } from "../../lib/utils";
 

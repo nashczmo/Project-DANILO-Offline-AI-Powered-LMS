@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import {
   LayoutDashboard,
   BookOpen,
@@ -8,8 +8,6 @@ import {
   Users,
   Layers,
   Megaphone,
-  Building2,
-  Settings,
   Cpu,
 } from "lucide-react";
 import { cn } from "../lib/utils";
