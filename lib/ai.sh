@@ -1,8 +1,11 @@
 # Project DANILO installer module: ai.sh
 
-DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-gemma3:1b}}"
-DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-tinyllama:1.1b-chat}"
-DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-qwen2.5:1.5b}"
+DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-phi3:mini}}"
+DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-gemma2:2b}"
+DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-}"
+DANILO_AI_RUNTIME="${DANILO_AI_RUNTIME:-llamacpp}"
+DANILO_AI_PRIMARY_MODEL="${DANILO_AI_PRIMARY_MODEL:-Phi-3-mini-4k-instruct-q4_k_m.gguf}"
+DANILO_AI_FALLBACK_MODEL="${DANILO_AI_FALLBACK_MODEL:-gemma-2-2b-it-q4_k_m.gguf}"
 DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-custom}"
 DANILO_CUSTOM_GGUF_PATH="${DANILO_CUSTOM_GGUF_PATH:-}"
 DANILO_CUSTOM_MODELFILE="${DANILO_CUSTOM_MODELFILE:-}"
@@ -21,21 +24,21 @@ detect_ai_hardware_profile() {
   DANILO_AI_MAX_CONCURRENT="${DANILO_AI_MAX_CONCURRENT:-1}"
   OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
   OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-1}"
-  OLLAMA_NUM_CTX="${OLLAMA_NUM_CTX:-1024}"
+  OLLAMA_NUM_CTX="${OLLAMA_NUM_CTX:-1536}"
   OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-5m}"
   OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-90}"
   OLLAMA_CONTEXT_CHARS="${OLLAMA_CONTEXT_CHARS:-1600}"
 
   if [[ "${mem_mb}" -lt 6144 ]]; then
-    warn "Detected ${mem_mb} MB RAM. DANILO will use single-request AI mode; install Gemma 3 1B or TinyLlama only."
+    warn "Detected ${mem_mb} MB RAM. DANILO will use single-request AI mode; use Q4_K_M Phi-3 Mini or Gemma 2 2B only."
   elif [[ "${mem_mb}" -ge 12288 && "${DANILO_ALLOW_AI_PARALLEL:-0}" == "1" ]]; then
     [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
     [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
   fi
 
-  export DANILO_AI_RAM_MB DANILO_AI_CPU_COUNT DANILO_AI_MAX_CONCURRENT
+  export DANILO_AI_RAM_MB DANILO_AI_CPU_COUNT DANILO_AI_MAX_CONCURRENT DANILO_AI_RUNTIME DANILO_AI_PRIMARY_MODEL DANILO_AI_FALLBACK_MODEL
   export OLLAMA_NUM_PARALLEL OLLAMA_MAX_LOADED_MODELS OLLAMA_NUM_CTX OLLAMA_KEEP_ALIVE OLLAMA_TIMEOUT_SECONDS OLLAMA_CONTEXT_CHARS
-  note "AI hardware profile: RAM=${DANILO_AI_RAM_MB}MB CPU=${DANILO_AI_CPU_COUNT} concurrent=${DANILO_AI_MAX_CONCURRENT} ctx=${OLLAMA_NUM_CTX}"
+  note "AI hardware profile: runtime=${DANILO_AI_RUNTIME} primary=${DANILO_AI_PRIMARY_MODEL} RAM=${DANILO_AI_RAM_MB}MB CPU=${DANILO_AI_CPU_COUNT} concurrent=${DANILO_AI_MAX_CONCURRENT} ctx=${OLLAMA_NUM_CTX}"
 }
 
 configure_ollama_model() {
@@ -54,6 +57,11 @@ configure_ollama_model() {
     if [[ ! -f "${gguf_path}" ]]; then
       echo "GGUF file not found"
       exit 1
+    fi
+
+    if [[ "${DANILO_AI_RUNTIME}" == "llamacpp" && ! -f "${models_dir}/${DANILO_AI_PRIMARY_MODEL}" ]]; then
+      export DANILO_AI_PRIMARY_MODEL="$(basename "${gguf_file}")"
+      echo "Using llama.cpp primary GGUF: ${DANILO_AI_PRIMARY_MODEL}"
     fi
 
     cat > "${modelfile}" <<EOF

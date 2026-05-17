@@ -130,6 +130,10 @@ export default memo(function Dashboard({ user, dashboard, onNavigate, loading })
   const streamItems = Array.isArray(dashboard.stream) ? dashboard.stream : [];
   const gradeData = Array.isArray(dashboard.grades) ? dashboard.grades : [];
   const highlights = Array.isArray(dashboard.operationsHighlights) ? dashboard.operationsHighlights : [];
+  const aiProfile = dashboard.aiProfile || {};
+  const aiTrends = Array.isArray(aiProfile.learningTrends) ? aiProfile.learningTrends : [];
+  const aiWeakConcepts = Array.isArray(aiProfile.weakConcepts) ? aiProfile.weakConcepts : [];
+  const aiRecommendations = Array.isArray(aiProfile.recommendations) ? aiProfile.recommendations : [];
 
   const hour = new Date().getHours();
   const greeting = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -204,6 +208,31 @@ export default memo(function Dashboard({ user, dashboard, onNavigate, loading })
           {isStudent && avgGrade != null && (
             <SummaryCard label="Average" value={`${avgGrade}%`} icon={<TrendingUp className="w-4 h-4" />} tone="warning" />
           )}
+        </div>
+      )}
+
+      {/* Student AI learning profile */}
+      {isStudent && (
+        <div className="dn-card p-4 border-l-4 border-danilo-primary">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="text-xs font-semibold text-danilo-text-muted uppercase tracking-wider">DANILO Learning Profile</p>
+              <h3 className="text-sm font-semibold text-danilo-text mt-1">Personalized next step</h3>
+            </div>
+            <Sparkles className="w-4 h-4 text-danilo-primary flex-shrink-0" />
+          </div>
+          <div className="space-y-2 text-sm text-danilo-text-secondary">
+            {aiTrends[0]?.message && <p>{aiTrends[0].message}</p>}
+            {aiWeakConcepts[0]?.topic && <p>You may need more practice with {aiWeakConcepts[0].topic}.</p>}
+            <p>{aiRecommendations[0] || "Ask DANILO for a worked example from today's lesson."}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate("/ai-tutor")}
+            className="mt-3 text-xs font-medium text-danilo-primary hover:text-danilo-primary-hover transition-colors"
+          >
+            Ask DANILO for help →
+          </button>
         </div>
       )}
 

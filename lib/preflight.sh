@@ -129,7 +129,7 @@ validate_ram_minimum() {
   available_mb="$(free -m | awk '/^Mem:/ { print $2 }')"
   if (( available_mb < required_mb )); then
     warn "System reports only ${available_mb} MB RAM. Project DANILO recommends at least $((required_mb / 1024)) GB."
-    warn "The default 1B-class AI profile needs roughly 2 GB free RAM. The portal will attempt to start, but AI may be unstable."
+    warn "The default Q4 educational AI profile needs several GB of free RAM. The portal will attempt to start, but AI may be unstable."
   else
     note "RAM check passed: ${available_mb} MB available (minimum ${required_mb} MB required)"
   fi

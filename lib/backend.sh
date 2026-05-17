@@ -535,6 +535,24 @@ class AIConversation(Base):
     module = relationship("Module", back_populates="conversations")
 
 
+class StudentAIProfile(Base):
+    __tablename__ = "student_ai_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    strengths_json = Column(Text, nullable=False, default="[]")
+    weak_concepts_json = Column(Text, nullable=False, default="[]")
+    learning_trends_json = Column(Text, nullable=False, default="[]")
+    recommendations_json = Column(Text, nullable=False, default="[]")
+    quiz_summary_json = Column(Text, nullable=False, default="{}")
+    assignment_summary_json = Column(Text, nullable=False, default="{}")
+    ai_interaction_count = Column(Integer, nullable=False, default=0)
+    last_interaction_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    student = relationship("User")
+
+
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
@@ -968,7 +986,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .database import Base, SessionLocal, engine, get_db, wait_for_database
-from .models import AIConversation, Assignment, AuditLog, ChatMessage, ChatSession, Course, Department, Enrollment, GradeEntry, Module, Quiz, QuizAttempt, QuizQuestion, Section, StreamPost, Submission, User
+from .models import AIConversation, Assignment, AuditLog, ChatMessage, ChatSession, Course, Department, Enrollment, GradeEntry, Module, Quiz, QuizAttempt, QuizQuestion, Section, StreamPost, StudentAIProfile, Submission, User
 from .schemas import LoginRequest, TutorRequest
 from .seed import seed_defaults
 from .security import create_access_token, decode_access_token, hash_password, verify_password
@@ -1006,14 +1024,18 @@ ai_logger.addHandler(_make_file_handler("ai.log"))
 
 JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
-OLLAMA_URL = os.getenv("OLLAMA_URL", "")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "")
-DANILO_AI_PRIMARY_MODEL = os.getenv("DANILO_AI_PRIMARY_MODEL", OLLAMA_MODEL or "gemma3:1b")
-DANILO_AI_FALLBACK_MODEL = os.getenv("DANILO_AI_FALLBACK_MODEL", "tinyllama:1.1b-chat")
-DANILO_AI_OPTIONAL_MODEL = os.getenv("DANILO_AI_OPTIONAL_MODEL", "qwen2.5:1.5b")
-OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))
-OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "1024"))
-OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "1600"))
+DANILO_AI_RUNTIME = os.getenv("DANILO_AI_RUNTIME", "llamacpp").strip().lower()
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
+LLAMA_CPP_URL = os.getenv("LLAMA_CPP_URL", "http://llamacpp:8080")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", os.getenv("DANILO_OLLAMA_MODEL", "phi3:mini"))
+DANILO_AI_PRIMARY_MODEL = os.getenv("DANILO_AI_PRIMARY_MODEL", "Phi-3-mini-4k-instruct-q4_k_m.gguf")
+DANILO_AI_FALLBACK_MODEL = os.getenv("DANILO_AI_FALLBACK_MODEL", "gemma-2-2b-it-q4_k_m.gguf")
+DANILO_AI_OPTIONAL_MODEL = os.getenv("DANILO_AI_OPTIONAL_MODEL", "")
+DANILO_AI_ACTIVE_MODEL = os.getenv("DANILO_AI_ACTIVE_MODEL", DANILO_AI_PRIMARY_MODEL if DANILO_AI_RUNTIME == "llamacpp" else OLLAMA_MODEL)
+AI_TIMEOUT_SECONDS = float(os.getenv("DANILO_AI_TIMEOUT_SECONDS", os.getenv("OLLAMA_TIMEOUT_SECONDS", "90")))
+OLLAMA_TIMEOUT_SECONDS = AI_TIMEOUT_SECONDS
+OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", os.getenv("DANILO_AI_NUM_CTX", "1536")))
+OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "2600"))
 DANILO_AI_INDEX_PATH = os.getenv("DANILO_AI_INDEX_PATH", "/var/lib/danilo/ai_index.sqlite3")
 PORTAL_DOMAIN = os.getenv("PORTAL_DOMAIN", "")
 SSID = os.getenv("SSID", "")
@@ -1027,10 +1049,12 @@ CORS_ORIGINS = [
 
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET must be set by the installer environment")
-if not OLLAMA_URL:
-    raise RuntimeError("OLLAMA_URL must be set by the installer environment")
-if not OLLAMA_MODEL:
-    raise RuntimeError("OLLAMA_MODEL must be set by the installer environment")
+if DANILO_AI_RUNTIME not in {"ollama", "llamacpp"}:
+    raise RuntimeError("DANILO_AI_RUNTIME must be either ollama or llamacpp")
+if DANILO_AI_RUNTIME == "ollama" and not OLLAMA_URL:
+    raise RuntimeError("OLLAMA_URL must be set when DANILO_AI_RUNTIME=ollama")
+if DANILO_AI_RUNTIME == "llamacpp" and not LLAMA_CPP_URL:
+    raise RuntimeError("LLAMA_CPP_URL must be set when DANILO_AI_RUNTIME=llamacpp")
 if not PORTAL_DOMAIN:
     raise RuntimeError("PORTAL_DOMAIN must be set by the installer environment")
 if not SSID:
@@ -1038,8 +1062,8 @@ if not SSID:
 
 # ---------------------------------------------------------------------------
 # AI scalability protections
-# Offline mini-PC profile: one loaded 1B-class model, app-level fair queue, and
-# per-user cooldown. This keeps 8 GB RAM systems responsive with many students.
+# Offline mini-PC profile: one loaded Q4 educational model, app-level fair queue, and
+# per-user cooldown. This keeps Intel N95 / 8 GB RAM systems responsive with many students.
 # ---------------------------------------------------------------------------
 _AI_MAX_CONCURRENT = max(1, int(os.getenv("DANILO_AI_MAX_CONCURRENT", "1")))
 _AI_QUEUE_TIMEOUT_SECONDS = float(os.getenv("DANILO_AI_QUEUE_TIMEOUT_SECONDS", "45"))
@@ -1049,7 +1073,7 @@ _AI_COOLDOWN_SECONDS = float(os.getenv("DANILO_AI_COOLDOWN_SECONDS", "4"))
 _AI_TOTAL_REQUESTS = 0
 _AI_TIMEOUTS = 0
 _AI_ERRORS = 0
-_AI_LAST_MODEL = OLLAMA_MODEL
+_AI_LAST_MODEL = DANILO_AI_ACTIVE_MODEL
 _AI_LAST_LATENCY_MS: int | None = None
 # How often (seconds) to evict stale entries from the cooldown dict to prevent
 # unbounded growth when many learners are active during the school day.
@@ -1107,7 +1131,7 @@ _AI_CACHE_MAXSIZE = int(os.getenv("DANILO_AI_CACHE_SIZE", "200"))
 _ai_response_cache: "OrderedDict[str, str]" = OrderedDict()
 
 def _cache_key(prompt: str, mode: str) -> str:
-    return hashlib.sha256(f"{mode}:{prompt}".encode()).hexdigest()
+    return hashlib.sha256(f"{DANILO_AI_RUNTIME}:{DANILO_AI_ACTIVE_MODEL}:{mode}:{prompt}".encode()).hexdigest()
 
 def _cache_get(prompt: str, mode: str) -> str | None:
     key = _cache_key(prompt, mode)
@@ -1201,6 +1225,26 @@ def migrate_users_table() -> None:
             connection.execute(text("ALTER TABLE submissions ADD COLUMN score FLOAT"))
         if "submissions" in inspector.get_table_names() and "feedback" not in submission_columns:
             connection.execute(text("ALTER TABLE submissions ADD COLUMN feedback TEXT"))
+
+    inspector = inspect(engine)
+    profile_columns = {column["name"] for column in inspector.get_columns("student_ai_profiles")} if "student_ai_profiles" in inspector.get_table_names() else set()
+    with engine.begin() as connection:
+        if "student_ai_profiles" not in inspector.get_table_names():
+            Base.metadata.create_all(bind=engine)
+        else:
+            for column_name, ddl in {
+                "strengths_json": "ALTER TABLE student_ai_profiles ADD COLUMN strengths_json TEXT DEFAULT '[]' NOT NULL",
+                "weak_concepts_json": "ALTER TABLE student_ai_profiles ADD COLUMN weak_concepts_json TEXT DEFAULT '[]' NOT NULL",
+                "learning_trends_json": "ALTER TABLE student_ai_profiles ADD COLUMN learning_trends_json TEXT DEFAULT '[]' NOT NULL",
+                "recommendations_json": "ALTER TABLE student_ai_profiles ADD COLUMN recommendations_json TEXT DEFAULT '[]' NOT NULL",
+                "quiz_summary_json": "ALTER TABLE student_ai_profiles ADD COLUMN quiz_summary_json TEXT DEFAULT '{}' NOT NULL",
+                "assignment_summary_json": "ALTER TABLE student_ai_profiles ADD COLUMN assignment_summary_json TEXT DEFAULT '{}' NOT NULL",
+                "ai_interaction_count": "ALTER TABLE student_ai_profiles ADD COLUMN ai_interaction_count INTEGER DEFAULT 0 NOT NULL",
+                "last_interaction_at": "ALTER TABLE student_ai_profiles ADD COLUMN last_interaction_at TIMESTAMPTZ",
+                "updated_at": "ALTER TABLE student_ai_profiles ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now() NOT NULL",
+            }.items():
+                if column_name not in profile_columns:
+                    connection.execute(text(ddl))
 
 
 @asynccontextmanager
@@ -1901,11 +1945,13 @@ def build_pdf_document(title: str, lines: list[str]) -> bytes:
 
 
 SYSTEM_PROMPT = (
-    "You are DANILO, an offline DepEd AI tutor for Filipino students (Grades 1-12). "
-    "Be clear, concise, and accurate. Use lesson context when provided. Never guess or hallucinate.\n"
+    "You are DANILO, an offline AI-native learning operating system for Filipino students (Grades 1-12). "
+    "Use the current lesson, curriculum excerpts, and student learning profile before answering. "
+    "Be concise, accurate, encouraging, and age-appropriate. Never invent curriculum facts.\n"
+    "Response structure: 1) Direct answer, 2) Explanation, 3) Example, 4) Optional practice/help. "
+    "Avoid giant paragraphs. Prefer bullets or short sections. "
     "Rules: No violent, sexual, or harmful content. No weapons, drugs, self-harm, or illegal info. "
-    "If off-topic or unsafe, redirect politely to the lesson. "
-    "Tone: encouraging, age-appropriate, patient."
+    "If off-topic or unsafe, redirect politely to the lesson."
 )
 SAFETY_KEYWORDS = {
     "kill", "suicide", "bomb", "weapon", "drug", "sex", "porn", "nude", "hack",
@@ -1918,9 +1964,9 @@ SAFETY_REDIRECT = (
 )
 ROLLING_MEMORY_LIMIT = int(os.getenv("DANILO_ROLLING_MEMORY", "4"))
 RESPONSE_MODE_OPTIONS = {
-    "short":    {"num_predict": int(os.getenv("DANILO_TOKENS_SHORT",    "100")), "instruction": "Answer in 1-2 short paragraphs only."},
-    "normal":   {"num_predict": int(os.getenv("DANILO_TOKENS_NORMAL",   "220")), "instruction": "Answer in 2-3 clear paragraphs. Be concise."},
-    "detailed": {"num_predict": int(os.getenv("DANILO_TOKENS_DETAILED", "450")), "instruction": "Give a clear explanation with steps or examples. Stay focused."},
+    "short":    {"num_predict": int(os.getenv("DANILO_TOKENS_SHORT",    "140")), "instruction": "Answer in 1 short direct answer, 1 brief explanation, and 1 example."},
+    "normal":   {"num_predict": int(os.getenv("DANILO_TOKENS_NORMAL",   "280")), "instruction": "Use short sections: Direct answer, Explanation, Example, and Practice if helpful."},
+    "detailed": {"num_predict": int(os.getenv("DANILO_TOKENS_DETAILED", "520")), "instruction": "Give a step-by-step teaching response with short sections, an example, and a quick practice task."},
 }
 
 
@@ -1966,6 +2012,10 @@ def trim_text(value: str | None, limit: int) -> str:
     if len(text_value) <= limit:
         return text_value
     return text_value[:limit].rsplit(" ", 1)[0] + " ..."
+
+
+def average(values: list[float]) -> float | None:
+    return sum(values) / len(values) if values else None
 
 
 _RAG_STOPWORDS = {
@@ -2127,6 +2177,118 @@ def ollama_chat_payload(prompt: str, mode: str, *, stream: bool, memory: list[di
     }
 
 
+def _json_loads(value: str | None, fallback):
+    try:
+        return json.loads(value or "")
+    except Exception:
+        return fallback
+
+
+def build_student_ai_profile(db: Session, student: User, *, persist: bool = True) -> dict:
+    if student.role != "student":
+        return {"strengths": [], "weakConcepts": [], "learningTrends": [], "recommendations": [], "aiInteractionCount": 0}
+    profile = db.scalar(select(StudentAIProfile).where(StudentAIProfile.student_id == student.id))
+    if not profile and persist:
+        profile = StudentAIProfile(student_id=student.id)
+        db.add(profile)
+        db.flush()
+
+    topic_scores: dict[str, list[float]] = {}
+    subject_scores: dict[str, list[float]] = {}
+    for grade, course in db.execute(select(GradeEntry, Course).join(Course, GradeEntry.course_id == Course.id).where(GradeEntry.student_id == student.id).order_by(GradeEntry.created_at.asc())).all():
+        if grade.max_score:
+            pct = (grade.score / grade.max_score) * 100.0
+            topic = trim_text(grade.component or course.subject, 70)
+            topic_scores.setdefault(topic, []).append(pct)
+            subject_scores.setdefault(course.subject, []).append(pct)
+
+    quiz_scores = []
+    for attempt, quiz, course in db.execute(select(QuizAttempt, Quiz, Course).join(Quiz, QuizAttempt.quiz_id == Quiz.id).join(Course, Quiz.course_id == Course.id).where(QuizAttempt.student_id == student.id).order_by(QuizAttempt.submitted_at.asc())).all():
+        if attempt.score is not None:
+            score = float(attempt.score)
+            quiz_scores.append(score)
+            topic_scores.setdefault(trim_text(quiz.title or course.subject, 70), []).append(score)
+            subject_scores.setdefault(course.subject, []).append(score)
+
+    assignment_count = 0
+    assignment_scores = []
+    for submission, assignment, course in db.execute(select(Submission, Assignment, Course).join(Assignment, Submission.assignment_id == Assignment.id).join(Course, Assignment.course_id == Course.id).where(Submission.student_id == student.id).order_by(Submission.submitted_at.asc())).all():
+        if submission.status in {"submitted", "completed"}:
+            assignment_count += 1
+        if submission.score is not None and assignment.points:
+            pct = (submission.score / assignment.points) * 100.0
+            assignment_scores.append(pct)
+            topic_scores.setdefault(trim_text(assignment.title or course.subject, 70), []).append(pct)
+            subject_scores.setdefault(course.subject, []).append(pct)
+
+    strengths = []
+    weak_concepts = []
+    for topic, scores in topic_scores.items():
+        avg = average(scores)
+        if avg is None:
+            continue
+        item = {"topic": topic, "average": round(avg, 1), "evidenceCount": len(scores)}
+        if avg >= 85:
+            strengths.append(item)
+        elif avg < 78:
+            weak_concepts.append(item)
+    strengths = sorted(strengths, key=lambda item: (-item["average"], item["topic"]))[:5]
+    weak_concepts = sorted(weak_concepts, key=lambda item: (item["average"], -item["evidenceCount"], item["topic"]))[:5]
+
+    trends = []
+    for subject, scores in subject_scores.items():
+        if len(scores) >= 2:
+            delta = round(scores[-1] - scores[0], 1)
+            direction = "improved" if delta > 0 else "declined" if delta < 0 else "held steady"
+            trends.append({"subject": subject, "delta": delta, "message": f"Your {subject} accuracy {direction} by {abs(delta):.1f}% across recent work."})
+    trends = sorted(trends, key=lambda item: -abs(item["delta"]))[:4]
+    recommendations = [f"Review {item['topic']} with a short practice activity." for item in weak_concepts[:3]]
+    if not recommendations:
+        recommendations.append(f"Try an enrichment challenge in {strengths[0]['topic']}." if strengths else "Start with today's lesson and ask DANILO for one worked example.")
+
+    quiz_summary = {"attempts": len(quiz_scores), "average": round(average(quiz_scores), 1) if quiz_scores else None, "latest": round(quiz_scores[-1], 1) if quiz_scores else None}
+    assignment_summary = {"submitted": assignment_count, "scoredAverage": round(average(assignment_scores), 1) if assignment_scores else None}
+    ai_count = db.query(AIConversation).filter(AIConversation.student_id == student.id).count()
+    last_ai = db.scalar(select(AIConversation).where(AIConversation.student_id == student.id).order_by(AIConversation.created_at.desc()).limit(1))
+
+    if profile and persist:
+        profile.strengths_json = json.dumps(strengths, ensure_ascii=True)
+        profile.weak_concepts_json = json.dumps(weak_concepts, ensure_ascii=True)
+        profile.learning_trends_json = json.dumps(trends, ensure_ascii=True)
+        profile.recommendations_json = json.dumps(recommendations, ensure_ascii=True)
+        profile.quiz_summary_json = json.dumps(quiz_summary, ensure_ascii=True)
+        profile.assignment_summary_json = json.dumps(assignment_summary, ensure_ascii=True)
+        profile.ai_interaction_count = ai_count
+        profile.last_interaction_at = last_ai.created_at if last_ai else profile.last_interaction_at
+        profile.updated_at = datetime.now(timezone.utc)
+        db.flush()
+
+    return {
+        "strengths": strengths,
+        "weakConcepts": weak_concepts,
+        "learningTrends": trends,
+        "recommendations": recommendations,
+        "quizSummary": quiz_summary,
+        "assignmentSummary": assignment_summary,
+        "aiInteractionCount": ai_count,
+        "lastInteractionAt": last_ai.created_at.isoformat() if last_ai and last_ai.created_at else None,
+        "updatedAt": profile.updated_at.isoformat() if profile and profile.updated_at else None,
+    }
+
+
+def format_student_profile_for_prompt(profile: dict) -> list[str]:
+    lines = []
+    if profile.get("strengths"):
+        lines.append("Strengths: " + "; ".join(f"{item['topic']} ({item['average']}%)" for item in profile["strengths"][:3]))
+    if profile.get("weakConcepts"):
+        lines.append("Weak concepts: " + "; ".join(f"{item['topic']} ({item['average']}%)" for item in profile["weakConcepts"][:3]))
+    if profile.get("learningTrends"):
+        lines.append("Trends: " + " ".join(item.get("message", "") for item in profile["learningTrends"][:2]))
+    if profile.get("recommendations"):
+        lines.append("Recommended next steps: " + "; ".join(profile["recommendations"][:2]))
+    return lines
+
+
 def build_tutor_prompt(
     db: Session,
     current_user: User,
@@ -2175,37 +2337,45 @@ def build_tutor_prompt(
                 + (f" missed: {'; '.join(incorrect_qs[:2])}" if incorrect_qs else "")
             )
 
-    # Lesson context: keep within OLLAMA_CONTEXT_CHARS budget
-    context_budget = max(400, OLLAMA_CONTEXT_CHARS)
+    profile = build_student_ai_profile(db, current_user, persist=True) if current_user.role == "student" else {}
+    profile_lines = format_student_profile_for_prompt(profile)
+    context_budget = max(600, OLLAMA_CONTEXT_CHARS)
     lesson_lines = []
     if course:
-        lesson_lines.append(f"Subject: {trim_text(course.title, 80)}")
+        lesson_lines.append(f"Current class: {course.title} | Subject: {course.subject} | Grade: {course.grade_level} | Quarter: {course.quarter}")
     if module:
         content_parts = [
-            f"Module: {trim_text(module.title, 60)}",
+            f"Current lesson: {trim_text(module.title, 80)}",
             f"MELC: {module.melc_code}",
-            f"Competency: {trim_text(module.learning_competency or '', 120)}",
-            f"Summary: {trim_text(module.summary, 300)}",
+            f"Competency: {trim_text(module.learning_competency or '', 180)}",
+            f"Objectives: {trim_text(module.lesson_objectives or '', 180)}",
+            f"Summary: {trim_text(module.summary, 420)}",
         ]
         if module.content:
-            content_parts.append(f"Content: {trim_text(module.content, 200)}")
+            content_parts.append(f"Teacher material: {trim_text(module.content, 350)}")
         lesson_lines.append(trim_text(" | ".join(content_parts), context_budget))
-    retrieved_chunks = retrieve_lesson_context(payload.question, course.id if course else None, module.id if module else None)
+    retrieved_chunks = retrieve_lesson_context(payload.question, course.id if course else None, module.id if module else None, limit=4)
 
-    context_parts = [RESPONSE_MODE_OPTIONS[mode]["instruction"]]
+    context_parts = [
+        "Task: Answer as DANILO using this orchestration pipeline: learner input -> context builder -> curriculum retrieval -> learning profile -> response.",
+        RESPONSE_MODE_OPTIONS[mode]["instruction"],
+    ]
     context_parts.append("Use Filipino if the learner writes in Filipino; otherwise English.")
+    context_parts.append("If context is missing, say what you can answer and ask one focused follow-up only if necessary.")
     if current_user.grade_level:
-        context_parts.append(f"Grade: {current_user.grade_level}")
+        context_parts.append(f"Learner grade level: {current_user.grade_level}")
+    if profile_lines:
+        context_parts.append("Student learning profile: " + " | ".join(profile_lines))
     if grade_lines:
-        context_parts.append("Grades: " + "; ".join(grade_lines))
+        context_parts.append("Recent grade signals: " + "; ".join(grade_lines))
     if quiz_lines:
-        context_parts.append("Recent quizzes: " + " | ".join(quiz_lines))
+        context_parts.append("Recent quiz signals: " + " | ".join(quiz_lines))
     if lesson_lines:
-        context_parts.append("Lesson: " + " ".join(lesson_lines))
+        context_parts.append("Automatic classroom context: " + " ".join(lesson_lines))
     if retrieved_chunks:
         rag_lines = [f"{item['title']}: {item['content']}" for item in retrieved_chunks]
-        context_parts.append("Relevant lesson excerpts: " + trim_text(" || ".join(rag_lines), context_budget))
-    context_parts.append(f"Question: {payload.question.strip()}")
+        context_parts.append("Retrieved curriculum excerpts: " + trim_text(" || ".join(rag_lines), context_budget))
+    context_parts.append(f"Learner question: {payload.question.strip()}")
 
     prompt = "\n".join(context_parts)
     return prompt, module, course, grade_lines, mode
@@ -2232,61 +2402,76 @@ def save_ai_conversation(
     db.commit()
 
 
+def llama_cpp_chat_payload(prompt: str, mode: str, *, stream: bool, memory: list[dict] | None = None, model: str | None = None) -> dict:
+    mode = tutor_mode(mode)
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if memory:
+        messages.extend(memory)
+    messages.append({"role": "user", "content": prompt})
+    return {"model": model or DANILO_AI_PRIMARY_MODEL, "stream": stream, "messages": messages, "temperature": 0.25, "top_p": 0.9, "max_tokens": RESPONSE_MODE_OPTIONS[mode]["num_predict"]}
+
+
+def _models_to_try() -> list[str]:
+    primary = DANILO_AI_PRIMARY_MODEL if DANILO_AI_RUNTIME == "llamacpp" else OLLAMA_MODEL
+    models = [primary]
+    if DANILO_AI_FALLBACK_MODEL and DANILO_AI_FALLBACK_MODEL not in models:
+        models.append(DANILO_AI_FALLBACK_MODEL)
+    return models
+
+
+async def _post_nonstream_inference(client: httpx.AsyncClient, prompt: str, mode: str, memory: list[dict] | None, model_name: str) -> tuple[str, dict]:
+    if DANILO_AI_RUNTIME == "llamacpp":
+        payload = llama_cpp_chat_payload(prompt, mode, stream=False, memory=memory, model=model_name)
+        response = await client.post(f"{LLAMA_CPP_URL}/v1/chat/completions", json=payload)
+        response.raise_for_status()
+        body = response.json()
+        usage = body.get("usage") or {}
+        content = (body.get("choices") or [{}])[0].get("message", {}).get("content", "")
+        return content.strip(), {"model": body.get("model", model_name), "prompt_tokens": usage.get("prompt_tokens"), "response_tokens": usage.get("completion_tokens")}
+    payload = ollama_chat_payload(prompt, mode, stream=False, memory=memory, model=model_name)
+    response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
+    response.raise_for_status()
+    body = response.json()
+    return body.get("message", {}).get("content", "").strip(), {"model": body.get("model", model_name), "prompt_tokens": body.get("prompt_eval_count"), "response_tokens": body.get("eval_count")}
+
+
 async def ask_ollama(prompt: str, mode: str, memory: list[dict] | None = None) -> tuple[str, dict]:
     global _AI_TOTAL_REQUESTS
-    # Check response cache first (no semaphore needed for cache hits)
     cached = _cache_get(prompt, mode)
     if cached:
-        ai_logger.info("AI cache hit mode=%s prompt_len=%s", mode, len(prompt))
-        return cached, {"model": OLLAMA_MODEL, "mode": mode, "duration_ms": 0, "cache": True}
+        ai_logger.info("AI cache hit runtime=%s mode=%s prompt_len=%s", DANILO_AI_RUNTIME, mode, len(prompt))
+        return cached, {"runtime": DANILO_AI_RUNTIME, "model": DANILO_AI_ACTIVE_MODEL, "mode": mode, "duration_ms": 0, "cache": True}
 
     _AI_TOTAL_REQUESTS += 1
     started = time.perf_counter()
     prompt_tokens = estimate_prompt_tokens(prompt)
-    timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS, connect=5.0)
+    timeout = httpx.Timeout(AI_TIMEOUT_SECONDS, connect=5.0)
     queue_depth = _ai_queue_depth()
     if queue_depth > 0:
         ai_logger.info("AI queue depth=%s user will wait for semaphore", queue_depth)
     sem = await _acquire_ai_slot()
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            models_to_try = [OLLAMA_MODEL]
-            if DANILO_AI_FALLBACK_MODEL and DANILO_AI_FALLBACK_MODEL not in models_to_try:
-                models_to_try.append(DANILO_AI_FALLBACK_MODEL)
             last_error: Exception | None = None
-            body = {}
-            for model_name in models_to_try:
+            result = ""
+            raw_metrics = {}
+            for model_name in _models_to_try():
                 try:
-                    payload = ollama_chat_payload(prompt, mode, stream=False, memory=memory, model=model_name)
-                    response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
-                    response.raise_for_status()
-                    body = response.json()
+                    result, raw_metrics = await _post_nonstream_inference(client, prompt, mode, memory, model_name)
                     break
                 except Exception as exc:
                     last_error = exc
-                    ai_logger.warning("AI model attempt failed model=%s error=%s", model_name, exc)
+                    ai_logger.warning("AI model attempt failed runtime=%s model=%s error=%s", DANILO_AI_RUNTIME, model_name, exc)
             else:
                 raise last_error or RuntimeError("No AI model returned a response")
     finally:
         sem.release()
     duration_ms = int((time.perf_counter() - started) * 1000)
-    metrics = {
-        "model": body.get("model", OLLAMA_MODEL),
-        "mode": tutor_mode(mode),
-        "duration_ms": duration_ms,
-        "prompt_tokens": body.get("prompt_eval_count") or prompt_tokens,
-        "response_tokens": body.get("eval_count"),
-    }
-    result = body.get("message", {}).get("content", "").strip()
-    ai_logger.info(
-        "AI tutor completed model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s",
-        metrics["model"], metrics["mode"], metrics["prompt_tokens"],
-        metrics["response_tokens"], metrics["duration_ms"],
-    )
+    metrics = {"runtime": DANILO_AI_RUNTIME, "model": raw_metrics.get("model", DANILO_AI_ACTIVE_MODEL), "mode": tutor_mode(mode), "duration_ms": duration_ms, "prompt_tokens": raw_metrics.get("prompt_tokens") or prompt_tokens, "response_tokens": raw_metrics.get("response_tokens")}
+    ai_logger.info("AI tutor completed runtime=%s model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s", metrics["runtime"], metrics["model"], metrics["mode"], metrics["prompt_tokens"], metrics["response_tokens"], metrics["duration_ms"])
     _record_ai_result(metrics)
     _cache_set(prompt, mode, result)
     return result, metrics
-
 
 def build_student_insights_prompt(analysis: dict) -> str:
     struggling = analysis.get("strugglingStudents", [])[:8]
@@ -2322,83 +2507,111 @@ def build_student_insights_prompt(analysis: dict) -> str:
     return "\n".join(lines)
 
 
+def _semantic_stream_chunks(text_value: str) -> tuple[list[str], str]:
+    chunks = []
+    buffer = text_value
+    while buffer:
+        match = re.search(r"(.{30,}?[.!?]\s+|.{80,}?[,;:]\s+|.{140,}\s+)", buffer, flags=re.S)
+        if not match:
+            break
+        chunk = match.group(0)
+        chunks.append(chunk)
+        buffer = buffer[len(chunk):]
+    return chunks, buffer
+
+
 async def stream_ollama(prompt: str, mode: str, memory: list[dict] | None = None):
     global _AI_TOTAL_REQUESTS
-    # Cache hit: stream the cached answer word-by-word so the UX stays consistent
     cached = _cache_get(prompt, mode)
     if cached:
-        ai_logger.info("AI stream cache hit mode=%s prompt_len=%s", mode, len(prompt))
-        words = cached.split(" ")
-        for i, word in enumerate(words):
-            chunk = word if i == 0 else " " + word
+        ai_logger.info("AI stream cache hit runtime=%s mode=%s prompt_len=%s", DANILO_AI_RUNTIME, mode, len(prompt))
+        remainder = cached
+        chunks, remainder = _semantic_stream_chunks(remainder)
+        for chunk in chunks:
             yield {"content": chunk, "done": False}
-            await asyncio.sleep(0)  # yield control to event loop between chunks
-        yield {"content": "", "done": True, "metrics": {"model": OLLAMA_MODEL, "mode": tutor_mode(mode), "duration_ms": 0, "cache": True}}
+            await asyncio.sleep(0)
+        if remainder:
+            yield {"content": remainder, "done": False}
+        yield {"content": "", "done": True, "metrics": {"runtime": DANILO_AI_RUNTIME, "model": DANILO_AI_ACTIVE_MODEL, "mode": tutor_mode(mode), "duration_ms": 0, "cache": True}}
         return
 
     _AI_TOTAL_REQUESTS += 1
     started = time.perf_counter()
     prompt_tokens = estimate_prompt_tokens(prompt)
-    timeout = httpx.Timeout(OLLAMA_TIMEOUT_SECONDS, connect=5.0)
-    # Emit queue position before waiting so the frontend can show feedback
+    timeout = httpx.Timeout(AI_TIMEOUT_SECONDS, connect=5.0)
     queue_depth = _ai_queue_depth()
     if queue_depth > 0:
         yield {"queued": True, "position": queue_depth, "done": False}
+    else:
+        yield {"thinking": True, "message": "Building lesson context and learning profile...", "done": False}
     sem = await _acquire_ai_slot()
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            models_to_try = [OLLAMA_MODEL]
-            if DANILO_AI_FALLBACK_MODEL and DANILO_AI_FALLBACK_MODEL not in models_to_try:
-                models_to_try.append(DANILO_AI_FALLBACK_MODEL)
             last_error: Exception | None = None
-            for model_name in models_to_try:
+            for model_name in _models_to_try():
                 try:
-                    payload = ollama_chat_payload(prompt, mode, stream=True, memory=memory, model=model_name)
-                    async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
-                        response.raise_for_status()
-                        full_parts: list[str] = []
-                        async for line in response.aiter_lines():
-                            if not line:
-                                continue
-                            body = json.loads(line)
-                            content = body.get("message", {}).get("content", "")
-                            if content:
-                                full_parts.append(content)
-                                yield {"content": content, "done": False}
-                            if body.get("done"):
-                                duration_ms = int((time.perf_counter() - started) * 1000)
-                                metrics = {
-                                    "model": body.get("model", model_name),
-                                    "mode": tutor_mode(mode),
-                                    "duration_ms": duration_ms,
-                                    "prompt_tokens": body.get("prompt_eval_count") or prompt_tokens,
-                                    "response_tokens": body.get("eval_count"),
-                                }
-                                ai_logger.info(
-                                    "AI tutor streamed model=%s mode=%s prompt_tokens=%s response_tokens=%s duration_ms=%s",
-                                    metrics["model"], metrics["mode"], metrics["prompt_tokens"],
-                                    metrics["response_tokens"], metrics["duration_ms"],
-                                )
-                                full_response = "".join(full_parts).strip()
-                                if full_response:
-                                    _cache_set(prompt, mode, full_response)
-                                _record_ai_result(metrics)
-                                yield {"content": "", "done": True, "metrics": metrics}
-                                return
+                    full_parts: list[str] = []
+                    pending = ""
+                    if DANILO_AI_RUNTIME == "llamacpp":
+                        payload = llama_cpp_chat_payload(prompt, mode, stream=True, memory=memory, model=model_name)
+                        async with client.stream("POST", f"{LLAMA_CPP_URL}/v1/chat/completions", json=payload) as response:
+                            response.raise_for_status()
+                            async for line in response.aiter_lines():
+                                if not line or not line.startswith("data: "):
+                                    continue
+                                data = line[6:].strip()
+                                if data == "[DONE]":
+                                    break
+                                body = json.loads(data)
+                                delta = (body.get("choices") or [{}])[0].get("delta", {}).get("content", "")
+                                if delta:
+                                    full_parts.append(delta)
+                                    pending += delta
+                                    chunks, pending = _semantic_stream_chunks(pending)
+                                    for chunk in chunks:
+                                        yield {"content": chunk, "done": False}
+                    else:
+                        payload = ollama_chat_payload(prompt, mode, stream=True, memory=memory, model=model_name)
+                        async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
+                            response.raise_for_status()
+                            async for line in response.aiter_lines():
+                                if not line:
+                                    continue
+                                body = json.loads(line)
+                                delta = body.get("message", {}).get("content", "")
+                                if delta:
+                                    full_parts.append(delta)
+                                    pending += delta
+                                    chunks, pending = _semantic_stream_chunks(pending)
+                                    for chunk in chunks:
+                                        yield {"content": chunk, "done": False}
+                                if body.get("done"):
+                                    break
+                    if pending:
+                        yield {"content": pending, "done": False}
+                    duration_ms = int((time.perf_counter() - started) * 1000)
+                    metrics = {"runtime": DANILO_AI_RUNTIME, "model": model_name, "mode": tutor_mode(mode), "duration_ms": duration_ms, "prompt_tokens": prompt_tokens, "response_tokens": None}
+                    ai_logger.info("AI tutor streamed runtime=%s model=%s mode=%s prompt_tokens=%s duration_ms=%s", metrics["runtime"], metrics["model"], metrics["mode"], metrics["prompt_tokens"], metrics["duration_ms"])
+                    full_response = "".join(full_parts).strip()
+                    if full_response:
+                        _cache_set(prompt, mode, full_response)
+                    _record_ai_result(metrics)
+                    yield {"content": "", "done": True, "metrics": metrics}
+                    return
                 except Exception as exc:
                     last_error = exc
-                    ai_logger.warning("AI stream model attempt failed model=%s error=%s", model_name, exc)
+                    ai_logger.warning("AI stream model attempt failed runtime=%s model=%s error=%s", DANILO_AI_RUNTIME, model_name, exc)
             raise last_error or RuntimeError("No AI model returned a stream")
     finally:
         sem.release()
-
 
 @router.get("/health", tags=["health"])
 def health() -> dict:
     return {
         "status": "ok",
         "service": "project-danilo",
-        "model": OLLAMA_MODEL,
+        "model": DANILO_AI_ACTIVE_MODEL,
+        "runtime": DANILO_AI_RUNTIME,
         "portalDomain": PORTAL_DOMAIN,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -2406,40 +2619,54 @@ def health() -> dict:
 
 @ai_router.get("/ai/status", tags=["health"])
 def ai_status() -> dict:
-    """Public endpoint to check AI readiness without authentication.
-    Used by the frontend to display AI availability before login."""
-    ollama_ok = False
+    """Public endpoint to check AI readiness without authentication."""
+    runtime_ok = False
     model_loaded = False
     available_models: list[str] = []
     error_message = ""
+    base_url = LLAMA_CPP_URL if DANILO_AI_RUNTIME == "llamacpp" else OLLAMA_URL
 
     try:
-        r = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=4.0)
-        if r.status_code == 200:
-            ollama_ok = True
-            available_models = [m.get("name", "") for m in (r.json().get("models") or [])]
-            expected_models = {OLLAMA_MODEL, f"{OLLAMA_MODEL}:latest", DANILO_AI_FALLBACK_MODEL, f"{DANILO_AI_FALLBACK_MODEL}:latest"}
-            model_loaded = any(name in expected_models for name in available_models)
+        if DANILO_AI_RUNTIME == "llamacpp":
+            health_response = httpx.get(f"{base_url}/health", timeout=4.0)
+            runtime_ok = health_response.status_code < 500
+            models_response = httpx.get(f"{base_url}/v1/models", timeout=4.0)
+            if models_response.status_code == 200:
+                available_models = [m.get("id", "") for m in (models_response.json().get("data") or [])]
+            model_loaded = runtime_ok if not available_models else any(name in {DANILO_AI_PRIMARY_MODEL, DANILO_AI_ACTIVE_MODEL} for name in available_models)
+        else:
+            response = httpx.get(f"{base_url}/api/tags", timeout=4.0)
+            if response.status_code == 200:
+                runtime_ok = True
+                available_models = [m.get("name", "") for m in (response.json().get("models") or [])]
+                expected_models = {OLLAMA_MODEL, f"{OLLAMA_MODEL}:latest", DANILO_AI_FALLBACK_MODEL, f"{DANILO_AI_FALLBACK_MODEL}:latest"}
+                model_loaded = any(name in expected_models for name in available_models)
     except Exception as exc:
         error_message = str(exc)[:120]
 
     ram_available_mb: float | None = None
+    cpu_percent: float | None = None
     if _psutil:
         try:
             vm = _psutil.virtual_memory()
             ram_available_mb = round(vm.available / 1024 / 1024, 1)
+            cpu_percent = _psutil.cpu_percent(interval=0.0)
         except Exception:
             pass
 
     return {
-        "ollamaOnline": ollama_ok,
+        "runtime": DANILO_AI_RUNTIME,
+        "runtimeOnline": runtime_ok,
+        "ollamaOnline": runtime_ok if DANILO_AI_RUNTIME == "ollama" else None,
+        "llamaCppOnline": runtime_ok if DANILO_AI_RUNTIME == "llamacpp" else None,
         "modelLoaded": model_loaded,
-        "modelName": OLLAMA_MODEL,
+        "modelName": DANILO_AI_ACTIVE_MODEL,
         "primaryModel": DANILO_AI_PRIMARY_MODEL,
         "fallbackModel": DANILO_AI_FALLBACK_MODEL,
         "optionalModel": DANILO_AI_OPTIONAL_MODEL,
         "availableModels": available_models,
         "ramAvailableMb": ram_available_mb,
+        "cpuPercent": cpu_percent,
         "queueSlots": _AI_MAX_CONCURRENT,
         "queueDepth": _ai_queue_depth(),
         "queueTimeoutSeconds": _AI_QUEUE_TIMEOUT_SECONDS,
@@ -2451,11 +2678,10 @@ def ai_status() -> dict:
         "lastLatencyMs": _AI_LAST_LATENCY_MS,
         "ragIndexPath": DANILO_AI_INDEX_PATH,
         "ragIndexed": os.path.exists(DANILO_AI_INDEX_PATH),
-        "status": "ready" if (ollama_ok and model_loaded) else ("degraded" if ollama_ok else "offline"),
+        "status": "ready" if (runtime_ok and model_loaded) else ("degraded" if runtime_ok else "offline"),
         "errorMessage": error_message or None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-
 
 @router.post("/auth/login", tags=["auth"])
 def login(payload: dict = Body(default={}), db: Session = Depends(get_db)) -> dict:
@@ -2525,6 +2751,7 @@ def dashboard(current_user: User = Depends(get_current_user), db: Session = Depe
     try:
         stream_items = build_stream(db, current_user)
         grade_summary = build_grade_summary(db, current_user.id) if current_user.role == "student" else []
+        ai_profile = build_student_ai_profile(db, current_user, persist=True) if current_user.role == "student" else None
         if current_user.role == "admin":
             courses = build_admin_course_cards(db)
         elif current_user.role == "teacher":
@@ -2533,6 +2760,8 @@ def dashboard(current_user: User = Depends(get_current_user), db: Session = Depe
             courses = build_student_course_cards(db, current_user.id)
         content_items = build_content_tree(db, user=current_user)
         workflow_status = build_content_workflow_status()
+        if ai_profile is not None:
+            db.commit()
 
         return {
             "user": serialize_user(current_user),
@@ -2540,6 +2769,7 @@ def dashboard(current_user: User = Depends(get_current_user), db: Session = Depe
             "courses": courses or [],
             "contentFolders": content_items or [],
             "grades": grade_summary or [],
+            "aiProfile": ai_profile,
             "hints": {
                 "hasContent": bool(content_items),
                 "hasCourses": bool(courses),
@@ -2555,7 +2785,8 @@ def dashboard(current_user: User = Depends(get_current_user), db: Session = Depe
             "operationsHighlights": [
                 {"label": "Portal", "value": f"http://{PORTAL_DOMAIN}"},
                 {"label": "SSID", "value": SSID},
-                {"label": "AI Model", "value": OLLAMA_MODEL},
+                {"label": "AI Runtime", "value": DANILO_AI_RUNTIME},
+                {"label": "AI Model", "value": DANILO_AI_ACTIVE_MODEL},
             ],
         }
     except SQLAlchemyError as exc:
@@ -2628,7 +2859,8 @@ def admin_overview(current_user: User = Depends(get_current_user), db: Session =
         "system": {
             "portalUrl": f"http://{PORTAL_DOMAIN}",
             "wifiSsid": SSID,
-            "aiModel": OLLAMA_MODEL,
+            "aiRuntime": DANILO_AI_RUNTIME,
+            "aiModel": DANILO_AI_ACTIVE_MODEL,
             "database": "connected",
             "mode": "LAN offline-first",
         },
@@ -2643,7 +2875,7 @@ def admin_overview(current_user: User = Depends(get_current_user), db: Session =
         "operationsHighlights": [
             {"label": "Portal", "value": f"http://{PORTAL_DOMAIN}"},
             {"label": "SSID", "value": SSID},
-            {"label": "AI Model", "value": OLLAMA_MODEL},
+            {"label": "AI Model", "value": DANILO_AI_ACTIVE_MODEL},
         ],
     }
 
@@ -3071,7 +3303,7 @@ def teacher_dashboard(current_user: User = Depends(get_current_user), db: Sessio
         "operationsHighlights": [
             {"label": "Portal", "value": f"http://{PORTAL_DOMAIN}"},
             {"label": "SSID", "value": SSID},
-            {"label": "AI Model", "value": OLLAMA_MODEL},
+            {"label": "AI Model", "value": DANILO_AI_ACTIVE_MODEL},
         ],
     }
 
@@ -3635,6 +3867,14 @@ def _check_ai_rate_limit(user_id: int) -> None:
     _AI_USER_LAST_REQUEST[user_id] = time.monotonic()
 
 
+@ai_router.get("/ai/profile")
+def ai_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "student")
+    profile = build_student_ai_profile(db, current_user, persist=True)
+    db.commit()
+    return {"studentId": current_user.id, "studentName": current_user.full_name, "profile": profile}
+
+
 @ai_router.post("/ai/tutor")
 async def tutor(
     payload: TutorRequest,
@@ -3653,18 +3893,18 @@ async def tutor(
         answer, metrics = await ask_ollama(prompt, mode, memory=memory)
     except httpx.TimeoutException:
         _record_ai_result(timeout=True)
-        logger.warning("Ollama timed out while answering tutor request for user_id=%s", current_user.id)
-        metrics = {"model": OLLAMA_MODEL, "mode": mode, "prompt_tokens": estimate_prompt_tokens(prompt)}
+        logger.warning("AI runtime timed out while answering tutor request for user_id=%s", current_user.id)
+        metrics = {"runtime": DANILO_AI_RUNTIME, "model": DANILO_AI_ACTIVE_MODEL, "mode": mode, "prompt_tokens": estimate_prompt_tokens(prompt)}
         answer = (
             "DANILO is taking longer than expected on this device. "
             "Please try a shorter question, or ask again in a moment."
         )
     except Exception:
         _record_ai_result(error=True)
-        logger.exception("Ollama failed while answering tutor request for user_id=%s", current_user.id)
-        metrics = {"model": OLLAMA_MODEL, "mode": mode, "prompt_tokens": estimate_prompt_tokens(prompt)}
+        logger.exception("AI runtime failed while answering tutor request for user_id=%s", current_user.id)
+        metrics = {"runtime": DANILO_AI_RUNTIME, "model": DANILO_AI_ACTIVE_MODEL, "mode": mode, "prompt_tokens": estimate_prompt_tokens(prompt)}
         answer = (
-            "DANILO Tutor is offline or still getting ready. Please check the local Ollama service, then try again."
+            "DANILO Tutor is offline or still getting ready. Please check the local AI runtime, then try again."
         )
 
     save_ai_conversation(
@@ -3702,8 +3942,8 @@ async def tutor_stream(
     if check_safety(payload.question):
         save_ai_conversation(db, user_id=current_user.id, course_id=None, module_id=None, question=payload.question, answer=SAFETY_REDIRECT)
         async def safe_redirect():
-            yield f"data: {json.dumps({'content': SAFETY_REDIRECT})}\n\n"
-            yield "event: done\ndata: {}\n\n"
+            yield f"data: {json.dumps({'content': SAFETY_REDIRECT, 'token': SAFETY_REDIRECT})}\n\n"
+            yield "data: [DONE]\n\n"
         return StreamingResponse(safe_redirect(), media_type="text/event-stream")
 
     prompt, module, course, _, mode = build_tutor_prompt(db, current_user, payload)
@@ -3721,8 +3961,9 @@ async def tutor_stream(
         try:
             async for item in stream_ollama(prompt, mode, memory=memory):
                 if item.get("queued"):
-                    # Let the learner know they're in queue
-                    yield f"event: queued\ndata: {json.dumps({'position': item.get('position', 1)})}\n\n"
+                    yield f"data: {json.dumps({'queue_position': item.get('position', 1), 'warming_up': False})}\n\n"
+                elif item.get("thinking"):
+                    yield f"data: {json.dumps({'thinking': True, 'message': item.get('message', 'Thinking...')})}\n\n"
                 elif item.get("done"):
                     answer = "".join(answer_parts).strip()
                     if answer:
@@ -3740,19 +3981,20 @@ async def tutor_stream(
                             stream_db.commit()
                         finally:
                             stream_db.close()
-                    yield f"event: done\ndata: {json.dumps({**item.get('metrics', {}), 'sessionId': session_id})}\n\n"
+                    yield f"data: {json.dumps({'done': True, **item.get('metrics', {}), 'sessionId': session_id, 'session_id': session_id})}\n\n"
+                    yield "data: [DONE]\n\n"
                 else:
                     chunk = item.get("content", "")
                     answer_parts.append(chunk)
-                    yield f"data: {json.dumps({'content': chunk})}\n\n"
+                    yield f"data: {json.dumps({'content': chunk, 'token': chunk, 'session_id': session_id})}\n\n"
         except httpx.TimeoutException:
             _record_ai_result(timeout=True)
-            logger.warning("Ollama stream timed out while answering tutor request for user_id=%s", user_id)
+            logger.warning("AI runtime stream timed out while answering tutor request for user_id=%s", user_id)
             yield "event: error\ndata: {\"detail\":\"DANILO is taking longer than expected. Try Short mode or ask again.\"}\n\n"
         except Exception:
             _record_ai_result(error=True)
-            logger.exception("Ollama stream failed while answering tutor request for user_id=%s", user_id)
-            yield "event: error\ndata: {\"detail\":\"DANILO Tutor is offline or still getting ready. Check local Ollama, then try again.\"}\n\n"
+            logger.exception("AI runtime stream failed while answering tutor request for user_id=%s", user_id)
+            yield "event: error\ndata: {\"detail\":\"DANILO Tutor is offline or still getting ready. Check the local AI runtime, then try again.\"}\n\n"
 
     return StreamingResponse(
         event_stream(),
@@ -3897,6 +4139,8 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
     return {
         "database": db_status,
         "ollama": ollama_status,
+        "aiRuntime": DANILO_AI_RUNTIME,
+        "activeModel": DANILO_AI_ACTIVE_MODEL,
         "ollamaModel": OLLAMA_MODEL,
         "aiPrimaryModel": DANILO_AI_PRIMARY_MODEL,
         "aiFallbackModel": DANILO_AI_FALLBACK_MODEL,
@@ -3951,12 +4195,13 @@ def admin_ai_models(current_user: User = Depends(get_current_user)) -> dict:
         logger.exception("Could not list local AI models")
         models = []
     presets = [
-        {"key": "primary", "model": DANILO_AI_PRIMARY_MODEL, "purpose": "Default 1B-class classroom tutor for 8 GB RAM mini PCs"},
-        {"key": "fallback", "model": DANILO_AI_FALLBACK_MODEL, "purpose": "Smallest emergency fallback when the primary model is unavailable"},
-        {"key": "optional", "model": DANILO_AI_OPTIONAL_MODEL, "purpose": "Higher-quality optional model for stronger devices"},
+        {"key": "primary", "model": DANILO_AI_PRIMARY_MODEL, "purpose": "Phi-3 Mini Instruct Q4_K_M for higher-quality offline tutoring on Intel N95"},
+        {"key": "fallback", "model": DANILO_AI_FALLBACK_MODEL, "purpose": "Gemma 2 2B Q4_K_M fallback when the primary model is unavailable"},
+        {"key": "ollama-dev", "model": OLLAMA_MODEL, "purpose": "Development runtime fallback"},
     ]
     return {
-        "currentModel": OLLAMA_MODEL,
+        "runtime": DANILO_AI_RUNTIME,
+        "currentModel": DANILO_AI_ACTIVE_MODEL,
         "models": models,
         "presets": presets,
         "queueSlots": _AI_MAX_CONCURRENT,

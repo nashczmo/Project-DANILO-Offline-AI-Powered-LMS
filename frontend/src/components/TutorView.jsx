@@ -287,15 +287,23 @@ export default memo(function TutorView({ token, modules }) {
           if (payload === "[DONE]") break outer;
           try {
             const chunk = JSON.parse(payload);
-            if (chunk.queue_position != null) {
-              setQueuePosition(chunk.queue_position);
+            const position = chunk.queue_position ?? chunk.position;
+            if (position != null) {
+              setQueuePosition(position);
               if (chunk.warming_up) setIsWarmingUp(true);
+              continue;
+            }
+            if (chunk.thinking) {
+              setQueuePosition(null);
+              setIsWarmingUp(Boolean(chunk.warming_up));
               continue;
             }
             setQueuePosition(null);
             setIsWarmingUp(false);
-            if (chunk.session_id) receivedSessionId = chunk.session_id;
-            if (chunk.token) { fullAnswer += chunk.token; setStreamingContent(fullAnswer); }
+            if (chunk.session_id || chunk.sessionId) receivedSessionId = chunk.session_id || chunk.sessionId;
+            const content = chunk.token ?? chunk.content;
+            if (content) { fullAnswer += content; setStreamingContent(fullAnswer); }
+            if (chunk.done) break outer;
             if (chunk.error) throw new Error(chunk.error);
           } catch (_) {}
         }

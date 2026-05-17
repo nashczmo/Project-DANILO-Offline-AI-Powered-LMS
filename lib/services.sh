@@ -199,6 +199,7 @@ services:
         condition: service_started
     volumes:
       - ai_index:/var/lib/danilo
+      - ./models:/models:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=20)\""]
       interval: 30s
@@ -209,11 +210,12 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    profiles: ["ollama"]
     environment:
       # Concurrency: default single generation for 8 GB RAM classroom mini PCs
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
       OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
-      # Keep the 1B-class model warm briefly, then free RAM during idle periods
+      # Keep the development model warm briefly, then free RAM during idle periods
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
       # Limit context window to reduce per-request RAM/KV-cache usage
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-1024}
@@ -234,6 +236,29 @@ services:
       retries: 40
       start_period: 180s
 
+  llamacpp:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    restart: unless-stopped
+    profiles: ["llamacpp"]
+    command:
+      - "-m"
+      - "/models/${DANILO_AI_PRIMARY_MODEL:-Phi-3-mini-4k-instruct-q4_k_m.gguf}"
+      - "-c"
+      - "${DANILO_AI_NUM_CTX:-1536}"
+      - "-t"
+      - "${DANILO_AI_THREADS:-4}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+    volumes:
+      - ./models:/models:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "3.0"
+          memory: 4096M
+
   gateway:
     build:
       context: .
@@ -243,8 +268,6 @@ services:
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_started
-      ollama:
         condition: service_started
     ports:
       - "80:80"
@@ -283,29 +306,35 @@ POSTGRES_DB=danilo
 POSTGRES_USER=danilo
 POSTGRES_PASSWORD=change-me
 JWT_EXPIRE_MINUTES=720
+COMPOSE_PROFILES=llamacpp
+DANILO_AI_RUNTIME=llamacpp
+LLAMA_CPP_URL=http://llamacpp:8080
 OLLAMA_URL=http://ollama:11434
-DANILO_OLLAMA_MODEL=gemma3:1b
-OLLAMA_MODEL=gemma3:1b
-DANILO_AI_PRIMARY_MODEL=gemma3:1b
-DANILO_AI_FALLBACK_MODEL=tinyllama:1.1b-chat
-DANILO_AI_OPTIONAL_MODEL=qwen2.5:1.5b
+DANILO_OLLAMA_MODEL=phi3:mini
+OLLAMA_MODEL=phi3:mini
+DANILO_AI_PRIMARY_MODEL=Phi-3-mini-4k-instruct-q4_k_m.gguf
+DANILO_AI_FALLBACK_MODEL=gemma-2-2b-it-q4_k_m.gguf
+DANILO_AI_OPTIONAL_MODEL=
 DANILO_AI_MAX_CONCURRENT=1
 DANILO_AI_QUEUE_TIMEOUT_SECONDS=45
+DANILO_AI_TIMEOUT_SECONDS=90
+DANILO_AI_NUM_CTX=1536
+DANILO_AI_THREADS=4
 DANILO_AI_INDEX_PATH=/var/lib/danilo/ai_index.sqlite3
 OLLAMA_NUM_PARALLEL=1
 OLLAMA_MAX_LOADED_MODELS=1
 OLLAMA_KEEP_ALIVE=5m
 OLLAMA_FLASH_ATTENTION=1
 OLLAMA_TIMEOUT_SECONDS=90
-OLLAMA_NUM_CTX=1024
-OLLAMA_CONTEXT_CHARS=1600
+OLLAMA_NUM_CTX=1536
+OLLAMA_CONTEXT_CHARS=2600
 DANILO_AI_COOLDOWN_SECONDS=4
 DANILO_AI_CACHE_SIZE=200
 DANILO_ROLLING_MEMORY=4
 DANILO_MEMORY_CHAR_BUDGET=800
-DANILO_TOKENS_SHORT=100
-DANILO_TOKENS_NORMAL=220
-DANILO_TOKENS_DETAILED=450
+DANILO_TOKENS_SHORT=140
+DANILO_TOKENS_NORMAL=280
+DANILO_TOKENS_DETAILED=520
 SSID=PROJECT-DANILO
 PORTAL_DOMAIN=danilo.local
 DANILO_SEED_DEMO=0
@@ -314,7 +343,7 @@ EOF
   cat > "${APP_ROOT}/README.md" <<'EOF'
 # Project DANILO
 
-Project DANILO is an offline-first DepEd school portal packaged with FastAPI, React/Vite, PostgreSQL, Nginx, Docker Compose, and Ollama.
+Project DANILO is an offline-first DepEd school portal packaged with FastAPI, React/Vite, PostgreSQL, Nginx, Docker Compose, llama.cpp production inference, and Ollama development fallback.
 
 ## Default Local Admin
 
@@ -373,11 +402,11 @@ Copy `.env.example` to `.env` for manual deployments and override secrets before
 
 ## Low-Power AI Defaults
 
-DANILO defaults to a 1B-class offline classroom profile: primary `gemma3:1b`, fallback `tinyllama:1.1b-chat`, and optional stronger-device preset `qwen2.5:1.5b`. A teacher can also place a `.gguf` file in `models/` before install to create `danilo-custom`.
+DANILO defaults to an AI-native offline classroom profile: primary `Phi-3 Mini Instruct GGUF Q4_K_M` on llama.cpp, fallback `Gemma 2 2B Q4_K_M`, and Ollama `phi3:mini` for development. Place the Phi-3 GGUF in `models/` before install.
 
 ```bash
-# Override model if desired
-sudo DANILO_OLLAMA_MODEL=tinyllama:1.1b-chat bash danilo.sh --install
+# Use Ollama development mode if llama.cpp model files are not installed yet
+sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
 ```
 
 ### Performance Profile (8 GB school server)
@@ -387,7 +416,9 @@ sudo DANILO_OLLAMA_MODEL=tinyllama:1.1b-chat bash danilo.sh --install
 | `OLLAMA_NUM_PARALLEL` | `1` | Single generation keeps RAM stable under many learners |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | Only one model loaded; frees RAM |
 | `OLLAMA_KEEP_ALIVE` | `5m` | Unloads model after 5 min idle |
-| `OLLAMA_NUM_CTX` | `1024` | Small context = fast, low RAM per request |
+| `DANILO_AI_RUNTIME` | `llamacpp` | Production inference path with lower overhead than Ollama |
+| `DANILO_AI_PRIMARY_MODEL` | `Phi-3-mini-4k-instruct-q4_k_m.gguf` | Higher-quality educational reasoning model |
+| `OLLAMA_NUM_CTX` | `1536` | Small context = fast, low RAM per request |
 | `OLLAMA_FLASH_ATTENTION` | `1` | Reduces KV cache memory usage |
 | `DANILO_AI_MAX_CONCURRENT` | `1` | Backend fair queue matches Ollama slots |
 | `DANILO_AI_QUEUE_TIMEOUT_SECONDS` | `45` | Prevents requests from waiting forever |
@@ -395,7 +426,7 @@ sudo DANILO_OLLAMA_MODEL=tinyllama:1.1b-chat bash danilo.sh --install
 | `DANILO_TOKENS_NORMAL` | `220` | Normal mode: balanced |
 | `DANILO_TOKENS_DETAILED` | `450` | Detailed mode: fuller explanation |
 
-All AI responses stream token-by-token so learners see text immediately rather than waiting for completion. Repeated questions are served from an LRU cache without re-running inference. Lesson modules are indexed into a lightweight local SQLite retrieval store at `/var/lib/danilo/ai_index.sqlite3` so prompts include relevant class excerpts without increasing the base model size.
+AI responses stream by sentence or semantic chunk so learners see progress without distracting character-by-character output. Repeated questions are served from an LRU cache without re-running inference. Lesson modules are indexed into a lightweight local SQLite retrieval store at `/var/lib/danilo/ai_index.sqlite3` so prompts include relevant class excerpts without increasing the base model size.
 
 Use **Short** mode for fastest student help; **Detailed** only when a fuller explanation is needed.
 EOF
@@ -510,13 +541,21 @@ wait_for_stack_readiness() {
   note "Checking compose services are running"
   wait_for_service_running postgres
   wait_for_service_running backend
-  wait_for_service_running ollama
+  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "llamacpp" ]]; then
+    wait_for_service_running llamacpp
+  elif [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+    wait_for_service_running ollama
+  fi
   wait_for_service_running gateway
 
   note "Checking compose health status"
   wait_for_container_healthy postgres "Postgres healthcheck"
   wait_for_container_healthy backend "Backend healthcheck"
-  wait_for_container_healthy ollama "Ollama service readiness"
+  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "llamacpp" ]]; then
+    wait_for_service_running llamacpp
+  elif [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+    wait_for_container_healthy ollama "Ollama service readiness"
+  fi
   wait_for_container_healthy gateway "Gateway/frontend healthcheck"
 
   note "Checking Postgres database readiness"
@@ -532,40 +571,42 @@ wait_for_stack_readiness() {
     sleep 2
   done
 
-  note "Checking Ollama API response"
-  attempts=0
-  until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:11434/api/tags" >/dev/null 2>&1; do
-    attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 30 ]]; then
-      echo "Ollama is running but its API did not answer on /api/tags."
-      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
-      exit 1
-    fi
-    sleep 2
-  done
-
-  note "Checking Ollama model availability"
-  attempts=0
-  until ollama_model_exists_in_compose "${OLLAMA_MODEL}"; do
-    attempts=$((attempts + 1))
-    if [[ "${attempts}" -eq 10 ]]; then
-      if internet_reachable_now; then
-        note "Configured model not yet present. Internet is available, so DANILO will try to pull it now."
-        if ! docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama pull "${OLLAMA_MODEL}" >/dev/null 2>&1; then
-          note "Automatic Ollama model pull did not complete yet; continuing readiness checks"
-        fi
-      else
-        note "Configured model not yet present and internet is not reachable. Waiting for a preloaded local model."
+  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+    note "Checking Ollama API response"
+    attempts=0
+    until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:11434/api/tags" >/dev/null 2>&1; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -gt 30 ]]; then
+        echo "Ollama is running but its API did not answer on /api/tags."
+        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
+        exit 1
       fi
-    fi
-    if [[ "${attempts}" -gt 60 ]]; then
-      echo "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
-      echo "Reconnect temporary internet or preload this model, then re-run the installer."
-      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
-      exit 1
-    fi
-    sleep 3
-  done
+      sleep 2
+    done
+
+    note "Checking Ollama model availability"
+    attempts=0
+    until ollama_model_exists_in_compose "${OLLAMA_MODEL}"; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -eq 10 ]]; then
+        if internet_reachable_now; then
+          note "Configured model not yet present. Internet is available, so DANILO will try to pull it now."
+          if ! docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama pull "${OLLAMA_MODEL}" >/dev/null 2>&1; then
+            note "Automatic Ollama model pull did not complete yet; continuing readiness checks"
+          fi
+        else
+          note "Configured model not yet present and internet is not reachable. Waiting for a preloaded local model."
+        fi
+      fi
+      if [[ "${attempts}" -gt 60 ]]; then
+        echo "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
+        echo "Reconnect temporary internet or preload this model, then re-run the installer."
+        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
+        exit 1
+      fi
+      sleep 3
+    done
+  fi
 
   note "Checking backend API through gateway"
   attempts=0

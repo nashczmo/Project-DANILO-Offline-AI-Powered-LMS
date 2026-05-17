@@ -13,7 +13,7 @@ The deployment verifier checks:
 - Backend `/api/health`
 - Frontend gateway
 - PostgreSQL readiness
-- Ollama reachability and active model loading
+- AI runtime reachability and active model loading
 - `danilo.local` name resolution
 - Admin login using `admin` / `ProjectDANILO2026!`
 
@@ -27,11 +27,11 @@ The verifier checks:
 
 - Docker daemon status.
 - Docker Compose project readability.
-- Postgres, backend, Ollama, and gateway container health.
+- Postgres, backend, AI runtime, and gateway container health.
 - Backend health through `http://danilo.local/api/health`.
 - Frontend health through `http://danilo.local/`.
 - Postgres database readiness.
-- Ollama connection and active model loading.
+- AI runtime connection and active model loading.
 - `danilo.local` local name resolution.
 - Admin login endpoint using `admin` / `ProjectDANILO2026!`.
 - Admin overview route access.
@@ -59,4 +59,4 @@ sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec -T olla
 sudo grep '^OLLAMA_MODEL=' /opt/danilo/app/.env
 ```
 
-If `models/*.gguf` exists before install, the active model should be `danilo-custom`. If no GGUF file exists, the active model should be `gemma3:1b`.
+If `models/*.gguf` exists before install, the active model should be `danilo-custom`. If no GGUF file exists, the active model should be `Phi-3 Mini Instruct Q4_K_M`.

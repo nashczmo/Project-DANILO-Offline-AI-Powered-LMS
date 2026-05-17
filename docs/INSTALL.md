@@ -21,7 +21,7 @@ sudo bash danilo.sh --uninstall
 sudo bash danilo.sh --help
 ```
 
-The installer checks sudo/root, Ubuntu 24.04, free disk space, base packages, Docker, Node.js, Python runtime packages, backend files, frontend files, PostgreSQL, Ollama, Wi-Fi/AP services, systemd units, nginx gateway, logs, backups, and rollback.
+The installer checks sudo/root, Ubuntu 24.04, free disk space, base packages, Docker, Node.js, Python runtime packages, backend files, frontend files, PostgreSQL, AI runtime, Wi-Fi/AP services, systemd units, nginx gateway, logs, backups, and rollback.
 
 Generated runtime structure:
 

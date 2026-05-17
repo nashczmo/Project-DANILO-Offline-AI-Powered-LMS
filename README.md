@@ -1,6 +1,6 @@
 # Project DANILO Installer
 
-Project DANILO packages an offline-first, DepEd-aligned AI-powered LMS for low-connectivity schools. The installer generates a complete local stack with FastAPI, React, PostgreSQL, Nginx, Docker Compose, Wi-Fi captive portal services, and an Ollama AI tutor.
+Project DANILO packages an offline-first, DepEd-aligned AI-native learning LMS for low-connectivity schools. The installer generates a complete local stack with FastAPI, React, PostgreSQL, Nginx, Docker Compose, Wi-Fi captive portal services, llama.cpp production inference, and Ollama development fallback.
 
 Default administrator credentials:
 
@@ -36,7 +36,7 @@ Logs are written to `/var/log/danilo-install.log`. Backups are stored in `/var/b
 ```text
 danilo.sh              # installer entrypoint
 lib/                   # installer, backend, frontend, AI, network, service, verification modules
-models/                # optional *.gguf files; first file becomes danilo-custom
+models/                # offline GGUF models, e.g. Phi-3 Mini Instruct Q4_K_M
 docs/                  # install, model, troubleshooting, verification, release docs
 scripts/               # repository-side verification helpers
 ```
@@ -58,9 +58,15 @@ sudo bash danilo.sh --help
 
 `--install`, `--update`, and `--rebuild-frontend` preserve existing data. `--clean-install` resets data only through the clean-install/reset path.
 
-## Custom GGUF Models
+## AI Runtime And Models
 
-Put a `.gguf` file in `models/` before install. The installer automatically creates `danilo-custom`, writes `models/Modelfile`, and makes it the default AI tutor model. Without a GGUF file, DANILO uses `gemma3:1b` with `tinyllama:1.1b-chat` as fallback.
+DANILO production mode is llama.cpp with `Phi-3 Mini Instruct GGUF Q4_K_M` as the primary model and `Gemma 2 2B Q4_K_M` as fallback. Put the GGUF files in `models/` before install and keep the default `DANILO_AI_RUNTIME=llamacpp`.
+
+For development without GGUF files, use Ollama:
+
+```bash
+sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
+```
 
 See `docs/CUSTOM_MODEL.md`.
 

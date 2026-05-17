@@ -57,4 +57,4 @@
 - Join the `PROJECT-DANILO` Wi-Fi AP.
 - Open `http://danilo.local`.
 - Confirm `/api/health` returns `status: ok`.
-- Confirm the AI model is `danilo-custom` when `models/*.gguf` exists, otherwise `gemma3:1b`.
+- Confirm the AI runtime is llama.cpp with Phi-3 Mini Instruct Q4_K_M in production, or Ollama phi3:mini only for development.

@@ -1,91 +1,56 @@
-# Custom GGUF Model
+# Offline AI Models
 
-Place one `.gguf` file in:
+Project DANILO now treats AI as platform infrastructure, not a standalone chatbot. Production inference should run through llama.cpp with local GGUF files.
 
-```text
-danilo-installer/models/
-```
+## Recommended Production Models
 
-Example:
+Place these files in `models/` before installing on the Ubuntu server:
 
 ```text
-danilo-installer/models/deped-tutor-q8.gguf
+models/Phi-3-mini-4k-instruct-q4_k_m.gguf
+models/gemma-2-2b-it-q4_k_m.gguf
 ```
 
-During `--install`, `--clean-install`, or `--update`, the installer detects the first `.gguf` file, resolves its absolute path, regenerates `models/Modelfile`, creates the Ollama model `danilo-custom`, and sets it as the default tutor model.
+Default runtime settings:
 
-The installer log clearly prints either:
-
-```text
-Custom GGUF detected: ...
-Using custom model: danilo-custom
+```env
+DANILO_AI_RUNTIME=llamacpp
+DANILO_AI_PRIMARY_MODEL=Phi-3-mini-4k-instruct-q4_k_m.gguf
+DANILO_AI_FALLBACK_MODEL=gemma-2-2b-it-q4_k_m.gguf
+DANILO_AI_NUM_CTX=1536
+DANILO_AI_THREADS=4
+DANILO_AI_MAX_CONCURRENT=1
 ```
 
-or:
+This profile targets Intel N95, 8 GB RAM, Ubuntu Server, and offline classroom Wi-Fi usage. It favors one stable generation at a time, semantic chunk streaming, and queue feedback instead of letting requests overload the CPU.
 
-```text
-No custom GGUF found
-Using default model: gemma3:1b
-```
+## Development Mode
 
-The generated Ollama model creation is equivalent to:
+Ollama remains supported for development or temporary testing:
 
 ```bash
-ollama create danilo-custom -f models/Modelfile
+sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
 ```
 
-Generated Modelfile:
+The Ollama fallback is not the preferred production path; llama.cpp is lower overhead and easier to tune for CPU-only inference.
+
+## AI-Native Backend Flow
+
+Every tutor request is orchestrated as:
 
 ```text
-FROM /absolute/path/to/model.gguf
-
-PARAMETER temperature 0.3
-PARAMETER top_p 0.9
-PARAMETER repeat_penalty 1.1
-PARAMETER num_ctx 1024
-
-SYSTEM You are DANILO, an offline DepEd-aligned AI tutor. Explain clearly, simply, and accurately. Use lesson context when available. Do not hallucinate.
+User input -> Context builder -> Curriculum retrieval -> Student learning profile -> Prompt composer -> Inference runtime -> Response formatter
 ```
 
-Install with custom model:
+The backend also persists a student AI profile with strengths, weak concepts, quiz signals, assignment signals, learning trends, AI interaction counts, and recommendations. The dashboard and tutor prompts can use this profile automatically, so students do not need to restate their grade, subject, lesson, or weak topics.
 
-```bash
-sudo bash danilo.sh --clean-install
-```
+## Verify
 
-Verify:
+After install:
 
 ```bash
 sudo bash danilo.sh --verify
-sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec -T ollama ollama list
-sudo grep '^OLLAMA_MODEL=' /opt/danilo/app/.env
+curl http://danilo.local/api/ai/status
 ```
 
-If the repository was edited on Windows before copying to Ubuntu, normalize shell files first:
-
-```powershell
-Get-ChildItem -File *.sh,lib\*.sh | ForEach-Object {
-  $text = Get-Content -LiteralPath $_.FullName -Raw
-  $text = $text -replace "`r`n", "`n"
-  [System.IO.File]::WriteAllText($_.FullName, $text, [System.Text.UTF8Encoding]::new($false))
-}
-```
-
-Expected active model when a GGUF exists:
-
-```text
-danilo-custom
-```
-
-If no `.gguf` file exists, DANILO uses:
-
-```text
-gemma3:1b
-```
-
-Notes:
-
-- Only the first `.gguf` file by sorted filename is registered automatically.
-- The registered model name is always `danilo-custom`.
-- If custom model registration fails, the installer rewrites the runtime environment to use `gemma3:1b`.
-- `sudo bash danilo.sh --verify` confirms the active model is loaded in Ollama.
+For llama.cpp mode, confirm `llamaCppOnline` is true and `modelName` matches the Phi-3 GGUF filename. For Ollama mode, confirm `ollamaOnline` is true and the configured Ollama model is present.

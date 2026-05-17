@@ -16,6 +16,7 @@ frontend/dist/
 # IDE
 .idea/
 .vscode/
+.devin/config.local.json
 *.swp
 *.swo
 
