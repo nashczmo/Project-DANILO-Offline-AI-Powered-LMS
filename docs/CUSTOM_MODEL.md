@@ -1,6 +1,6 @@
 # Offline AI Models
 
-Project DANILO now treats AI as platform infrastructure, not a standalone chatbot. Production inference should run through llama.cpp with local GGUF files.
+Project DANILO treats AI as platform infrastructure, not a standalone chatbot. The stable deployment runtime is currently Ollama; llama.cpp remains available when local GGUF files are installed and explicitly enabled.
 
 ## Recommended Production Models
 
@@ -11,9 +11,10 @@ models/Phi-3-mini-4k-instruct-q4_k_m.gguf
 models/gemma-2-2b-it-q4_k_m.gguf
 ```
 
-Default runtime settings:
+llama.cpp runtime settings:
 
 ```env
+COMPOSE_PROFILES=llamacpp
 DANILO_AI_RUNTIME=llamacpp
 DANILO_AI_PRIMARY_MODEL=Phi-3-mini-4k-instruct-q4_k_m.gguf
 DANILO_AI_FALLBACK_MODEL=gemma-2-2b-it-q4_k_m.gguf
@@ -24,15 +25,15 @@ DANILO_AI_MAX_CONCURRENT=1
 
 This profile targets Intel N95, 8 GB RAM, Ubuntu Server, and offline classroom Wi-Fi usage. It favors one stable generation at a time, semantic chunk streaming, and queue feedback instead of letting requests overload the CPU.
 
-## Development Mode
+## Stable Runtime
 
-Ollama remains supported for development or temporary testing:
+Ollama is the default stable runtime while llama.cpp migration is optional:
 
 ```bash
 sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
 ```
 
-The Ollama fallback is not the preferred production path; llama.cpp is lower overhead and easier to tune for CPU-only inference.
+Use llama.cpp only when the configured GGUF model exists in `models/`; otherwise keep Ollama active so the stack starts cleanly.
 
 ## AI-Native Backend Flow
 

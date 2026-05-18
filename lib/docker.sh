@@ -101,7 +101,7 @@ prefetch_container_assets() {
   note "Building local application images while internet is still available"
   run_step_command "Building DANILO backend and gateway images" docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" build "${build_args[@]}" backend gateway
 
-  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+  if [[ "${DANILO_AI_RUNTIME:-ollama}" == "ollama" ]]; then
     note "Preloading the Ollama model into the persistent stack volume"
     run_step_command "Creating the DANILO Ollama model volume" docker volume create "${STACK_NAME}_ollama_data"
     docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null 2>&1 || true
@@ -124,7 +124,7 @@ prefetch_container_assets() {
     preload_ollama_model "${TEMP_OLLAMA_CONTAINER}"
     docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null
   else
-    note "Skipping Ollama preload because DANILO_AI_RUNTIME=${DANILO_AI_RUNTIME:-llamacpp}; llama.cpp will load GGUF files from models/"
+    note "Skipping Ollama preload because DANILO_AI_RUNTIME=${DANILO_AI_RUNTIME:-ollama}; llama.cpp will load GGUF files from models/"
   fi
 }
 

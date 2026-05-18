@@ -3,7 +3,7 @@
 DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-phi3:mini}}"
 DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-gemma2:2b}"
 DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-}"
-DANILO_AI_RUNTIME="${DANILO_AI_RUNTIME:-llamacpp}"
+DANILO_AI_RUNTIME="${DANILO_AI_RUNTIME:-ollama}"
 DANILO_AI_PRIMARY_MODEL="${DANILO_AI_PRIMARY_MODEL:-Phi-3-mini-4k-instruct-q4_k_m.gguf}"
 DANILO_AI_FALLBACK_MODEL="${DANILO_AI_FALLBACK_MODEL:-gemma-2-2b-it-q4_k_m.gguf}"
 DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-custom}"
@@ -88,6 +88,12 @@ EOF
     export DANILO_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL}"
     OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL}"
     echo "Using default model: ${DANILO_DEFAULT_OLLAMA_MODEL}"
+  fi
+
+  if [[ "${DANILO_AI_RUNTIME}" == "llamacpp" && ! -f "${models_dir}/${DANILO_AI_PRIMARY_MODEL}" ]]; then
+    echo "llama.cpp runtime requires ${models_dir}/${DANILO_AI_PRIMARY_MODEL}, but the GGUF file is missing."
+    echo "Place the GGUF model in models/ or run with DANILO_AI_RUNTIME=ollama for the stable Ollama runtime."
+    exit 1
   fi
 }
 

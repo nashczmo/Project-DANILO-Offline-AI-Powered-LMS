@@ -9,7 +9,7 @@ sudo bash danilo.sh --verify
 The deployment verifier checks:
 
 - Docker daemon and Docker Compose project
-- `postgres`, `backend`, `ollama`, and `gateway` containers
+- `postgres`, `backend`, active AI runtime, and `gateway` containers
 - Backend `/api/health`
 - Frontend gateway
 - PostgreSQL readiness
@@ -55,8 +55,8 @@ sudo systemctl status danilo-stack.service danilo-ap.service dnsmasq.service hos
 Model verification:
 
 ```bash
+sudo grep '^DANILO_AI_RUNTIME=' /opt/danilo/app/.env
 sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec -T ollama ollama list
-sudo grep '^OLLAMA_MODEL=' /opt/danilo/app/.env
 ```
 
-If `models/*.gguf` exists before install, the active model should be `danilo-custom`. If no GGUF file exists, the active model should be `Phi-3 Mini Instruct Q4_K_M`.
+Default installs use Ollama and should show `phi3:mini` or `danilo-custom`. llama.cpp installs should show `DANILO_AI_RUNTIME=llamacpp` and a matching GGUF filename in `DANILO_AI_PRIMARY_MODEL`.

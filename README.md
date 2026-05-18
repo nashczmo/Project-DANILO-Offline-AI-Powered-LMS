@@ -1,6 +1,6 @@
 # Project DANILO Installer
 
-Project DANILO packages an offline-first, DepEd-aligned AI-native learning LMS for low-connectivity schools. The installer generates a complete local stack with FastAPI, React, PostgreSQL, Nginx, Docker Compose, Wi-Fi captive portal services, llama.cpp production inference, and Ollama development fallback.
+Project DANILO packages an offline-first, DepEd-aligned AI-native learning LMS for low-connectivity schools. The installer generates a complete local stack with FastAPI, React, PostgreSQL, Nginx, Docker Compose, Wi-Fi captive portal services, stable Ollama inference, and optional llama.cpp GGUF inference.
 
 Default administrator credentials:
 
@@ -60,9 +60,9 @@ sudo bash danilo.sh --help
 
 ## AI Runtime And Models
 
-DANILO production mode is llama.cpp with `Phi-3 Mini Instruct GGUF Q4_K_M` as the primary model and `Gemma 2 2B Q4_K_M` as fallback. Put the GGUF files in `models/` before install and keep the default `DANILO_AI_RUNTIME=llamacpp`.
+DANILO currently defaults to the stable Ollama runtime with `phi3:mini` so deployments start reliably while llama.cpp migration remains optional. Put GGUF files in `models/` and set `DANILO_AI_RUNTIME=llamacpp` only when using the llama.cpp profile.
 
-For development without GGUF files, use Ollama:
+To pin the stable Ollama runtime explicitly:
 
 ```bash
 sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install

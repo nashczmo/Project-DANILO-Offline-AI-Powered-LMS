@@ -237,7 +237,7 @@ services:
       start_period: 180s
 
   llamacpp:
-    image: ghcr.io/ggerganov/llama.cpp:server
+    image: ghcr.io/ggml-org/llama.cpp:server
     restart: unless-stopped
     profiles: ["llamacpp"]
     command:
@@ -306,8 +306,8 @@ POSTGRES_DB=danilo
 POSTGRES_USER=danilo
 POSTGRES_PASSWORD=change-me
 JWT_EXPIRE_MINUTES=720
-COMPOSE_PROFILES=llamacpp
-DANILO_AI_RUNTIME=llamacpp
+COMPOSE_PROFILES=ollama
+DANILO_AI_RUNTIME=ollama
 LLAMA_CPP_URL=http://llamacpp:8080
 OLLAMA_URL=http://ollama:11434
 DANILO_OLLAMA_MODEL=phi3:mini
@@ -343,7 +343,7 @@ EOF
   cat > "${APP_ROOT}/README.md" <<'EOF'
 # Project DANILO
 
-Project DANILO is an offline-first DepEd school portal packaged with FastAPI, React/Vite, PostgreSQL, Nginx, Docker Compose, llama.cpp production inference, and Ollama development fallback.
+Project DANILO is an offline-first DepEd school portal packaged with FastAPI, React/Vite, PostgreSQL, Nginx, Docker Compose, Ollama stable inference, and optional llama.cpp GGUF inference.
 
 ## Default Local Admin
 
@@ -402,7 +402,7 @@ Copy `.env.example` to `.env` for manual deployments and override secrets before
 
 ## Low-Power AI Defaults
 
-DANILO defaults to an AI-native offline classroom profile: primary `Phi-3 Mini Instruct GGUF Q4_K_M` on llama.cpp, fallback `Gemma 2 2B Q4_K_M`, and Ollama `phi3:mini` for development. Place the Phi-3 GGUF in `models/` before install.
+DANILO defaults to the stable Ollama `phi3:mini` runtime for classroom deployments. Optional llama.cpp mode is available when a local GGUF model is placed in `models/` before install.
 
 ```bash
 # Use Ollama development mode if llama.cpp model files are not installed yet
@@ -416,7 +416,7 @@ sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --ins
 | `OLLAMA_NUM_PARALLEL` | `1` | Single generation keeps RAM stable under many learners |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | Only one model loaded; frees RAM |
 | `OLLAMA_KEEP_ALIVE` | `5m` | Unloads model after 5 min idle |
-| `DANILO_AI_RUNTIME` | `llamacpp` | Production inference path with lower overhead than Ollama |
+| `DANILO_AI_RUNTIME` | `ollama` | Stable active inference runtime; set to `llamacpp` only when local GGUF files are installed |
 | `DANILO_AI_PRIMARY_MODEL` | `Phi-3-mini-4k-instruct-q4_k_m.gguf` | Higher-quality educational reasoning model |
 | `OLLAMA_NUM_CTX` | `1536` | Small context = fast, low RAM per request |
 | `OLLAMA_FLASH_ATTENTION` | `1` | Reduces KV cache memory usage |
@@ -506,9 +506,12 @@ Wants=network-online.target danilo-ap.service
 Type=oneshot
 RemainAfterExit=yes
 Environment=COMPOSE_PROJECT_NAME=danilo
+Environment=COMPOSE_PROFILES=${DANILO_AI_RUNTIME:-ollama}
 WorkingDirectory=${APP_ROOT}
+ExecStartPre=/usr/bin/docker compose -p danilo -f ${APP_ROOT}/docker-compose.yml config -q
 ExecStart=/usr/bin/docker compose -p danilo -f ${APP_ROOT}/docker-compose.yml up -d --no-build
 ExecStop=/usr/bin/docker compose -p danilo -f ${APP_ROOT}/docker-compose.yml down
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
@@ -526,6 +529,7 @@ wait_for_stack_readiness() {
   local attempts=0
   local health_body=""
   local ollama_ip=""
+  local llama_cpp_ip=""
 
   note "Running final end-to-end readiness checks"
   note "Checking Docker daemon readiness"
@@ -541,9 +545,9 @@ wait_for_stack_readiness() {
   note "Checking compose services are running"
   wait_for_service_running postgres
   wait_for_service_running backend
-  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "llamacpp" ]]; then
+  if [[ "${DANILO_AI_RUNTIME:-ollama}" == "llamacpp" ]]; then
     wait_for_service_running llamacpp
-  elif [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+  elif [[ "${DANILO_AI_RUNTIME:-ollama}" == "ollama" ]]; then
     wait_for_service_running ollama
   fi
   wait_for_service_running gateway
@@ -551,9 +555,9 @@ wait_for_stack_readiness() {
   note "Checking compose health status"
   wait_for_container_healthy postgres "Postgres healthcheck"
   wait_for_container_healthy backend "Backend healthcheck"
-  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "llamacpp" ]]; then
+  if [[ "${DANILO_AI_RUNTIME:-ollama}" == "llamacpp" ]]; then
     wait_for_service_running llamacpp
-  elif [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+  elif [[ "${DANILO_AI_RUNTIME:-ollama}" == "ollama" ]]; then
     wait_for_container_healthy ollama "Ollama service readiness"
   fi
   wait_for_container_healthy gateway "Gateway/frontend healthcheck"
@@ -571,7 +575,21 @@ wait_for_stack_readiness() {
     sleep 2
   done
 
-  if [[ "${DANILO_AI_RUNTIME:-llamacpp}" == "ollama" ]]; then
+  if [[ "${DANILO_AI_RUNTIME:-ollama}" == "llamacpp" ]]; then
+    note "Checking llama.cpp API response"
+    attempts=0
+    until llama_cpp_ip="$(get_container_ip llamacpp)" && [[ -n "${llama_cpp_ip}" ]] && curl -fsS "http://${llama_cpp_ip}:8080/v1/models" >/dev/null 2>&1; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -gt 60 ]]; then
+        echo "llama.cpp is running but its API did not answer on /v1/models."
+        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 llamacpp || true
+        exit 1
+      fi
+      sleep 3
+    done
+  fi
+
+  if [[ "${DANILO_AI_RUNTIME:-ollama}" == "ollama" ]]; then
     note "Checking Ollama API response"
     attempts=0
     until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:11434/api/tags" >/dev/null 2>&1; do

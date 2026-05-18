@@ -31,7 +31,7 @@ Common fixes:
 - Low disk space: free at least 30 GB before install.
 - Docker unavailable: reconnect internet and rerun `sudo bash danilo.sh --install`.
 - Portal refresh 404: rerun `sudo bash danilo.sh --rebuild-frontend`; the nginx gateway serves SPA fallback routes.
-- AI runtime offline: check `sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo logs --tail=120 ollama`.
+- AI runtime offline: check `sudo grep '^DANILO_AI_RUNTIME=' /opt/danilo/app/.env`, then inspect `ollama` or `llamacpp` logs with `sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo logs --tail=120 <service>`.
 - Model missing: place a `.gguf` file in `models/`, then run `sudo bash danilo.sh --update`.
 - Admin login failure: rerun `sudo bash danilo.sh --update`; backend startup repairs the configured admin account without changing the required credentials.
 - Teacher upload failure: verify the file is under the upload limit and is `.pdf`, `.ppt`, `.pptx`, `.docx`, or `.txt`; then check backend logs.

@@ -1024,7 +1024,7 @@ ai_logger.addHandler(_make_file_handler("ai.log"))
 
 JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
-DANILO_AI_RUNTIME = os.getenv("DANILO_AI_RUNTIME", "llamacpp").strip().lower()
+DANILO_AI_RUNTIME = os.getenv("DANILO_AI_RUNTIME", "ollama").strip().lower()
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 LLAMA_CPP_URL = os.getenv("LLAMA_CPP_URL", "http://llamacpp:8080")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", os.getenv("DANILO_OLLAMA_MODEL", "phi3:mini"))
