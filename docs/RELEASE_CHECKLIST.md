@@ -57,4 +57,4 @@
 - Join the `PROJECT-DANILO` Wi-Fi AP.
 - Open `http://danilo.local`.
 - Confirm `/api/health` returns `status: ok`.
-- Confirm the AI runtime is Ollama `phi3:mini` for stable deployments, or llama.cpp only when the configured GGUF file is present.
+- Confirm the AI runtime is Ollama `phi4-mini` or the local `danilo-phi4-mini` GGUF-backed Ollama model.

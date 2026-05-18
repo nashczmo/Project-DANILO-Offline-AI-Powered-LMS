@@ -27,10 +27,6 @@ import { cn, getInitials } from "./lib/utils";
    CONSTANTS
    ======================================================================== */
 
-const initialLogin = { username: "", password: "" };
-const initialTutor = { moduleId: "", question: "", responseMode: "normal" };
-let nextMsgId = 1;
-
 function createBootstrapDashboard(user) {
   return { user, stream: [], courses: [], contentFolders: [], grades: [], hints: { hasContent: false, hasCourses: false, hasGrades: false, hasStream: false }, contentWorkflow: null, network: null, operationsHighlights: [] };
 }
@@ -587,14 +583,9 @@ export default function App() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminCourses, setAdminCourses] = useState([]);
   const [adminAssignments, setAdminAssignments] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [dashboardError, setDashboardError] = useState("");
-  const [loginForm, setLoginForm] = useState(initialLogin);
-  const [tutorForm, setTutorForm] = useState(initialTutor);
-  const [tutorLoading, setTutorLoading] = useState(false);
-  const [tutorMessages, setTutorMessages] = useState([]);
   const [confirmState, setConfirmState] = useState({ open: false, title: "", message: "", onConfirm: null, confirmLabel: "Confirm", variant: "default" });
 
   const route = useMemo(() => matchRoute(path), [path]);
@@ -676,58 +667,12 @@ export default function App() {
     return () => { active = false; };
   }, [token]);
 
-  const handleLoginChange = (e) => { const { name, value } = e.target; setLoginForm((c) => ({ ...c, [name]: value })); };
-  const handleTutorChange = (e) => { const { name, value } = e.target; setTutorForm((c) => ({ ...c, [name]: value })); };
-
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setLoginError("");
-    setDashboardError("");
-    try {
-      const response = await apiRequest("/auth/login", { method: "POST", body: { username: loginForm.username.trim(), password: loginForm.password } });
-      if (!response?.accessToken || !response?.user) throw new Error("Invalid username or password");
-      setToken(response.accessToken);
-      setUser(response.user);
-      setDashboard(createBootstrapDashboard(response.user));
-      navigate("/overview");
-      loadRoleData(response.accessToken, response.user).catch((error) => {
-        if (error?.status === 401) { logout(); setLoginError("Your session expired. Please sign in again."); return; }
-        setDashboard(createBootstrapDashboard(response.user));
-        setDashboardError(error?.message || "Dashboard data could not be loaded yet.");
-      });
-    } catch (error) {
-      if (error?.status === 401) logout();
-      setLoginError(error?.message || "Invalid username or password");
-    } finally { setLoading(false); }
-  };
-
   const handleLogout = () => {
     confirm("Sign Out", "Are you sure you want to sign out of DANILO?", () => {
       logout();
       setAdminUsers([]); setAdminCourses([]); setAdminAssignments([]);
-      setTutorMessages([]);
       navigate("/");
     }, { confirmLabel: "Sign Out", variant: "danger" });
-  };
-
-  const handleTutorSubmit = async (e, activeSessionId = null, sessionMessages = null) => {
-    e.preventDefault();
-    if (!token || !tutorForm.question.trim()) return;
-    const userMsg = { id: nextMsgId++, role: "user", content: tutorForm.question };
-    if (sessionMessages !== null) setTutorMessages([...(sessionMessages || []), userMsg]);
-    else setTutorMessages((prev) => [...prev, userMsg]);
-    setTutorForm((f) => ({ ...f, question: "" }));
-    setTutorLoading(true);
-    try {
-      const response = await apiRequest("/ai/tutor", {
-        method: "POST", token,
-        body: { question: userMsg.content, session_id: activeSessionId || null, module_id: tutorForm.moduleId ? Number(tutorForm.moduleId) : null, response_mode: tutorForm.responseMode || "normal" },
-      });
-      setTutorMessages((prev) => [...prev, { id: nextMsgId++, role: "ai", content: response.answer, context: response.context, sessionId: response.sessionId }]);
-    } catch (error) {
-      setTutorMessages((prev) => [...prev, { id: nextMsgId++, role: "ai", content: error.message, context: {} }]);
-    } finally { setTutorLoading(false); }
   };
 
   const installApp = async () => { if (!promptEvent) return; await promptEvent.prompt(); setPromptEvent(null); };
@@ -766,7 +711,7 @@ export default function App() {
 
   /* Login screen */
   if (!token || !dashboard || !user) {
-    return <LoginView form={loginForm} onChange={handleLoginChange} onSubmit={handleLoginSubmit} loading={loading} error={loginError} />;
+    return <LoginView sessionError={loginError} />;
   }
 
   /* Authenticated layout */
@@ -780,7 +725,7 @@ export default function App() {
       case "my-classes": return <MyClassesView courses={dashboard.courses} navigate={navigate} />;
       case "class-detail": return <ClassDetailView classId={route.classId} tab={route.tab} courses={dashboard.courses} dashboard={dashboard} navigate={navigate} token={token} user={user} reloadData={reloadData} />;
       case "grades": return <GradesView grades={normalizeGradeRows(dashboard.grades)} />;
-      case "ai-tutor": return <TutorView token={token} modules={dashboard.contentFolders} />;
+      case "ai-tutor": return <TutorView token={token} modules={dashboard.contentFolders} user={user} onNavigate={navigate} />;
       case "users": return <AdminUsersView token={token} users={adminUsers} reload={reloadData} />;
       case "classes": return <AdminClassesView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
       case "sections": return <AdminSectionsView token={token} users={adminUsers} reload={reloadData} />;
@@ -797,44 +742,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-danilo-bg">
       <Sidebar user={user} currentPage={page} navigate={navigate} onLogout={handleLogout} />
-      <div className="md:hidden">
-        <header className="fixed top-0 inset-x-0 z-40 border-b border-danilo-border bg-danilo-bg/95 backdrop-blur-md" role="banner">
-          <div className="flex items-center justify-between px-2 h-[56px]">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-danilo-text-muted hover:bg-danilo-surface-hover transition"
-                aria-label="Open navigation menu"
-                aria-expanded={mobileMenuOpen}
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                </svg>
-              </button>
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-md bg-danilo-primary flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
-                </div>
-                <p className="text-sm font-semibold text-danilo-text tracking-tight truncate">
-                  {page === "overview" ? "DANILO" : (
-                    { "my-classes": "My Subjects", assignments: "Assessments", "ai-tutor": "AI Assistant",
-                      grades: "Progress", users: "People", classes: "Subjects", sections: "Sections",
-                      announcements: "Announcements", departments: "Departments", system: "System",
-                      settings: "Settings", "class-detail": "Class", }[page] || "DANILO"
-                  )}
-                </p>
-              </div>
-            </div>
-            <div
-              className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mr-1", { admin: "bg-danilo-primary", teacher: "bg-danilo-secondary", student: "bg-danilo-border" }[user.role] || "bg-danilo-border")}
-              aria-hidden="true"
-            >
-              <span className="text-[11px] font-bold text-white">{getInitials(user.fullName)}</span>
-            </div>
-          </div>
-        </header>
-      </div>
       <MobileDrawer open={mobileMenuOpen} user={user} currentPage={page} navigate={navigate} onClose={() => setMobileMenuOpen(false)} onLogout={handleLogout} />
 
       <main
@@ -843,8 +750,8 @@ export default function App() {
           sidebarCollapsed ? "md:pl-[72px]" : "md:pl-[256px]"
         )}
       >
-        <TopBar user={user} currentPage={page} />
-        <div className="min-h-screen pt-[56px] md:pt-0 pb-[80px] md:pb-8">
+        <TopBar user={user} currentPage={page} onLogout={handleLogout} />
+        <div className="min-h-screen pt-16 md:pt-0 pb-20 md:pb-8">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
             <InstallBanner promptEvent={promptEvent} onInstall={installApp} onDismiss={() => setPromptEvent(null)} />
 

@@ -1024,18 +1024,17 @@ ai_logger.addHandler(_make_file_handler("ai.log"))
 
 JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
-DANILO_AI_RUNTIME = os.getenv("DANILO_AI_RUNTIME", "ollama").strip().lower()
+DANILO_AI_RUNTIME = "ollama"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
-LLAMA_CPP_URL = os.getenv("LLAMA_CPP_URL", "http://llamacpp:8080")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", os.getenv("DANILO_OLLAMA_MODEL", "phi3:mini"))
-DANILO_AI_PRIMARY_MODEL = os.getenv("DANILO_AI_PRIMARY_MODEL", "Phi-3-mini-4k-instruct-q4_k_m.gguf")
-DANILO_AI_FALLBACK_MODEL = os.getenv("DANILO_AI_FALLBACK_MODEL", "gemma-2-2b-it-q4_k_m.gguf")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", os.getenv("DANILO_OLLAMA_MODEL", "phi4-mini"))
+DANILO_AI_PRIMARY_MODEL = os.getenv("DANILO_AI_PRIMARY_MODEL", "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf")
+DANILO_AI_FALLBACK_MODEL = os.getenv("DANILO_AI_FALLBACK_MODEL", "")
 DANILO_AI_OPTIONAL_MODEL = os.getenv("DANILO_AI_OPTIONAL_MODEL", "")
-DANILO_AI_ACTIVE_MODEL = os.getenv("DANILO_AI_ACTIVE_MODEL", DANILO_AI_PRIMARY_MODEL if DANILO_AI_RUNTIME == "llamacpp" else OLLAMA_MODEL)
-AI_TIMEOUT_SECONDS = float(os.getenv("DANILO_AI_TIMEOUT_SECONDS", os.getenv("OLLAMA_TIMEOUT_SECONDS", "90")))
+DANILO_AI_ACTIVE_MODEL = os.getenv("DANILO_AI_ACTIVE_MODEL", OLLAMA_MODEL)
+AI_TIMEOUT_SECONDS = float(os.getenv("DANILO_AI_TIMEOUT_SECONDS", os.getenv("OLLAMA_TIMEOUT_SECONDS", "120")))
 OLLAMA_TIMEOUT_SECONDS = AI_TIMEOUT_SECONDS
 OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", os.getenv("DANILO_AI_NUM_CTX", "1536")))
-OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "2600"))
+OLLAMA_CONTEXT_CHARS = int(os.getenv("OLLAMA_CONTEXT_CHARS", "2200"))
 DANILO_AI_INDEX_PATH = os.getenv("DANILO_AI_INDEX_PATH", "/var/lib/danilo/ai_index.sqlite3")
 PORTAL_DOMAIN = os.getenv("PORTAL_DOMAIN", "")
 SSID = os.getenv("SSID", "")
@@ -1049,12 +1048,8 @@ CORS_ORIGINS = [
 
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET must be set by the installer environment")
-if DANILO_AI_RUNTIME not in {"ollama", "llamacpp"}:
-    raise RuntimeError("DANILO_AI_RUNTIME must be either ollama or llamacpp")
-if DANILO_AI_RUNTIME == "ollama" and not OLLAMA_URL:
-    raise RuntimeError("OLLAMA_URL must be set when DANILO_AI_RUNTIME=ollama")
-if DANILO_AI_RUNTIME == "llamacpp" and not LLAMA_CPP_URL:
-    raise RuntimeError("LLAMA_CPP_URL must be set when DANILO_AI_RUNTIME=llamacpp")
+if not OLLAMA_URL:
+    raise RuntimeError("OLLAMA_URL must be set for the Ollama runtime")
 if not PORTAL_DOMAIN:
     raise RuntimeError("PORTAL_DOMAIN must be set by the installer environment")
 if not SSID:
@@ -2402,32 +2397,14 @@ def save_ai_conversation(
     db.commit()
 
 
-def llama_cpp_chat_payload(prompt: str, mode: str, *, stream: bool, memory: list[dict] | None = None, model: str | None = None) -> dict:
-    mode = tutor_mode(mode)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    if memory:
-        messages.extend(memory)
-    messages.append({"role": "user", "content": prompt})
-    return {"model": model or DANILO_AI_PRIMARY_MODEL, "stream": stream, "messages": messages, "temperature": 0.25, "top_p": 0.9, "max_tokens": RESPONSE_MODE_OPTIONS[mode]["num_predict"]}
-
-
 def _models_to_try() -> list[str]:
-    primary = DANILO_AI_PRIMARY_MODEL if DANILO_AI_RUNTIME == "llamacpp" else OLLAMA_MODEL
-    models = [primary]
-    if DANILO_AI_FALLBACK_MODEL and DANILO_AI_FALLBACK_MODEL not in models:
-        models.append(DANILO_AI_FALLBACK_MODEL)
+    models = [OLLAMA_MODEL]
+    if DANILO_AI_OPTIONAL_MODEL and DANILO_AI_OPTIONAL_MODEL not in models:
+        models.append(DANILO_AI_OPTIONAL_MODEL)
     return models
 
 
 async def _post_nonstream_inference(client: httpx.AsyncClient, prompt: str, mode: str, memory: list[dict] | None, model_name: str) -> tuple[str, dict]:
-    if DANILO_AI_RUNTIME == "llamacpp":
-        payload = llama_cpp_chat_payload(prompt, mode, stream=False, memory=memory, model=model_name)
-        response = await client.post(f"{LLAMA_CPP_URL}/v1/chat/completions", json=payload)
-        response.raise_for_status()
-        body = response.json()
-        usage = body.get("usage") or {}
-        content = (body.get("choices") or [{}])[0].get("message", {}).get("content", "")
-        return content.strip(), {"model": body.get("model", model_name), "prompt_tokens": usage.get("prompt_tokens"), "response_tokens": usage.get("completion_tokens")}
     payload = ollama_chat_payload(prompt, mode, stream=False, memory=memory, model=model_name)
     response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
     response.raise_for_status()
@@ -2552,41 +2529,22 @@ async def stream_ollama(prompt: str, mode: str, memory: list[dict] | None = None
                 try:
                     full_parts: list[str] = []
                     pending = ""
-                    if DANILO_AI_RUNTIME == "llamacpp":
-                        payload = llama_cpp_chat_payload(prompt, mode, stream=True, memory=memory, model=model_name)
-                        async with client.stream("POST", f"{LLAMA_CPP_URL}/v1/chat/completions", json=payload) as response:
-                            response.raise_for_status()
-                            async for line in response.aiter_lines():
-                                if not line or not line.startswith("data: "):
-                                    continue
-                                data = line[6:].strip()
-                                if data == "[DONE]":
-                                    break
-                                body = json.loads(data)
-                                delta = (body.get("choices") or [{}])[0].get("delta", {}).get("content", "")
-                                if delta:
-                                    full_parts.append(delta)
-                                    pending += delta
-                                    chunks, pending = _semantic_stream_chunks(pending)
-                                    for chunk in chunks:
-                                        yield {"content": chunk, "done": False}
-                    else:
-                        payload = ollama_chat_payload(prompt, mode, stream=True, memory=memory, model=model_name)
-                        async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
-                            response.raise_for_status()
-                            async for line in response.aiter_lines():
-                                if not line:
-                                    continue
-                                body = json.loads(line)
-                                delta = body.get("message", {}).get("content", "")
-                                if delta:
-                                    full_parts.append(delta)
-                                    pending += delta
-                                    chunks, pending = _semantic_stream_chunks(pending)
-                                    for chunk in chunks:
-                                        yield {"content": chunk, "done": False}
-                                if body.get("done"):
-                                    break
+                    payload = ollama_chat_payload(prompt, mode, stream=True, memory=memory, model=model_name)
+                    async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as response:
+                        response.raise_for_status()
+                        async for line in response.aiter_lines():
+                            if not line:
+                                continue
+                            body = json.loads(line)
+                            delta = body.get("message", {}).get("content", "")
+                            if delta:
+                                full_parts.append(delta)
+                                pending += delta
+                                chunks, pending = _semantic_stream_chunks(pending)
+                                for chunk in chunks:
+                                    yield {"content": chunk, "done": False}
+                            if body.get("done"):
+                                break
                     if pending:
                         yield {"content": pending, "done": False}
                     duration_ms = int((time.perf_counter() - started) * 1000)
@@ -2624,23 +2582,15 @@ def ai_status() -> dict:
     model_loaded = False
     available_models: list[str] = []
     error_message = ""
-    base_url = LLAMA_CPP_URL if DANILO_AI_RUNTIME == "llamacpp" else OLLAMA_URL
-
     try:
-        if DANILO_AI_RUNTIME == "llamacpp":
-            health_response = httpx.get(f"{base_url}/health", timeout=4.0)
-            runtime_ok = health_response.status_code < 500
-            models_response = httpx.get(f"{base_url}/v1/models", timeout=4.0)
-            if models_response.status_code == 200:
-                available_models = [m.get("id", "") for m in (models_response.json().get("data") or [])]
-            model_loaded = runtime_ok if not available_models else any(name in {DANILO_AI_PRIMARY_MODEL, DANILO_AI_ACTIVE_MODEL} for name in available_models)
-        else:
-            response = httpx.get(f"{base_url}/api/tags", timeout=4.0)
-            if response.status_code == 200:
-                runtime_ok = True
-                available_models = [m.get("name", "") for m in (response.json().get("models") or [])]
-                expected_models = {OLLAMA_MODEL, f"{OLLAMA_MODEL}:latest", DANILO_AI_FALLBACK_MODEL, f"{DANILO_AI_FALLBACK_MODEL}:latest"}
-                model_loaded = any(name in expected_models for name in available_models)
+        response = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=4.0)
+        if response.status_code == 200:
+            runtime_ok = True
+            available_models = [m.get("name", "") for m in (response.json().get("models") or [])]
+            expected_models = {OLLAMA_MODEL, f"{OLLAMA_MODEL}:latest"}
+            if DANILO_AI_OPTIONAL_MODEL:
+                expected_models.update({DANILO_AI_OPTIONAL_MODEL, f"{DANILO_AI_OPTIONAL_MODEL}:latest"})
+            model_loaded = any(name in expected_models for name in available_models)
     except Exception as exc:
         error_message = str(exc)[:120]
 
@@ -2657,8 +2607,7 @@ def ai_status() -> dict:
     return {
         "runtime": DANILO_AI_RUNTIME,
         "runtimeOnline": runtime_ok,
-        "ollamaOnline": runtime_ok if DANILO_AI_RUNTIME == "ollama" else None,
-        "llamaCppOnline": runtime_ok if DANILO_AI_RUNTIME == "llamacpp" else None,
+        "ollamaOnline": runtime_ok,
         "modelLoaded": model_loaded,
         "modelName": DANILO_AI_ACTIVE_MODEL,
         "primaryModel": DANILO_AI_PRIMARY_MODEL,
@@ -3264,6 +3213,12 @@ def admin_system_announcement(payload: dict = Body(default={}), current_user: Us
     return {"ok": True, "postedToClasses": len(courses)}
 
 
+@admin_router.get("/admin/announcements")
+def admin_list_announcements(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+    require_role(current_user, "admin")
+    return [item for item in build_stream(db) if item.get("postType") == "announcement"]
+
+
 @admin_router.get("/admin/reports/roster")
 def admin_roster_report(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
     require_role(current_user, "admin")
@@ -3328,6 +3283,18 @@ def teacher_create_announcement(course_id: int, payload: dict = Body(default={})
     db.add(post)
     db.commit()
     return {"ok": True, "id": post.id}
+
+
+@teacher_router.get("/teacher/announcements")
+def teacher_list_announcements(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+    require_role(current_user, "teacher")
+    return [item for item in build_stream(db, current_user) if item.get("postType") == "announcement"]
+
+
+@teacher_router.post("/teacher/announcements")
+def teacher_create_announcement_compat(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    course_id = parse_int(payload.get("courseId") or payload.get("course_id"), "Class", minimum=1)
+    return teacher_create_announcement(course_id, payload, current_user, db)
 
 
 @teacher_router.post("/teacher/courses/{course_id}/modules")
@@ -3805,6 +3772,30 @@ def admin_enrollments(current_user: User = Depends(get_current_user), db: Sessio
     return [{"id": enrollment.id, "courseId": course.id, "courseCode": course.code, "courseTitle": course.title, "studentId": student.id, "studentName": student.full_name, "studentUsername": student.username, "status": enrollment.status} for enrollment, course, student in rows]
 
 
+@admin_router.post("/admin/enrollments")
+def admin_create_enrollment(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    course_id = parse_int(payload.get("courseId") or payload.get("course_id"), "Class", minimum=1)
+    student_id = parse_int(payload.get("studentId") or payload.get("student_id"), "Learner", minimum=1)
+    course = db.get(Course, course_id)
+    student = db.get(User, student_id)
+    if not course or not course.is_active:
+        raise HTTPException(status_code=404, detail="Class not found")
+    if not student or student.role != "student" or not student.is_active:
+        raise HTTPException(status_code=404, detail="Learner not found")
+    enrollment = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id))
+    if enrollment:
+        enrollment.status = "active"
+    else:
+        enrollment = Enrollment(course_id=course_id, student_id=student_id, status="active")
+        db.add(enrollment)
+        db.flush()
+    log_action(db, current_user, "create_enrollment", "enrollment", enrollment.id, f"course_id={course_id} student_id={student_id}")
+    db.commit()
+    db.refresh(enrollment)
+    return {"ok": True, "id": enrollment.id, "courseId": course_id, "studentId": student_id, "status": enrollment.status}
+
+
 @admin_router.get("/admin/assignments")
 def admin_assignments(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
     require_role(current_user, "admin")
@@ -4136,9 +4127,19 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
     # Active users = distinct users with JWT activity in the last 15 minutes.
     # We approximate using the AI cooldown dict as a proxy for recent activity.
     active_user_count = len(_AI_USER_LAST_REQUEST)
+    ai_ready = ollama_status == "online" and any(name in {OLLAMA_MODEL, f"{OLLAMA_MODEL}:latest"} for name in ollama_models)
     return {
         "database": db_status,
         "ollama": ollama_status,
+        "cpu": cpu_pct,
+        "memory": ram_pct,
+        "disk": disk_pct,
+        "uptime": f"{round((uptime_seconds or 0) / 3600, 1)}h" if uptime_seconds is not None else None,
+        "aiStatus": {
+            "ready": ai_ready,
+            "model": OLLAMA_MODEL,
+            "message": "Ollama model is available" if ai_ready else "Ollama is offline or the Phi-4 Mini model is missing",
+        },
         "aiRuntime": DANILO_AI_RUNTIME,
         "activeModel": DANILO_AI_ACTIVE_MODEL,
         "ollamaModel": OLLAMA_MODEL,
@@ -4184,6 +4185,27 @@ def admin_system_status(current_user: User = Depends(get_current_user), db: Sess
     }
 
 
+@admin_router.get("/admin/logs")
+def admin_recent_logs(current_user: User = Depends(get_current_user)) -> list[dict]:
+    require_role(current_user, "admin")
+    log_paths = [os.path.join(_LOG_DIR, "backend.log"), os.path.join(_LOG_DIR, "ai.log")]
+    entries: list[dict] = []
+    for path in log_paths:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                lines = handle.readlines()[-80:]
+        except OSError:
+            continue
+        for line in lines:
+            match = re.match(r"(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>[A-Z]+)\] (?P<message>.*)", line.strip())
+            if match:
+                entries.append(match.groupdict())
+            elif line.strip():
+                entries.append({"time": "", "level": "INFO", "message": line.strip()})
+    entries.sort(key=lambda item: item.get("time") or "", reverse=True)
+    return entries[:100]
+
+
 @admin_router.get("/admin/ai/models")
 def admin_ai_models(current_user: User = Depends(get_current_user)) -> dict:
     require_role(current_user, "admin")
@@ -4195,9 +4217,8 @@ def admin_ai_models(current_user: User = Depends(get_current_user)) -> dict:
         logger.exception("Could not list local AI models")
         models = []
     presets = [
-        {"key": "primary", "model": DANILO_AI_PRIMARY_MODEL, "purpose": "Phi-3 Mini Instruct Q4_K_M for higher-quality offline tutoring on Intel N95"},
-        {"key": "fallback", "model": DANILO_AI_FALLBACK_MODEL, "purpose": "Gemma 2 2B Q4_K_M fallback when the primary model is unavailable"},
-        {"key": "ollama-dev", "model": OLLAMA_MODEL, "purpose": "Development runtime fallback"},
+        {"key": "primary", "model": OLLAMA_MODEL, "purpose": "Phi-4 Mini Instruct via Ollama for offline tutoring on Intel N95"},
+        {"key": "gguf", "model": DANILO_AI_PRIMARY_MODEL, "purpose": "Expected Phi-4 Mini Instruct GGUF Q4_K_M asset when using a local custom Ollama model"},
     ]
     return {
         "runtime": DANILO_AI_RUNTIME,
@@ -4212,14 +4233,14 @@ def admin_ai_models(current_user: User = Depends(get_current_user)) -> dict:
 
 
 @ai_router.get("/ai/sessions")
-def list_chat_sessions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+def list_chat_sessions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     sessions = db.scalars(
         select(ChatSession)
         .where(ChatSession.user_id == current_user.id, ChatSession.is_active == True)
         .order_by(ChatSession.updated_at.desc())
         .limit(50)
     ).all()
-    return [{"id": s.id, "title": s.title, "createdAt": s.created_at.isoformat(), "updatedAt": s.updated_at.isoformat(), "messageCount": len(s.messages)} for s in sessions]
+    return {"sessions": [{"id": s.id, "title": s.title, "createdAt": s.created_at.isoformat(), "updatedAt": s.updated_at.isoformat(), "messageCount": len(s.messages)} for s in sessions]}
 
 
 @ai_router.post("/ai/sessions")

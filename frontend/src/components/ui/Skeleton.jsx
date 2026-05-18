@@ -5,7 +5,7 @@ export const Skeleton = memo(function Skeleton({ className, count = 1 }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className={cn("animate-pulse rounded-xl bg-danilo-surface-hover", className)} />
+        <div key={i} className={cn("dn-shimmer", className)} />
       ))}
     </>
   );
@@ -21,19 +21,19 @@ export function CardSkeleton() {
   );
 }
 
-/* Student AI-native hero skeleton */
-function StudentHeroSkeleton() {
+/* Dashboard hero skeleton */
+function HeroSkeleton() {
   return (
-    <div className="rounded-3xl border border-danilo-border bg-danilo-surface p-6 sm:p-8 space-y-5">
+    <div className="dn-card p-6 sm:p-8 space-y-5">
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-8 w-40" />
         </div>
-        <Skeleton className="h-6 w-24 rounded-full" />
+        <Skeleton className="h-6 w-24 rounded-full flex-shrink-0" />
       </div>
       <Skeleton className="h-16 w-full rounded-2xl" />
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Skeleton className="h-7 w-24 rounded-xl" />
         <Skeleton className="h-7 w-20 rounded-xl" />
         <Skeleton className="h-7 w-20 rounded-xl" />
@@ -46,7 +46,7 @@ function StudentHeroSkeleton() {
   );
 }
 
-/* Student AI quick-ask bar skeleton */
+/* Quick-ask bar skeleton */
 function QuickAskSkeleton() {
   return (
     <div className="dn-card p-5 space-y-4">
@@ -57,22 +57,22 @@ function QuickAskSkeleton() {
       <Skeleton className="h-10 w-full rounded-xl" />
       <div className="flex gap-2 flex-wrap">
         {[96, 64, 88, 80, 80, 104].map((w, i) => (
-          <Skeleton key={i} className={`h-7 rounded-xl`} style={{ width: `${w}px` }} />
+          <Skeleton key={i} className="h-7 rounded-xl" style={{ width: `${w}px` }} />
         ))}
       </div>
     </div>
   );
 }
 
-/* Skeleton for the student dashboard */
+/* Skeleton for the dashboard */
 export function DashboardSkeleton() {
   return (
     <div className="space-y-5 animate-fade-in">
-      <StudentHeroSkeleton />
+      <HeroSkeleton />
       <QuickAskSkeleton />
-      <div className="grid gap-5 lg:grid-cols-[1fr_288px] xl:grid-cols-[1fr_304px]">
+      <div className="grid gap-5 lg:grid-cols-3">
         {/* Left column */}
-        <div className="space-y-5">
+        <div className="space-y-5 lg:col-span-2">
           <CardSkeleton />
           <div className="space-y-3">
             <Skeleton className="h-4 w-36" />

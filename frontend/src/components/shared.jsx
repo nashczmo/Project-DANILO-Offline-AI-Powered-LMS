@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Inbox, Search, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { apiUrl } from "../api";
 import { cn } from "../lib/utils";
 
@@ -22,7 +23,7 @@ export const ASSESSMENT_TYPES = ["Written Work", "Performance Task", "Quarterly 
 export function Field({ label, children, className = "" }) {
   return (
     <label className={cn("grid gap-1.5 text-sm", className)}>
-      <span className="font-medium text-danilo-text-secondary">{label}</span>
+      <span className="dn-label">{label}</span>
       {children}
     </label>
   );
@@ -33,7 +34,7 @@ export function Stat({ label, value, accent }) {
   return (
     <div className="dn-card p-4 text-center">
       <p className={cn("text-2xl font-bold tracking-tight", accent ? "text-danilo-primary" : "text-danilo-text")}>{displayValue}</p>
-      <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-danilo-text-muted">{label}</p>
+      <p className="mt-1 dn-overline">{label}</p>
     </div>
   );
 }
@@ -41,12 +42,8 @@ export function Stat({ label, value, accent }) {
 export function Empty({ icon, title, body }) {
   return (
     <div className="dn-card p-10 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-danilo-bg flex items-center justify-center mx-auto mb-4 border border-danilo-border">
-        {icon || (
-          <svg className="w-6 h-6 text-danilo-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-          </svg>
-        )}
+      <div className="w-12 h-12 rounded-2xl bg-danilo-bg-secondary flex items-center justify-center mx-auto mb-4 border border-danilo-border">
+        {icon || <Inbox className="w-6 h-6 text-danilo-text-muted" />}
       </div>
       <p className="font-semibold text-danilo-text tracking-tight">{title}</p>
       {body && <p className="text-sm text-danilo-text-secondary mt-1.5 max-w-xs mx-auto leading-relaxed">{body}</p>}
@@ -56,7 +53,7 @@ export function Empty({ icon, title, body }) {
 
 export function Badge({ children, tone = "default" }) {
   const tones = {
-    default: "bg-danilo-bg text-danilo-text-secondary border border-danilo-border",
+    default: "bg-danilo-bg-secondary text-danilo-text-secondary border border-danilo-border",
     blue:    "bg-danilo-primary-subtle text-danilo-primary",
     green:   "bg-danilo-success-subtle text-danilo-success",
     red:     "bg-danilo-error-subtle text-danilo-error",
@@ -70,7 +67,7 @@ export function SectionHeader({ title, subtitle, children }) {
     <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
       <div>
         <h2 className="dn-title">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-sm text-danilo-text-secondary">{subtitle}</p>}
+        {subtitle && <p className="mt-0.5 dn-subtitle">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -112,8 +109,8 @@ export function PageHeader({ title, subtitle, children }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
       <div>
-        <h1 className="text-xl font-bold text-danilo-text tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-danilo-text-secondary">{subtitle}</p>}
+        <h1 className="dn-heading-md">{title}</h1>
+        {subtitle && <p className="mt-0.5 dn-subtitle">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -123,13 +120,29 @@ export function PageHeader({ title, subtitle, children }) {
 export function DataTable({ columns, rows, keyField = "id", emptyTitle = "No data", emptyBody = "" }) {
   if (!rows || rows.length === 0) return <Empty title={emptyTitle} body={emptyBody} />;
   return (
-    <div className="dn-table-wrap">
-      <table className="dn-table">
-        <thead><tr>{columns.map((col) => <th key={col.key} style={col.width ? { width: col.width } : undefined}>{col.label}</th>)}</tr></thead>
-        <tbody>
+    <div className="overflow-x-auto rounded-2xl border border-danilo-border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-danilo-border bg-danilo-bg-secondary">
+            {columns.map((col) => (
+              <th
+                key={col.key}
+                className="px-4 py-3 text-left text-xs font-semibold text-danilo-text-secondary uppercase tracking-wider"
+                style={col.width ? { width: col.width } : undefined}
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-danilo-border">
           {rows.map((row) => (
-            <tr key={row[keyField] ?? row._key}>
-              {columns.map((col) => <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>)}
+            <tr key={row[keyField] ?? row._key} className="bg-white hover:bg-danilo-bg-secondary transition-colors">
+              {columns.map((col) => (
+                <td key={col.key} className="px-4 py-3 text-danilo-text">
+                  {col.render ? col.render(row) : row[col.key]}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -151,18 +164,56 @@ export function PaginatedTable({ columns, rows, keyField = "id", pageSize = 10, 
     <div className="space-y-3">
       {searchFields.length > 0 && (
         <div className="flex items-center gap-3">
-          <input type="text" value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} placeholder="Search..." className="dn-search max-w-xs" aria-label="Search table" />
-          <span className="text-xs text-danilo-text-muted">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
+          <div className="relative max-w-xs w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-danilo-text-muted" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(0); }}
+              placeholder="Search..."
+              className="dn-input pl-9"
+              aria-label="Search table"
+            />
+          </div>
+          <span className="dn-caption">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
         </div>
       )}
       <DataTable columns={columns} rows={pageRows} keyField={keyField} emptyTitle={emptyTitle} emptyBody={emptyBody} />
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-danilo-text-muted">Page {currentPage + 1} of {totalPages}</span>
-          <div className="dn-pagination">
-            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={currentPage === 0} aria-label="Previous page">&larr;</button>
-            {Array.from({ length: totalPages }, (_, i) => <button key={i} onClick={() => setPage(i)} className={i === currentPage ? "active" : ""} aria-label={`Page ${i + 1}`}>{i + 1}</button>)}
-            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={currentPage === totalPages - 1} aria-label="Next page">&rarr;</button>
+          <span className="dn-caption">Page {currentPage + 1} of {totalPages}</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              className="dn-btn-icon dn-btn-icon-sm"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i)}
+                className={cn(
+                  "inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-medium transition",
+                  i === currentPage
+                    ? "bg-danilo-primary text-white"
+                    : "text-danilo-text-secondary hover:bg-danilo-bg-tertiary"
+                )}
+                aria-label={`Page ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage === totalPages - 1}
+              className="dn-btn-icon dn-btn-icon-sm"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
@@ -173,16 +224,21 @@ export function PaginatedTable({ columns, rows, keyField = "id", pageSize = 10, 
 export function Modal({ open, onClose, title, children, footer }) {
   if (!open) return null;
   return (
-    <div className="dn-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="dn-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="dn-modal-header">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-label="Close modal" />
+      <div className="relative w-full max-w-lg bg-white rounded-2xl border border-danilo-border shadow-xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-danilo-border">
           <h3 className="text-base font-semibold text-danilo-text">{title}</h3>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg text-danilo-text-muted hover:bg-danilo-surface-hover hover:text-danilo-text flex items-center justify-center transition" aria-label="Close">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          <button
+            onClick={onClose}
+            className="dn-btn-icon dn-btn-icon-sm"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="dn-modal-body">{children}</div>
-        {footer && <div className="dn-modal-footer">{footer}</div>}
+        <div className="px-5 py-4">{children}</div>
+        {footer && <div className="px-5 py-4 border-t border-danilo-border">{footer}</div>}
       </div>
     </div>
   );
@@ -200,7 +256,7 @@ export function SummaryCard({ label, value, icon, tone = "primary" }) {
       <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0", toneMap[tone] || toneMap.primary)}>{icon}</div>
       <div>
         <p className="text-lg font-bold text-danilo-text tracking-tight">{value ?? "0"}</p>
-        <p className="text-[11px] font-medium uppercase tracking-wider text-danilo-text-muted">{label}</p>
+        <p className="dn-overline">{label}</p>
       </div>
     </div>
   );

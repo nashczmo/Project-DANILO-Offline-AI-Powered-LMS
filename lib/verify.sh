@@ -57,11 +57,7 @@ verify_http_status() {
 }
 
 active_ai_runtime() {
-  local runtime="${DANILO_AI_RUNTIME:-}"
-  if [[ -f "${APP_ROOT}/.env" ]]; then
-    runtime="$(read_env_value "${APP_ROOT}/.env" "DANILO_AI_RUNTIME")"
-  fi
-  printf '%s' "${runtime:-ollama}"
+  printf '%s' "ollama"
 }
 
 verify_frontend_html() {
@@ -190,11 +186,7 @@ verify_active_model() {
 
   runtime="$(active_ai_runtime)"
   if [[ -f "${APP_ROOT}/.env" ]]; then
-    if [[ "${runtime}" == "llamacpp" ]]; then
-      active_model="$(read_env_value "${APP_ROOT}/.env" "DANILO_AI_PRIMARY_MODEL")"
-    else
-      active_model="$(read_env_value "${APP_ROOT}/.env" "OLLAMA_MODEL")"
-    fi
+    active_model="$(read_env_value "${APP_ROOT}/.env" "OLLAMA_MODEL")"
   fi
 
   if [[ -z "${active_model}" ]]; then
@@ -209,21 +201,11 @@ verify_active_model() {
     return 0
   fi
 
-  if [[ "${runtime}" == "llamacpp" ]]; then
-    model_list="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T backend \
-      python -c "import urllib.request; print(urllib.request.urlopen('http://llamacpp:8080/v1/models', timeout=5).read().decode())" 2>/dev/null || true)"
-    if [[ "${model_list}" == *"${active_model}"* || "${model_list}" == *'"data"'* ]]; then
-      verify_pass "Active AI model is loaded: ${active_model}"
-    else
-      verify_fail "Active AI model is loaded: ${active_model}"
-    fi
+  model_list="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama list 2>/dev/null || true)"
+  if printf '%s\n' "${model_list}" | awk -v model="${active_model}" 'NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 } END { exit found ? 0 : 1 }'; then
+    verify_pass "Active AI model is loaded: ${active_model}"
   else
-    model_list="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama list 2>/dev/null || true)"
-    if printf '%s\n' "${model_list}" | awk -v model="${active_model}" 'NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 } END { exit found ? 0 : 1 }'; then
-      verify_pass "Active AI model is loaded: ${active_model}"
-    else
-      verify_fail "Active AI model is loaded: ${active_model}"
-    fi
+    verify_fail "Active AI model is loaded: ${active_model}"
   fi
 }
 
@@ -241,23 +223,6 @@ verify_ollama_api() {
     verify_pass "Ollama API reachable"
   else
     verify_fail "Ollama API reachable"
-  fi
-}
-
-verify_llamacpp_api() {
-  local models_body=""
-
-  if [[ ! -f "${APP_ROOT}/docker-compose.yml" ]]; then
-    verify_fail "llama.cpp API reachable (missing compose file)"
-    return 0
-  fi
-
-  models_body="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T backend \
-    python -c "import urllib.request; print(urllib.request.urlopen('http://llamacpp:8080/v1/models', timeout=5).read().decode())" 2>/dev/null || true)"
-  if [[ "${models_body}" == *'"data"'* ]]; then
-    verify_pass "llama.cpp API reachable"
-  else
-    verify_fail "llama.cpp API reachable"
   fi
 }
 
@@ -346,11 +311,7 @@ verify_mode() {
   ai_runtime="$(active_ai_runtime)"
   local services=(postgres backend gateway)
   local service=""
-  if [[ "${ai_runtime}" == "llamacpp" ]]; then
-    services+=(llamacpp)
-  else
-    services+=(ollama)
-  fi
+  services+=(ollama)
   for service in "${services[@]}"; do
     verify_container "${service}"
   done
@@ -364,12 +325,8 @@ verify_mode() {
   verify_compose_command "Database connection works" exec -T postgres pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
   verify_database_schema
   verify_admin_seed
-  if [[ "${ai_runtime}" == "llamacpp" ]]; then
-    verify_llamacpp_api
-  else
-    verify_compose_command "Ollama CLI reachable" exec -T ollama ollama list
-    verify_ollama_api
-  fi
+  verify_compose_command "Ollama CLI reachable" exec -T ollama ollama list
+  verify_ollama_api
   verify_active_model
 
   if getent hosts "${PORTAL_DOMAIN}" >/dev/null 2>&1 || grep -q "${PORTAL_DOMAIN}" /etc/hosts 2>/dev/null; then

@@ -1,18 +1,37 @@
 import { memo } from "react";
+import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 export default memo(function ConfirmDialog({ open, title, message, onConfirm, onCancel, confirmLabel, variant }) {
   if (!open) return null;
   const isDestructive = variant === "danger";
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" className="absolute inset-0 bg-black/60" onClick={onCancel} aria-label="Cancel" />
-      <div className="relative bg-danilo-surface rounded-2xl shadow-xl border border-danilo-border p-6 w-full max-w-sm animate-slide-up">
-        <h3 className="text-base font-semibold text-danilo-text mb-2">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} aria-label="Cancel" />
+      <div className="relative w-full max-w-sm bg-white rounded-2xl border border-danilo-border shadow-xl p-6 animate-scale-in">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h3 className="text-base font-semibold text-danilo-text">{title}</h3>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="dn-btn-icon dn-btn-icon-sm flex-shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
         <p className="text-sm text-danilo-text-secondary mb-5 leading-relaxed">{message}</p>
         <div className="flex items-center justify-end gap-2">
-          <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium rounded-xl border border-danilo-border text-danilo-text-secondary hover:bg-danilo-surface-hover transition">Cancel</button>
-          <button type="button" onClick={onConfirm} className={cn("px-4 py-2 text-sm font-medium rounded-xl text-white transition", isDestructive ? "bg-danilo-error hover:brightness-110" : "bg-danilo-primary hover:bg-danilo-primary-hover")}>{confirmLabel || "Confirm"}</button>
+          <button type="button" onClick={onCancel} className="dn-btn-secondary dn-btn-sm">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={cn("dn-btn-primary dn-btn-sm", isDestructive && "dn-btn-danger")}
+          >
+            {confirmLabel || "Confirm"}
+          </button>
         </div>
       </div>
     </div>

@@ -1,50 +1,54 @@
 import { memo } from "react";
 import {
   LayoutDashboard,
-  BookOpen,
-  ClipboardList,
   Sparkles,
-  Award,
+  BookOpen,
+  TrendingUp,
   Users,
   Layers,
-  Megaphone,
+  Grid3x3,
+  UserCheck,
+  FileText,
   Building2,
+  BarChart3,
   Settings,
-  Cpu,
+  Megaphone,
   X,
+  LogOut,
 } from "lucide-react";
 import { cn, getInitials } from "../lib/utils";
+import { useAppStore } from "../store/useAppStore";
 
 const ROLE_LABEL = { admin: "School Admin", teacher: "Faculty", student: "Learner" };
 const ROLE_ICON = { admin: "bg-danilo-primary", teacher: "bg-danilo-secondary", student: "bg-danilo-border" };
 
-const NAV = {
-  student: [
-    { path: "/overview", label: "Dashboard", icon: LayoutDashboard, page: "overview" },
-    { path: "/my-classes", label: "My Subjects", icon: BookOpen, page: "my-classes" },
-    { path: "/assignments", label: "Assessments", icon: ClipboardList, page: "assignments" },
-    { path: "/ai-tutor", label: "AI Assistant", icon: Sparkles, page: "ai-tutor", shortLabel: "AI" },
-    { path: "/grades", label: "Progress", icon: Award, page: "grades" },
-  ],
-  teacher: [
-    { path: "/overview", label: "Dashboard", icon: LayoutDashboard, page: "overview" },
-    { path: "/my-classes", label: "My Subjects", icon: BookOpen, page: "my-classes" },
-    { path: "/sections", label: "Sections", icon: Layers, page: "sections" },
-    { path: "/announcements", label: "Announcements", icon: Megaphone, page: "announcements" },
-    { path: "/ai-tutor", label: "AI Assistant", icon: Sparkles, page: "ai-tutor", shortLabel: "AI" },
-    { path: "/grades", label: "Progress", icon: Award, page: "grades" },
-  ],
-  admin: [
-    { path: "/overview", label: "Dashboard", icon: LayoutDashboard, page: "overview" },
-    { path: "/users", label: "People", icon: Users, page: "users", shortLabel: "People" },
-    { path: "/classes", label: "Subjects", icon: BookOpen, page: "classes" },
-    { path: "/sections", label: "Sections", icon: Layers, page: "sections" },
-    { path: "/announcements", label: "Announcements", icon: Megaphone, page: "announcements", shortLabel: "News" },
-    { path: "/departments", label: "Departments", icon: Building2, page: "departments" },
-    { path: "/system", label: "System", icon: Cpu, page: "system", shortLabel: "System" },
-    { path: "/settings", label: "Settings", icon: Settings, page: "settings" },
-  ],
-};
+const ALL_NAV = [
+  { path: "/overview", label: "Overview", icon: LayoutDashboard, page: "overview" },
+  { path: "/ai-tutor", label: "AI Tutor", icon: Sparkles, page: "ai-tutor" },
+  { path: "/my-classes", label: "My Classes", icon: BookOpen, page: "my-classes" },
+  { path: "/grades", label: "Grades", icon: TrendingUp, page: "grades" },
+];
+
+const ADMIN_NAV = [
+  { path: "/users", label: "Users", icon: Users, page: "users" },
+  { path: "/classes", label: "Classes", icon: Layers, page: "classes" },
+  { path: "/sections", label: "Sections", icon: Grid3x3, page: "sections" },
+  { path: "/enrollments", label: "Enrollments", icon: UserCheck, page: "enrollments" },
+  { path: "/assignments", label: "Assignments", icon: FileText, page: "assignments" },
+  { path: "/departments", label: "Departments", icon: Building2, page: "departments" },
+  { path: "/reports", label: "Reports", icon: BarChart3, page: "reports" },
+  { path: "/system", label: "System", icon: Settings, page: "system" },
+];
+
+const TEACHER_NAV = [
+  { path: "/announcements", label: "Announcements", icon: Megaphone, page: "announcements" },
+];
+
+function getNav(role) {
+  if (role === "admin") return [...ALL_NAV, ...ADMIN_NAV];
+  if (role === "teacher") return [...ALL_NAV, ...TEACHER_NAV];
+  return ALL_NAV;
+}
 
 function isNavActive(currentPage, tabPage) {
   if (currentPage === tabPage) return true;
@@ -52,8 +56,12 @@ function isNavActive(currentPage, tabPage) {
   return false;
 }
 
-export default memo(function MobileDrawer({ open, user, currentPage, navigate, onClose, onLogout }) {
-  const tabs = NAV[user.role] || NAV.student;
+export default memo(function MobileDrawer({ open, user: userProp, currentPage, navigate, onClose, onLogout }) {
+  const storeUser = useAppStore((s) => s.user);
+  const user = userProp || storeUser;
+  if (!user) return null;
+
+  const tabs = getNav(user.role);
   const initials = getInitials(user.fullName);
 
   function choose(path) {
@@ -65,11 +73,26 @@ export default memo(function MobileDrawer({ open, user, currentPage, navigate, o
 
   return (
     <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Navigation menu">
-      <button type="button" className="absolute inset-0 bg-black/60" onClick={onClose} aria-label="Close navigation menu" />
-      <aside className="absolute inset-y-0 left-0 w-[min(84vw,320px)] bg-danilo-surface shadow-xl border-r border-danilo-border p-4 flex flex-col animate-fade-in">
-        <div className="flex items-center justify-between mb-4">
+      {/* Backdrop */}
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="Close navigation menu"
+      />
+
+      {/* Drawer */}
+      <aside className="absolute inset-y-0 left-0 w-full max-w-sm bg-white shadow-xl border-r border-danilo-border flex flex-col animate-slide-in-left">
+        {/* Header with close */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-danilo-border">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={cn("w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0", ROLE_ICON[user.role] || ROLE_ICON.student)}>
+            <div
+              className={cn(
+                "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0",
+                ROLE_ICON[user.role] || ROLE_ICON.student
+              )}
+              aria-hidden="true"
+            >
               <span className="text-xs font-bold text-white">{initials}</span>
             </div>
             <div className="min-w-0">
@@ -77,32 +100,49 @@ export default memo(function MobileDrawer({ open, user, currentPage, navigate, o
               <p className="text-xs text-danilo-text-muted">{ROLE_LABEL[user.role] || user.role}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="h-10 w-10 rounded-lg text-danilo-text-muted hover:bg-danilo-surface-hover transition" aria-label="Close">
-            <X className="h-5 w-5 mx-auto" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="dn-btn-icon"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto space-y-0.5 pr-1">
+        {/* Nav list */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = isNavActive(currentPage, tab.page);
             return (
-              <button key={tab.path} type="button" onClick={() => choose(tab.path)}
+              <button
+                key={tab.path}
+                type="button"
+                onClick={() => choose(tab.path)}
                 className={cn(
-                  "w-full min-h-[44px] flex items-center gap-3 rounded-xl px-3 text-sm font-medium active:scale-[0.99] transition",
-                  isActive ? "bg-danilo-primary-subtle text-danilo-primary" : "text-danilo-text-secondary active:bg-danilo-surface-hover"
-                )}>
-                <Icon className={cn("w-5 h-5", isActive ? "text-danilo-primary" : "text-danilo-text-muted")} />
-                {tab.label}
+                  "dn-nav-item w-full min-h-[44px]",
+                  isActive && "active"
+                )}
+              >
+                <Icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-danilo-primary" : "text-danilo-text-muted")} />
+                <span>{tab.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <button type="button" onClick={() => { onClose(); onLogout(); }}
-          className="mt-4 min-h-[44px] w-full rounded-xl border border-danilo-border px-4 text-sm font-medium text-danilo-text-secondary active:scale-[0.99] active:bg-danilo-surface-hover transition">
-          Sign Out
-        </button>
+        {/* Footer */}
+        <div className="p-3 border-t border-danilo-border">
+          <button
+            type="button"
+            onClick={() => { onClose(); onLogout(); }}
+            className="dn-btn-secondary w-full gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
       </aside>
     </div>
   );

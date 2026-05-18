@@ -124,7 +124,7 @@ prefetch_container_assets() {
     preload_ollama_model "${TEMP_OLLAMA_CONTAINER}"
     docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null
   else
-    note "Skipping Ollama preload because DANILO_AI_RUNTIME=${DANILO_AI_RUNTIME:-ollama}; llama.cpp will load GGUF files from models/"
+    note "Skipping Ollama preload because the Ollama runtime is disabled in the current environment"
   fi
 }
 

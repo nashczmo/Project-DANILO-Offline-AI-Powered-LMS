@@ -1,6 +1,6 @@
 # Project DANILO Installer
 
-Project DANILO packages an offline-first, DepEd-aligned AI-native learning LMS for low-connectivity schools. The installer generates a complete local stack with FastAPI, React, PostgreSQL, Nginx, Docker Compose, Wi-Fi captive portal services, stable Ollama inference, and optional llama.cpp GGUF inference.
+Project DANILO packages an offline-first, DepEd-aligned AI-native learning LMS for low-connectivity schools. The installer generates a complete local stack with FastAPI, React, PostgreSQL, Nginx, Docker Compose, Wi-Fi captive portal services, and stable Ollama inference.
 
 Default administrator credentials:
 
@@ -36,7 +36,7 @@ Logs are written to `/var/log/danilo-install.log`. Backups are stored in `/var/b
 ```text
 danilo.sh              # installer entrypoint
 lib/                   # installer, backend, frontend, AI, network, service, verification modules
-models/                # offline GGUF models, e.g. Phi-3 Mini Instruct Q4_K_M
+models/                # offline GGUF models, e.g. Phi-4 Mini Instruct Q4_K_M
 docs/                  # install, model, troubleshooting, verification, release docs
 scripts/               # repository-side verification helpers
 ```
@@ -60,12 +60,12 @@ sudo bash danilo.sh --help
 
 ## AI Runtime And Models
 
-DANILO currently defaults to the stable Ollama runtime with `phi3:mini` so deployments start reliably while llama.cpp migration remains optional. Put GGUF files in `models/` and set `DANILO_AI_RUNTIME=llamacpp` only when using the llama.cpp profile.
+DANILO currently defaults to the stable Ollama runtime with `phi4-mini` for offline classroom deployments. Put a Phi-4 Mini Instruct Q4_K_M GGUF in `models/` before install to register it as a local Ollama model.
 
 To pin the stable Ollama runtime explicitly:
 
 ```bash
-sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
+sudo DANILO_OLLAMA_MODEL=phi4-mini bash danilo.sh --install
 ```
 
 See `docs/CUSTOM_MODEL.md`.

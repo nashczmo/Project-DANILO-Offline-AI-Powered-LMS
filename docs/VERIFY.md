@@ -59,4 +59,4 @@ sudo grep '^DANILO_AI_RUNTIME=' /opt/danilo/app/.env
 sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec -T ollama ollama list
 ```
 
-Default installs use Ollama and should show `phi3:mini` or `danilo-custom`. llama.cpp installs should show `DANILO_AI_RUNTIME=llamacpp` and a matching GGUF filename in `DANILO_AI_PRIMARY_MODEL`.
+Default installs use Ollama and should show `phi4-mini` or `danilo-phi4-mini`.

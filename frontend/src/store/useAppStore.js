@@ -9,6 +9,9 @@ export const useAppStore = create((set, get) => ({
   sidebarCollapsed: localStorage.getItem("danilo.sidebar.collapsed") === "true",
   promptEvent: null,
   toasts: [],
+  aiStatus: { ready: false, model: null },
+  activePage: "overview",
+  notifications: [],
 
   setToken: (token) => {
     if (token) localStorage.setItem("danilo.token", token);
@@ -25,6 +28,12 @@ export const useAppStore = create((set, get) => ({
     set({ sidebarCollapsed: next });
   },
   setPromptEvent: (promptEvent) => set({ promptEvent }),
+  setAiStatus: (aiStatus) => set({ aiStatus }),
+  setActivePage: (activePage) => set({ activePage }),
+  addNotification: (notification) =>
+    set((state) => ({
+      notifications: [notification, ...state.notifications.slice(0, 19)],
+    })),
 
   addToast: (message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -37,6 +46,6 @@ export const useAppStore = create((set, get) => ({
 
   logout: () => {
     localStorage.removeItem("danilo.token");
-    set({ token: "", user: null, dashboard: null, toasts: [] });
+    set({ token: "", user: null, dashboard: null, toasts: [], notifications: [] });
   },
 }));

@@ -1,23 +1,24 @@
 # Offline AI Models
 
-Project DANILO treats AI as platform infrastructure, not a standalone chatbot. The stable deployment runtime is currently Ollama; llama.cpp remains available when local GGUF files are installed and explicitly enabled.
+Project DANILO treats AI as platform infrastructure, not a standalone chatbot. The stable deployment runtime is currently Ollama only.
 
 ## Recommended Production Models
 
-Place these files in `models/` before installing on the Ubuntu server:
+Use the default Ollama model, or place this GGUF file in `models/` before installing on the Ubuntu server:
 
 ```text
-models/Phi-3-mini-4k-instruct-q4_k_m.gguf
-models/gemma-2-2b-it-q4_k_m.gguf
+models/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf
 ```
 
-llama.cpp runtime settings:
+Ollama runtime settings:
 
 ```env
-COMPOSE_PROFILES=llamacpp
-DANILO_AI_RUNTIME=llamacpp
-DANILO_AI_PRIMARY_MODEL=Phi-3-mini-4k-instruct-q4_k_m.gguf
-DANILO_AI_FALLBACK_MODEL=gemma-2-2b-it-q4_k_m.gguf
+COMPOSE_PROFILES=ollama
+DANILO_AI_RUNTIME=ollama
+DANILO_OLLAMA_MODEL=phi4-mini
+OLLAMA_MODEL=phi4-mini
+DANILO_AI_PRIMARY_MODEL=microsoft_Phi-4-mini-instruct-Q4_K_M.gguf
+DANILO_AI_FALLBACK_MODEL=
 DANILO_AI_NUM_CTX=1536
 DANILO_AI_THREADS=4
 DANILO_AI_MAX_CONCURRENT=1
@@ -27,13 +28,13 @@ This profile targets Intel N95, 8 GB RAM, Ubuntu Server, and offline classroom W
 
 ## Stable Runtime
 
-Ollama is the default stable runtime while llama.cpp migration is optional:
+Ollama is the stable runtime:
 
 ```bash
-sudo DANILO_AI_RUNTIME=ollama DANILO_OLLAMA_MODEL=phi3:mini bash danilo.sh --install
+sudo DANILO_OLLAMA_MODEL=phi4-mini bash danilo.sh --install
 ```
 
-Use llama.cpp only when the configured GGUF model exists in `models/`; otherwise keep Ollama active so the stack starts cleanly.
+Do not enable alternate inference runtimes until the Ollama backend has been validated in classroom use.
 
 ## AI-Native Backend Flow
 
@@ -54,4 +55,4 @@ sudo bash danilo.sh --verify
 curl http://danilo.local/api/ai/status
 ```
 
-For llama.cpp mode, confirm `llamaCppOnline` is true and `modelName` matches the Phi-3 GGUF filename. For Ollama mode, confirm `ollamaOnline` is true and the configured Ollama model is present.
+Confirm `ollamaOnline` is true and the configured Ollama model is present.

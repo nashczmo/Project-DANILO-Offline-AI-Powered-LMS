@@ -1,12 +1,12 @@
 # Project DANILO installer module: ai.sh
 
-DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-phi3:mini}}"
-DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-gemma2:2b}"
+DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-phi4-mini}}"
+DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-}"
 DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-}"
-DANILO_AI_RUNTIME="${DANILO_AI_RUNTIME:-ollama}"
-DANILO_AI_PRIMARY_MODEL="${DANILO_AI_PRIMARY_MODEL:-Phi-3-mini-4k-instruct-q4_k_m.gguf}"
-DANILO_AI_FALLBACK_MODEL="${DANILO_AI_FALLBACK_MODEL:-gemma-2-2b-it-q4_k_m.gguf}"
-DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-custom}"
+DANILO_AI_RUNTIME="ollama"
+DANILO_AI_PRIMARY_MODEL="${DANILO_AI_PRIMARY_MODEL:-microsoft_Phi-4-mini-instruct-Q4_K_M.gguf}"
+DANILO_AI_FALLBACK_MODEL="${DANILO_AI_FALLBACK_MODEL:-}"
+DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-phi4-mini}"
 DANILO_CUSTOM_GGUF_PATH="${DANILO_CUSTOM_GGUF_PATH:-}"
 DANILO_CUSTOM_MODELFILE="${DANILO_CUSTOM_MODELFILE:-}"
 
@@ -21,16 +21,17 @@ detect_ai_hardware_profile() {
   local ollama_parallel_overridden=0
   [[ -n "${DANILO_AI_MAX_CONCURRENT:-}" ]] && ai_concurrency_overridden=1
   [[ -n "${OLLAMA_NUM_PARALLEL:-}" ]] && ollama_parallel_overridden=1
+  DANILO_AI_RUNTIME="ollama"
   DANILO_AI_MAX_CONCURRENT="${DANILO_AI_MAX_CONCURRENT:-1}"
   OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
   OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-1}"
   OLLAMA_NUM_CTX="${OLLAMA_NUM_CTX:-1536}"
-  OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-5m}"
-  OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-90}"
-  OLLAMA_CONTEXT_CHARS="${OLLAMA_CONTEXT_CHARS:-1600}"
+  OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-3m}"
+  OLLAMA_TIMEOUT_SECONDS="${OLLAMA_TIMEOUT_SECONDS:-120}"
+  OLLAMA_CONTEXT_CHARS="${OLLAMA_CONTEXT_CHARS:-2200}"
 
   if [[ "${mem_mb}" -lt 6144 ]]; then
-    warn "Detected ${mem_mb} MB RAM. DANILO will use single-request AI mode; use Q4_K_M Phi-3 Mini or Gemma 2 2B only."
+    warn "Detected ${mem_mb} MB RAM. DANILO will use single-request AI mode with Phi-4 Mini Instruct Q4_K_M via Ollama."
   elif [[ "${mem_mb}" -ge 12288 && "${DANILO_ALLOW_AI_PARALLEL:-0}" == "1" ]]; then
     [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
     [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
@@ -59,12 +60,7 @@ configure_ollama_model() {
       exit 1
     fi
 
-    if [[ "${DANILO_AI_RUNTIME}" == "llamacpp" && ! -f "${models_dir}/${DANILO_AI_PRIMARY_MODEL}" ]]; then
-      export DANILO_AI_PRIMARY_MODEL="$(basename "${gguf_file}")"
-      echo "Using llama.cpp primary GGUF: ${DANILO_AI_PRIMARY_MODEL}"
-    fi
-
-    cat > "${modelfile}" <<EOF
+      cat > "${modelfile}" <<EOF
 FROM ${gguf_path}
 
 PARAMETER temperature 0.3
@@ -90,11 +86,6 @@ EOF
     echo "Using default model: ${DANILO_DEFAULT_OLLAMA_MODEL}"
   fi
 
-  if [[ "${DANILO_AI_RUNTIME}" == "llamacpp" && ! -f "${models_dir}/${DANILO_AI_PRIMARY_MODEL}" ]]; then
-    echo "llama.cpp runtime requires ${models_dir}/${DANILO_AI_PRIMARY_MODEL}, but the GGUF file is missing."
-    echo "Place the GGUF model in models/ or run with DANILO_AI_RUNTIME=ollama for the stable Ollama runtime."
-    exit 1
-  fi
 }
 
 preload_ollama_model() {

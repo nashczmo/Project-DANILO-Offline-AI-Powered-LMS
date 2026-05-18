@@ -1,6 +1,16 @@
-import { memo } from "react";
-import { Search, Download, X, BookOpen } from "lucide-react";
-import { Empty } from "./shared";
+import { memo, useState } from "react";
+import {
+  Search,
+  Download,
+  X,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  GraduationCap,
+  Target,
+} from "lucide-react";
+import { Empty, Badge } from "./shared";
 import { cn } from "../lib/utils";
 
 const SUBJECT_COLORS = {
@@ -13,134 +23,291 @@ const SUBJECT_COLORS = {
 function getColor(subject) {
   return SUBJECT_COLORS[subject] || {
     bar: "bg-danilo-text-muted",
-    badge: "bg-danilo-bg text-danilo-text-secondary border border-danilo-border",
+    badge: "bg-danilo-bg-tertiary text-danilo-text-secondary border border-danilo-border",
   };
 }
 
-const LessonCard = memo(function LessonCard({ item }) {
+const ModuleCard = memo(function ModuleCard({ item }) {
+  const [open, setOpen] = useState(false);
   const c = getColor(item.subject);
+
   return (
-    <article className="dn-card dn-card-hover overflow-hidden">
-      <div className={cn("h-1", c.bar)} />
-      <div className="p-5">
-        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-          <span className={cn("dn-badge", c.badge)}>{item.subject}</span>
-          <span className="dn-badge bg-danilo-bg text-danilo-text-secondary border border-danilo-border">
-            {item.quarter} · W{item.week}
-          </span>
-          {item.melcCode && (
-            <span className="text-[11px] text-danilo-text-muted font-mono">{item.melcCode}</span>
-          )}
-        </div>
-        <p className="dn-overline mb-0.5">{item.folderName}</p>
-        <h3 className="text-sm font-semibold text-danilo-text tracking-tight mb-1">{item.title}</h3>
-        <p className="text-sm text-danilo-text-secondary leading-relaxed mb-3 line-clamp-2">{item.summary}</p>
-        {item.essentialQuestion && (
-          <div className="bg-danilo-bg rounded-xl px-3.5 py-2.5 mb-3 border border-danilo-border">
-            <p className="dn-overline mb-0.5">Essential Question</p>
-            <p className="text-sm text-danilo-text-secondary italic leading-relaxed">
-              &ldquo;{item.essentialQuestion}&rdquo;
+    <article className="dn-card overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between p-5 text-left hover:bg-danilo-bg-secondary transition-colors"
+      >
+        <div className="flex items-start gap-3 min-w-0 text-left">
+          <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5", c.badge)}>
+            <BookOpen className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              <Badge tone="default">{item.subject}</Badge>
+              <Badge tone="default">
+                {item.quarter} · W{item.week}
+              </Badge>
+              {item.melcCode && (
+                <span className="dn-badge bg-danilo-bg-tertiary text-danilo-text-muted border border-danilo-border font-mono">
+                  {item.melcCode}
+                </span>
+              )}
+              {item.assessmentType && (
+                <Badge tone="blue">{item.assessmentType}</Badge>
+              )}
+            </div>
+            <p className="text-sm font-semibold text-danilo-text tracking-tight truncate">
+              {item.title}
+            </p>
+            <p className="text-xs text-danilo-text-muted mt-0.5">
+              {item.courseCode}
+              {item.gradeLevel && ` · ${item.gradeLevel}`}
             </p>
           </div>
-        )}
-        <div className="flex items-center justify-between pt-3 border-t border-danilo-border/40">
-          <div className="text-xs text-danilo-text-muted">
-            <span className="font-medium text-danilo-text">{item.courseCode}</span>
-            {item.gradeLevel && ` · ${item.gradeLevel}`}
-          </div>
-          {item.pdfUrl && (
-            <a
-              href={item.pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="dn-btn-primary dn-btn-sm"
-              aria-label={`Open PDF for ${item.title}`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Open PDF
-            </a>
+        </div>
+        <div className="flex-shrink-0 ml-2">
+          {open ? (
+            <ChevronUp className="w-4 h-4 text-danilo-text-muted" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-danilo-text-muted" />
           )}
         </div>
-      </div>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 border-t border-danilo-border/40 space-y-4">
+          {item.learningCompetency && (
+            <div className="mt-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Target className="w-3.5 h-3.5 text-danilo-primary" />
+                <span className="dn-overline">Learning Competency</span>
+              </div>
+              <p className="text-sm text-danilo-text-secondary leading-relaxed">
+                {item.learningCompetency}
+              </p>
+            </div>
+          )}
+
+          {item.lessonObjectives && (
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <GraduationCap className="w-3.5 h-3.5 text-danilo-success" />
+                <span className="dn-overline">Lesson Objectives</span>
+              </div>
+              <p className="text-sm text-danilo-text-secondary leading-relaxed whitespace-pre-line">
+                {item.lessonObjectives}
+              </p>
+            </div>
+          )}
+
+          {item.summary && (
+            <div>
+              <span className="dn-overline">Summary</span>
+              <p className="text-sm text-danilo-text-secondary leading-relaxed mt-1">
+                {item.summary}
+              </p>
+            </div>
+          )}
+
+          {item.essentialQuestion && (
+            <div className="bg-danilo-bg-secondary rounded-xl px-4 py-3 border border-danilo-border">
+              <span className="dn-overline">Essential Question</span>
+              <p className="text-sm text-danilo-text-secondary italic leading-relaxed mt-1">
+                &ldquo;{item.essentialQuestion}&rdquo;
+              </p>
+            </div>
+          )}
+
+          {/* Files / Materials */}
+          {(item.files?.length > 0 || item.pdfUrl || item.attachments?.length > 0) && (
+            <div>
+              <span className="dn-overline">Materials</span>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {item.pdfUrl && (
+                  <a
+                    href={item.pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 dn-btn-secondary dn-btn-sm"
+                    aria-label={`Open PDF for ${item.title}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Open PDF
+                  </a>
+                )}
+                {(item.files || item.attachments || []).map((f) => (
+                  <a
+                    key={f.url || f.name}
+                    href={f.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-danilo-border bg-danilo-bg-secondary px-2.5 py-1.5 text-xs font-medium text-danilo-text-secondary hover:bg-danilo-bg-tertiary transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-danilo-text-muted" />
+                    {f.name || "File"}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </article>
   );
 });
 
-export default memo(function ContentView({ items, search, onSearchChange, quarter, onQuarterChange, subject, onSubjectChange }) {
-  const subjects = [...new Set(items.map((i) => i.subject))].sort();
-  const hasFilters = Boolean(search.trim() || quarter || subject);
+export default memo(function ContentView({
+  items,
+  modules,
+  search,
+  onSearchChange,
+  quarter,
+  onQuarterChange,
+  subject,
+  onSubjectChange,
+  token,
+  course,
+  loading,
+  onNavigate,
+  reload,
+  user,
+}) {
+  const data = modules ?? items ?? [];
+  const isFullPage = !!course;
+
+  const subjects = [...new Set(data.map((i) => i.subject))].sort();
+  const hasFilters = Boolean(search?.trim?.() || quarter || subject);
 
   function clearFilters() {
-    onSearchChange({ target: { value: "" } });
-    onQuarterChange({ target: { value: "" } });
-    onSubjectChange({ target: { value: "" } });
+    onSearchChange?.({ target: { value: "" } });
+    onQuarterChange?.({ target: { value: "" } });
+    onSubjectChange?.({ target: { value: "" } });
+  }
+
+  if (loading) {
+    return (
+      <section className="space-y-4" aria-label="Content loading">
+        <div className="dn-card p-5 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg dn-shimmer" />
+            <div className="space-y-2 flex-1">
+              <div className="h-3 w-40 dn-shimmer" />
+              <div className="h-2 w-24 dn-shimmer" />
+            </div>
+          </div>
+          <div className="h-3 w-full dn-shimmer" />
+          <div className="h-3 w-3/4 dn-shimmer" />
+        </div>
+        <div className="dn-card p-5 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg dn-shimmer" />
+            <div className="space-y-2 flex-1">
+              <div className="h-3 w-48 dn-shimmer" />
+              <div className="h-2 w-20 dn-shimmer" />
+            </div>
+          </div>
+          <div className="h-3 w-full dn-shimmer" />
+        </div>
+      </section>
+    );
   }
 
   return (
     <section aria-label="Learning Materials">
-      <div className="mb-5">
-        <h2 className="dn-title">Modules &amp; Materials</h2>
-        <p className="dn-subtitle mt-0.5">MELC-aligned modules for offline classroom delivery.</p>
-      </div>
+      {/* Header */}
+      {isFullPage && (
+        <div className="dn-card p-4 mb-4">
+          <h1 className="dn-heading-md">{course.title}</h1>
+          <p className="dn-subtitle mt-1">
+            {course.code} · {course.subject} · {course.gradeLevel}
+          </p>
+        </div>
+      )}
+
+      {!isFullPage && (
+        <div className="mb-5">
+          <h2 className="dn-title">Modules &amp; Materials</h2>
+          <p className="dn-subtitle mt-0.5">
+            MELC-aligned modules for offline classroom delivery.
+          </p>
+        </div>
+      )}
 
       {/* Filters */}
-      <div className="dn-card p-4 mb-5" role="search" aria-label="Filter modules">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-danilo-text-muted pointer-events-none" aria-hidden="true" />
-            <input
-              value={search}
-              onChange={onSearchChange}
-              placeholder="Search modules…"
-              className="dn-input pl-10"
-              aria-label="Search modules"
-            />
+      {onSearchChange && (
+        <div className="dn-card p-4 mb-5" role="search" aria-label="Filter modules">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="relative">
+              <Search
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-danilo-text-muted pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                value={search || ""}
+                onChange={onSearchChange}
+                placeholder="Search modules…"
+                className="dn-input pl-10"
+                aria-label="Search modules"
+              />
+            </div>
+            <select
+              value={quarter || ""}
+              onChange={onQuarterChange}
+              className="dn-input"
+              aria-label="Filter by quarter"
+            >
+              <option value="">All Quarters</option>
+              <option value="Q1">Quarter 1</option>
+              <option value="Q2">Quarter 2</option>
+              <option value="Q3">Quarter 3</option>
+              <option value="Q4">Quarter 4</option>
+            </select>
+            <select
+              value={subject || ""}
+              onChange={onSubjectChange}
+              className="dn-input"
+              aria-label="Filter by subject"
+            >
+              <option value="">All Subjects</option>
+              {subjects.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </div>
-          <select
-            value={quarter}
-            onChange={onQuarterChange}
-            className="dn-input"
-            aria-label="Filter by quarter"
-          >
-            <option value="">All Quarters</option>
-            <option value="Q1">Quarter 1</option>
-            <option value="Q2">Quarter 2</option>
-            <option value="Q3">Quarter 3</option>
-            <option value="Q4">Quarter 4</option>
-          </select>
-          <select
-            value={subject}
-            onChange={onSubjectChange}
-            className="dn-input"
-            aria-label="Filter by subject"
-          >
-            <option value="">All Subjects</option>
-            {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-3 text-xs font-medium text-danilo-primary hover:text-danilo-primary-hover transition-colors flex items-center gap-1"
+            >
+              <X className="w-3 h-3" />
+              Clear filters
+            </button>
+          )}
         </div>
-        {hasFilters && (
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="mt-3 text-xs font-medium text-danilo-primary hover:text-danilo-primary-hover transition-colors flex items-center gap-1"
-          >
-            <X className="w-3 h-3" />
-            Clear filters
-          </button>
-        )}
-      </div>
+      )}
 
-      {items.length === 0 ? (
+      {data.length === 0 ? (
         <Empty
           title="No modules found"
-          body={search || quarter || subject ? "Try adjusting your search or filters." : "Your faculty has not uploaded any modules yet."}
+          body={
+            search || quarter || subject
+              ? "Try adjusting your search or filters."
+              : "Your faculty has not uploaded any modules yet."
+          }
           icon={<BookOpen className="w-6 h-6 text-danilo-text-muted" />}
         />
       ) : (
         <>
-          <p className="text-xs text-danilo-text-muted mb-3">{items.length} module{items.length !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-danilo-text-muted mb-3">
+            {data.length} module{data.length !== 1 ? "s" : ""}
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
-            {items.map((item) => <LessonCard key={item.id} item={item} />)}
+            {data.map((item) => (
+              <ModuleCard key={item.id} item={item} />
+            ))}
           </div>
         </>
       )}
