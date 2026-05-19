@@ -23,7 +23,7 @@ write_frontend_files() {
 
   local font_dir="${APP_ROOT}/frontend/public/fonts"
   local source_font_dir="${SCRIPT_DIR}/assets/fonts"
-  local inter_files="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2"
+  local inter_files="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2"
   local missing_fonts=()
   local font_file=""
 
@@ -119,7 +119,7 @@ validate_frontend_dist() {
     return 1
   fi
 
-  for font_file in Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2; do
+  for font_file in Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2; do
     if [[ ! -s "${APP_ROOT}/frontend/dist/fonts/${font_file}" ]]; then
       echo "Frontend dist is missing bundled Inter font: ${font_file}"
       return 1
