@@ -712,7 +712,7 @@ export function AdminEnrollmentsView({ token, users, courses, reload }) {
       <ConfirmDialog
         open={confirmOpen}
         title="Remove Enrollment"
-        message={`Remove ${confirmTarget?.studentName || confirmTarget?.fullName ?? "this learner"} from the subject?`}
+        message={`Remove ${confirmTarget?.studentName ?? confirmTarget?.fullName ?? "this learner"} from the subject?`}
         onConfirm={() => { remove(confirmTarget?.id); setConfirmOpen(false); }}
         onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }}
         confirmLabel="Remove"
