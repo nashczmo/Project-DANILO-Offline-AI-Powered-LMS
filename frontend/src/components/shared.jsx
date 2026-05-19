@@ -136,8 +136,8 @@ export function DataTable({ columns, rows, keyField = "id", emptyTitle = "No dat
           </tr>
         </thead>
         <tbody className="divide-y divide-danilo-border">
-          {rows.map((row) => (
-            <tr key={row[keyField] ?? row._key} className="bg-white hover:bg-danilo-bg-secondary transition-colors">
+          {rows.map((row, index) => (
+            <tr key={row[keyField] ?? row._key ?? `${currentPageId(row)}-${index}`} className="bg-white hover:bg-danilo-bg-secondary transition-colors">
               {columns.map((col) => (
                 <td key={col.key} className="px-4 py-3 text-danilo-text">
                   {col.render ? col.render(row) : row[col.key]}
@@ -149,6 +149,10 @@ export function DataTable({ columns, rows, keyField = "id", emptyTitle = "No dat
       </table>
     </div>
   );
+}
+
+function currentPageId(row) {
+  return row?.id ?? row?.username ?? row?.title ?? "row";
 }
 
 export function PaginatedTable({ columns, rows, keyField = "id", pageSize = 10, searchFields = [], emptyTitle = "No data", emptyBody = "" }) {

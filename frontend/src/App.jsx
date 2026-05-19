@@ -21,15 +21,11 @@ import TopBar from "./layout/TopBar";
 import Dashboard from "./pages/Dashboard";
 import LoginView from "./pages/LoginView";
 import { useAppStore } from "./store/useAppStore";
-import { cn, getInitials } from "./lib/utils";
+import { cn, formatDateTimeFull } from "./lib/utils";
 
 /* ========================================================================
    CONSTANTS
    ======================================================================== */
-
-function createBootstrapDashboard(user) {
-  return { user, stream: [], courses: [], contentFolders: [], grades: [], hints: { hasContent: false, hasCourses: false, hasGrades: false, hasStream: false }, contentWorkflow: null, network: null, operationsHighlights: [] };
-}
 
 const ALLOWED = {
   admin:   ["overview", "users", "classes", "sections", "enrollments", "assignments", "grades", "departments", "reports", "settings", "system", "my-classes", "announcements", "not-found"],
@@ -37,9 +33,46 @@ const ALLOWED = {
   student: ["overview", "my-classes", "grades", "ai-tutor", "assignments", "class-detail", "not-found"],
 };
 const ROLE_LABEL = { admin: "School Admin", teacher: "Faculty", student: "Learner" };
+const EMPTY_DASHBOARD = {
+  stream: [],
+  courses: [],
+  contentFolders: [],
+  grades: [],
+  assignments: [],
+  quizzes: [],
+  hints: { hasContent: false, hasCourses: false, hasGrades: false, hasStream: false },
+  contentWorkflow: null,
+  network: null,
+  operationsHighlights: [],
+};
 
 function isAllowed(role, page) {
   return (ALLOWED[role] || ALLOWED.student).includes(page);
+}
+
+function coerceArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeDashboard(incoming, user) {
+  const source = incoming && typeof incoming === "object" ? incoming : {};
+  return {
+    ...EMPTY_DASHBOARD,
+    ...source,
+    user: source.user || user,
+    stream: coerceArray(source.stream),
+    courses: coerceArray(source.courses),
+    contentFolders: coerceArray(source.contentFolders),
+    grades: coerceArray(source.grades),
+    assignments: coerceArray(source.assignments),
+    quizzes: coerceArray(source.quizzes),
+    hints: { ...EMPTY_DASHBOARD.hints, ...(source.hints || {}) },
+    operationsHighlights: coerceArray(source.operationsHighlights),
+  };
+}
+
+function createBootstrapDashboard(user) {
+  return normalizeDashboard({}, user);
 }
 
 /* ========================================================================
@@ -61,20 +94,30 @@ function parseChoices(choicesJson) {
 function AssignmentCard({ token, assignment, canSubmit, onSaved }) {
   const [responseText, setResponseText] = useState(assignment.submission?.responseText || "");
   const [saving, setSaving] = useState(false);
-  const status = assignment.submission?.status || "not_started";
+  const [error, setError] = useState("");
+  const status = assignment.submission?.status || assignment.status || "not_started";
 
   async function submit(e) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
       await apiRequest(`/student/assignments/${assignment.id}/submit`, { method: "POST", token, body: { responseText } });
       await onSaved();
+    } catch (submitError) {
+      setError(submitError?.message || "Assessment could not be submitted.");
     } finally { setSaving(false); }
   }
 
   async function complete() {
     setSaving(true);
-    try { await apiRequest(`/student/assignments/${assignment.id}/complete`, { method: "POST", token }); await onSaved(); } finally { setSaving(false); }
+    setError("");
+    try {
+      await apiRequest(`/student/assignments/${assignment.id}/complete`, { method: "POST", token });
+      await onSaved();
+    } catch (completeError) {
+      setError(completeError?.message || "Assessment could not be marked complete.");
+    } finally { setSaving(false); }
   }
 
   return (
@@ -91,6 +134,7 @@ function AssignmentCard({ token, assignment, canSubmit, onSaved }) {
       {assignment.submission?.score != null && <p className="mt-1 text-xs text-danilo-text-secondary">Score: {assignment.submission.score}/{assignment.points}</p>}
       {canSubmit && (
         <form onSubmit={submit} className="mt-3 grid gap-2">
+          {error && <p className="rounded-lg bg-danilo-error-subtle px-3 py-2 text-xs text-danilo-error">{error}</p>}
           <textarea className="dn-input" rows={4} value={responseText} onChange={(e) => setResponseText(e.target.value)} placeholder="Type your answer or completion notes..." required />
           <div className="flex flex-wrap gap-2">
             <button disabled={saving || !responseText.trim()} className="dn-btn-primary text-xs py-1.5">Submit Answer</button>
@@ -147,7 +191,7 @@ function QuizCard({ token, quiz, canSubmit, onSaved }) {
           <button disabled={saving || !(quiz.questions || []).length} className="dn-btn-primary text-xs py-1.5">Submit Quiz</button>
         </form>
       )}
-      {canSubmit && quiz.attempt && <p className="text-xs text-danilo-text-muted">Submitted {quiz.attempt.submittedAt ? new Date(quiz.attempt.submittedAt).toLocaleString() : ""}</p>}
+      {canSubmit && quiz.attempt && <p className="text-xs text-danilo-text-muted">Submitted {formatDateTimeFull(quiz.attempt.submittedAt, "")}</p>}
     </article>
   );
 }
@@ -157,33 +201,59 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
   const [assignmentForm, setAssignmentForm] = useState({ title: "", instructions: "", points: 100 });
   const [quizForm, setQuizForm] = useState({ title: "", instructions: "", questionText: "", choicesText: "", answerKey: "", points: 1, isPublished: true });
   const [uploadState, setUploadState] = useState({ file: null, saving: false, error: "", success: "" });
+  const [formError, setFormError] = useState("");
+  const [savingType, setSavingType] = useState("");
 
   if (user.role !== "teacher") return null;
 
   async function createModule(e) {
     e.preventDefault();
-    await apiRequest(`/teacher/courses/${course.id}/modules`, { method: "POST", token, body: moduleForm });
-    setModuleForm({ title: "", melcCode: "", learningCompetency: "", lessonObjectives: "", assessmentType: "", quarter: course.quarter || "Q1", week: 1, summary: "" });
-    reload();
+    setSavingType("module");
+    setFormError("");
+    try {
+      await apiRequest(`/teacher/courses/${course.id}/modules`, { method: "POST", token, body: moduleForm });
+      setModuleForm({ title: "", melcCode: "", learningCompetency: "", lessonObjectives: "", assessmentType: "", quarter: course.quarter || "Q1", week: 1, summary: "" });
+      await reload();
+    } catch (error) {
+      setFormError(error?.message || "Module could not be saved.");
+    } finally {
+      setSavingType("");
+    }
   }
 
   async function createAssignment(e) {
     e.preventDefault();
-    await apiRequest(`/teacher/courses/${course.id}/assignments`, { method: "POST", token, body: assignmentForm });
-    setAssignmentForm({ title: "", instructions: "", points: 100 });
-    reload();
+    setSavingType("assignment");
+    setFormError("");
+    try {
+      await apiRequest(`/teacher/courses/${course.id}/assignments`, { method: "POST", token, body: assignmentForm });
+      setAssignmentForm({ title: "", instructions: "", points: 100 });
+      await reload();
+    } catch (error) {
+      setFormError(error?.message || "Assessment could not be saved.");
+    } finally {
+      setSavingType("");
+    }
   }
 
   async function createQuiz(e) {
     e.preventDefault();
-    await apiRequest(`/teacher/courses/${course.id}/quizzes`, {
-      method: "POST", token,
-      body: { title: quizForm.title, instructions: quizForm.instructions, isPublished: quizForm.isPublished,
-        questions: [{ questionText: quizForm.questionText, choicesJson: JSON.stringify(quizForm.choicesText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)), answerKey: quizForm.answerKey, points: quizForm.points }],
-      },
-    });
-    setQuizForm({ title: "", instructions: "", questionText: "", choicesText: "", answerKey: "", points: 1, isPublished: true });
-    reload();
+    setSavingType("quiz");
+    setFormError("");
+    try {
+      await apiRequest(`/teacher/courses/${course.id}/quizzes`, {
+        method: "POST", token,
+        body: { title: quizForm.title, instructions: quizForm.instructions, isPublished: quizForm.isPublished,
+          questions: [{ questionText: quizForm.questionText, choicesJson: JSON.stringify(quizForm.choicesText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)), answerKey: quizForm.answerKey, points: quizForm.points }],
+        },
+      });
+      setQuizForm({ title: "", instructions: "", questionText: "", choicesText: "", answerKey: "", points: 1, isPublished: true });
+      await reload();
+    } catch (error) {
+      setFormError(error?.message || "Quiz could not be saved.");
+    } finally {
+      setSavingType("");
+    }
   }
 
   async function generateLesson(e) {
@@ -204,6 +274,7 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
   if (tab === "classwork") {
     return (
       <div className="grid gap-4 mb-5 lg:grid-cols-2">
+        {formError && <div className="lg:col-span-2 rounded-xl border border-danilo-error/20 bg-danilo-error-subtle p-3 text-sm text-danilo-error">{formError}</div>}
         <form className="dn-card p-5" onSubmit={createModule}>
           <h3 className="font-semibold text-danilo-text mb-3">Add Module</h3>
           <div className="grid gap-3">
@@ -217,7 +288,7 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
             </div>
             <Field label="Assessment Type"><select className="dn-input" value={moduleForm.assessmentType} onChange={(e) => setModuleForm({ ...moduleForm, assessmentType: e.target.value })}><option value="">Optional</option>{ASSESSMENT_TYPES.map((x) => <option key={x}>{x}</option>)}</select></Field>
             <Field label="Summary"><textarea className="dn-input" rows={2} value={moduleForm.summary} onChange={(e) => setModuleForm({ ...moduleForm, summary: e.target.value })} /></Field>
-            <button className="dn-btn-primary">Add Module</button>
+            <button className="dn-btn-primary" disabled={savingType === "module"}>{savingType === "module" ? "Adding..." : "Add Module"}</button>
           </div>
         </form>
         <form className="dn-card p-5" onSubmit={createAssignment}>
@@ -226,7 +297,7 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
             <Field label="Title"><input className="dn-input" value={assignmentForm.title} onChange={(e) => setAssignmentForm({ ...assignmentForm, title: e.target.value })} required /></Field>
             <Field label="Instructions"><textarea className="dn-input" rows={5} value={assignmentForm.instructions} onChange={(e) => setAssignmentForm({ ...assignmentForm, instructions: e.target.value })} required /></Field>
             <Field label="Points"><input className="dn-input" type="number" min="1" value={assignmentForm.points} onChange={(e) => setAssignmentForm({ ...assignmentForm, points: e.target.value })} /></Field>
-            <button className="dn-btn-primary">Create Assignment</button>
+            <button className="dn-btn-primary" disabled={savingType === "assignment"}>{savingType === "assignment" ? "Creating..." : "Create Assignment"}</button>
           </div>
         </form>
         <form className="dn-card p-5 lg:col-span-2" onSubmit={createQuiz}>
@@ -244,7 +315,7 @@ function TeacherQuickTools({ token, user, course, tab, people, reload }) {
                 Publish immediately
               </label>
             </div>
-            <button className="dn-btn-primary sm:col-span-2">Create Quiz</button>
+            <button className="dn-btn-primary sm:col-span-2" disabled={savingType === "quiz"}>{savingType === "quiz" ? "Creating..." : "Create Quiz"}</button>
           </div>
         </form>
         <form className="dn-card p-5 lg:col-span-2" onSubmit={generateLesson}>
@@ -346,7 +417,8 @@ function InsightsPanel({ insights, loading, error, token, classId, onRefresh }) 
 }
 
 function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, user, reloadData }) {
-  const course = (courses || []).find((c) => c.id === classId);
+  const numericClassId = Number(classId);
+  const course = (courses || []).find((c) => c.id === classId || Number(c.id) === numericClassId);
   const [classData, setClassData] = useState({ loading: false, error: "", stream: null, classwork: null, people: null, grades: null, insights: null });
   const [classSearch, setClassSearch] = useState("");
   const [classQuarter, setClassQuarter] = useState("");
@@ -418,12 +490,12 @@ function ClassDetailView({ classId, tab, courses, dashboard, navigate, token, us
     );
   }
 
-  const stream = Array.isArray(classData.stream) ? classData.stream : (dashboard?.stream || []).filter((s) => s.courseId === classId);
+  const stream = Array.isArray(classData.stream) ? classData.stream : (dashboard?.stream || []).filter((s) => s.courseId === classId || Number(s.courseId) === numericClassId);
   const classwork = classData.classwork || {};
-  const content = classwork.modules || (dashboard?.contentFolders || []).filter((f) => f.courseId === classId);
-  const assignments = classwork.assignments || [];
-  const quizzes = classwork.quizzes || [];
-  const grades = normalizeGradeRows(classData.grades?.grades || (dashboard?.grades || []).filter((g) => g.courseId === classId));
+  const content = coerceArray(classwork.modules || (dashboard?.contentFolders || []).filter((f) => f.courseId === classId || Number(f.courseId) === numericClassId));
+  const assignments = coerceArray(classwork.assignments);
+  const quizzes = coerceArray(classwork.quizzes);
+  const grades = normalizeGradeRows(classData.grades?.grades || (dashboard?.grades || []).filter((g) => g.courseId === classId || Number(g.courseId) === numericClassId));
   const people = classData.people || { teacher: course.teacherName ? { fullName: course.teacherName } : null, students: [] };
 
   return (
@@ -518,7 +590,17 @@ function NotFoundView({ navigate }) {
 function normalizeGradeRows(grades) {
   return (grades || []).map((grade, index) => {
     const finalGrade = Number(grade.finalGrade ?? grade.score ?? 0);
-    return { ...grade, courseId: grade.courseId ?? grade.id ?? index, quarter: grade.quarter || "", subject: grade.subject || grade.courseTitle || "Class", courseTitle: grade.courseTitle || grade.studentName || "Grade record", courseCode: grade.courseCode || "", finalGrade, components: grade.components || [{ component: grade.component || "Recorded score", score: grade.score ?? finalGrade, maxScore: grade.maxScore ?? 100, weight: grade.weight ?? 1, percentage: grade.percentage ?? finalGrade, remarks: grade.remarks || "" }] };
+    const score = grade.score ?? finalGrade;
+    const components = grade.components || [{
+      component: grade.component || "Recorded score",
+      score,
+      maxScore: grade.maxScore ?? 100,
+      weight: grade.weight ?? 1,
+      percentage: grade.percentage ?? finalGrade,
+      remarks: grade.remarks || "",
+    }];
+    const courseId = grade.courseId ?? grade.id ?? index;
+    return { ...grade, courseId, quarter: grade.quarter || "", subject: grade.subject || grade.courseTitle || "Class", courseTitle: grade.courseTitle || grade.studentName || "Grade record", courseCode: grade.courseCode || "", finalGrade, components };
   });
 }
 
@@ -550,6 +632,30 @@ function MyClassesView({ courses, navigate }) {
             </button>
           ))}
         </div>
+      )}
+    </section>
+  );
+}
+
+function StudentAssignmentsView({ token, assignments, reload }) {
+  const rows = coerceArray(assignments);
+  return (
+    <section className="space-y-5">
+      <PageHeader title="Assessments" subtitle="Submit assignments and track completion across your subjects" />
+      {rows.length ? (
+        <div className="grid gap-3">
+          {rows.map((assignment) => (
+            <AssignmentCard
+              key={assignment.id}
+              token={token}
+              assignment={{ ...assignment, submission: assignment.submission || { status: assignment.status, responseText: assignment.responseText || "" } }}
+              canSubmit
+              onSaved={reload}
+            />
+          ))}
+        </div>
+      ) : (
+        <Empty title="No assessments yet" body="Assignments from your teachers will appear here." />
       )}
     </section>
   );
@@ -610,7 +716,7 @@ export default function App() {
   }, [setOffline, setPromptEvent]);
 
   async function loadRoleData(authToken, profile) {
-    const mergeDash = (incoming) => setDashboard((prev) => ({ ...(prev || {}), ...incoming }));
+    const mergeDash = (incoming) => setDashboard((prev) => normalizeDashboard({ ...(prev || {}), ...(incoming || {}) }, profile));
     if (profile.role === "admin") {
       const results = await Promise.allSettled([
         apiRequest("/admin/overview", { token: authToken }), apiRequest("/admin/users", { token: authToken }),
@@ -650,7 +756,7 @@ export default function App() {
         const profile = await apiRequest("/me", { token });
         if (!active) return;
         setUser(profile);
-        setDashboard((c) => c || createBootstrapDashboard(profile));
+        setDashboard((c) => c ? normalizeDashboard(c, profile) : createBootstrapDashboard(profile));
         try { await loadRoleData(token, profile); } catch (error) {
           if (!active) return;
           if (error?.status === 401) { logout(); setLoginError("Your session expired. Please sign in again."); return; }
@@ -722,16 +828,16 @@ export default function App() {
     if (forbidden) return <ForbiddenView navigate={navigate} />;
     switch (page) {
       case "overview": return <Dashboard user={user} dashboard={dashboard} onNavigate={navigate} loading={sessionLoading && !dashboard?.courses} />;
-      case "my-classes": return <MyClassesView courses={dashboard.courses} navigate={navigate} />;
-      case "class-detail": return <ClassDetailView classId={route.classId} tab={route.tab} courses={dashboard.courses} dashboard={dashboard} navigate={navigate} token={token} user={user} reloadData={reloadData} />;
-      case "grades": return <GradesView grades={normalizeGradeRows(dashboard.grades)} />;
-      case "ai-tutor": return <TutorView token={token} modules={dashboard.contentFolders} user={user} onNavigate={navigate} />;
+      case "my-classes": return <MyClassesView courses={dashboard.courses || []} navigate={navigate} />;
+      case "class-detail": return <ClassDetailView classId={route.classId} tab={route.tab} courses={dashboard.courses || []} dashboard={dashboard} navigate={navigate} token={token} user={user} reloadData={reloadData} />;
+      case "grades": return <GradesView grades={normalizeGradeRows(dashboard.grades || [])} />;
+      case "ai-tutor": return <TutorView token={token} modules={dashboard.contentFolders || []} user={user} onNavigate={navigate} />;
       case "users": return <AdminUsersView token={token} users={adminUsers} reload={reloadData} />;
       case "classes": return <AdminClassesView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
       case "sections": return <AdminSectionsView token={token} users={adminUsers} reload={reloadData} />;
       case "enrollments": return <AdminEnrollmentsView token={token} users={adminUsers} courses={adminCourses} reload={reloadData} />;
       case "departments": return <DepartmentsView token={token} reload={reloadData} />;
-      case "assignments": return <AdminAssignmentsView assignments={adminAssignments} />;
+      case "assignments": return user.role === "student" ? <StudentAssignmentsView token={token} assignments={adminAssignments} reload={reloadData} /> : <AdminAssignmentsView assignments={adminAssignments} />;
       case "reports": return <ReportsView token={token} dashboard={dashboard} />;
       case "system": case "settings": return <SystemView token={token} addToast={addToast} />;
       case "announcements": return user.role === "admin" ? <AdminAnnouncementsView token={token} reload={reloadData} /> : <TeacherAnnouncementsView token={token} courses={adminCourses} reload={reloadData} />;

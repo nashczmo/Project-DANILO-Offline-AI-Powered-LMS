@@ -70,7 +70,8 @@ function aggregateGrades(grades) {
         records: [],
       };
     }
-    bySubject[key].quarters[g.quarter || "Q1"] = g.finalGrade ?? g.score ?? 0;
+    const gradeValue = g.finalGrade ?? g.score ?? 0;
+    bySubject[key].quarters[g.quarter || "Q1"] = gradeValue;
     bySubject[key].records.push(g);
   });
 

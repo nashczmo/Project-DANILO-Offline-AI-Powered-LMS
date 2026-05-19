@@ -1,12 +1,12 @@
 import { create } from "zustand";
 
 export const useAppStore = create((set, get) => ({
-  token: localStorage.getItem("danilo.token") || "",
+  token: typeof localStorage !== "undefined" ? localStorage.getItem("danilo.token") || "" : "",
   user: null,
   dashboard: null,
   isOffline: typeof navigator !== "undefined" ? !navigator.onLine : false,
   mobileMenuOpen: false,
-  sidebarCollapsed: localStorage.getItem("danilo.sidebar.collapsed") === "true",
+  sidebarCollapsed: typeof localStorage !== "undefined" ? localStorage.getItem("danilo.sidebar.collapsed") === "true" : false,
   promptEvent: null,
   toasts: [],
   aiStatus: { ready: false, model: null },
@@ -14,8 +14,10 @@ export const useAppStore = create((set, get) => ({
   notifications: [],
 
   setToken: (token) => {
-    if (token) localStorage.setItem("danilo.token", token);
-    else localStorage.removeItem("danilo.token");
+    if (typeof localStorage !== "undefined") {
+      if (token) localStorage.setItem("danilo.token", token);
+      else localStorage.removeItem("danilo.token");
+    }
     set({ token });
   },
   setUser: (user) => set({ user }),
@@ -24,7 +26,9 @@ export const useAppStore = create((set, get) => ({
   setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
-    localStorage.setItem("danilo.sidebar.collapsed", String(next));
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("danilo.sidebar.collapsed", String(next));
+    }
     set({ sidebarCollapsed: next });
   },
   setPromptEvent: (promptEvent) => set({ promptEvent }),
@@ -45,7 +49,9 @@ export const useAppStore = create((set, get) => ({
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
 
   logout: () => {
-    localStorage.removeItem("danilo.token");
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem("danilo.token");
+    }
     set({ token: "", user: null, dashboard: null, toasts: [], notifications: [] });
   },
 }));

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 
 export function usePath() {
-  const [path, setPath] = useState(() => window.location.pathname);
+  const [path, setPath] = useState(() => (typeof window !== "undefined" ? window.location.pathname : "/"));
   useEffect(() => {
     const onPop = () => setPath(window.location.pathname);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
   const navigate = useCallback((to) => {
+    if (typeof window === "undefined") return;
     if (to !== window.location.pathname) {
       window.history.pushState(null, "", to);
       setPath(to);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../api";
+import { formatDateOnly, formatDateTimeFull } from "../lib/utils";
 import {
   DEPED_SUBJECTS,
   Badge,
@@ -712,7 +713,7 @@ export function AdminEnrollmentsView({ token, users, courses, reload }) {
       <ConfirmDialog
         open={confirmOpen}
         title="Remove Enrollment"
-        message={`Remove ${confirmTarget?.studentName || confirmTarget?.fullName ?? "this learner"} from the subject?`}
+        message={`Remove ${confirmTarget?.studentName ?? confirmTarget?.fullName ?? "this learner"} from the subject?`}
         onConfirm={() => { remove(confirmTarget?.id); setConfirmOpen(false); }}
         onCancel={() => { setConfirmOpen(false); setConfirmTarget(null); }}
         confirmLabel="Remove"
@@ -732,7 +733,7 @@ export function AdminAssignmentsView({ assignments }) {
     { key: "subject", label: "Subject", render: (a) => a.courseTitle || a.subject || "—" },
     { key: "type", label: "Type", render: (a) => <Badge>{a.type || "Assignment"}</Badge> },
     { key: "points", label: "Points", render: (a) => a.points ?? "—" },
-    { key: "dueDate", label: "Due", render: (a) => a.dueDate ? new Date(a.dueDate).toLocaleDateString() : "—" },
+    { key: "dueDate", label: "Due", render: (a) => formatDateOnly(a.dueDate || a.dueAt) },
   ];
 
   return (
@@ -1007,7 +1008,7 @@ export function SystemView({ token, addToast }) {
       const data = await apiRequest("/admin/system", { token });
       setStatus(data);
     } catch (e) {
-      addToast?.(e.message || "Failed to load system status", "error");
+      addToast?.(e.message || "Failed to load system status", "danger");
     } finally {
       setLoading(false);
     }
@@ -1122,7 +1123,7 @@ export function SystemView({ token, addToast }) {
               <tbody className="divide-y divide-danilo-border/30">
                 {logs.map((l, i) => (
                   <tr key={i} className="hover:bg-danilo-bg-secondary/50 transition-colors">
-                    <td className="px-4 py-2 text-danilo-text-secondary whitespace-nowrap">{l.time ? new Date(l.time).toLocaleString() : "—"}</td>
+                    <td className="px-4 py-2 text-danilo-text-secondary whitespace-nowrap">{formatDateTimeFull(l.time)}</td>
                     <td className="px-4 py-2"><Badge tone={l.level === "ERROR" ? "red" : l.level === "WARN" ? "yellow" : "green"}>{l.level}</Badge></td>
                     <td className="px-4 py-2 text-danilo-text">{l.message}</td>
                   </tr>
@@ -1188,7 +1189,7 @@ export function AdminAnnouncementsView({ token, reload }) {
             <div key={item.id} className="dn-card p-4">
               <p className="text-sm font-semibold text-danilo-text">{item.title}</p>
               <p className="text-sm text-danilo-text-secondary mt-1 whitespace-pre-wrap">{item.body}</p>
-              <p className="text-xs text-danilo-text-muted mt-2">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</p>
+              <p className="text-xs text-danilo-text-muted mt-2">{formatDateTimeFull(item.createdAt, "")}</p>
             </div>
           ))
         )}
@@ -1250,7 +1251,7 @@ export function TeacherAnnouncementsView({ token, courses, reload }) {
               <p className="text-sm font-semibold text-danilo-text">{item.title}</p>
               <p className="text-xs text-danilo-text-secondary mb-1">{item.courseTitle || item.courseCode || ""}</p>
               <p className="text-sm text-danilo-text-secondary mt-1 whitespace-pre-wrap">{item.body}</p>
-              <p className="text-xs text-danilo-text-muted mt-2">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</p>
+              <p className="text-xs text-danilo-text-muted mt-2">{formatDateTimeFull(item.createdAt, "")}</p>
             </div>
           ))
         )}

@@ -1,8 +1,12 @@
 const RAW_API_BASE = (import.meta.env.VITE_API_BASE_URL || import.meta.env.API_BASE_URL || "").replace(/\/$/, "");
 
 function normalizePath(path) {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return normalizedPath.startsWith("/api/") ? normalizedPath : `/api${normalizedPath}`;
+  const rawPath = String(path || "/");
+  if (/^https?:\/\//i.test(rawPath)) return rawPath;
+  const [pathname, suffix = ""] = rawPath.split(/([?#].*)/, 2);
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const apiPath = normalizedPath.startsWith("/api/") ? normalizedPath : `/api${normalizedPath}`;
+  return `${apiPath}${suffix}`;
 }
 
 export function apiUrl(path) {
@@ -15,20 +19,27 @@ export function apiUrl(path) {
 
 function buildHeaders(token, extras = {}) {
   return {
-    "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extras
   };
 }
 
-export async function apiRequest(path, { method = "GET", token, body } = {}) {
+async function parseResponse(response) {
+  if (response.status === 204) return null;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return response.json();
+  return response.text();
+}
+
+export async function apiRequest(path, { method = "GET", token, body, signal, headers } = {}) {
+  const hasBody = body !== undefined && body !== null;
   const response = await fetch(apiUrl(path), {
     method,
-    headers: buildHeaders(token),
-    body: body ? JSON.stringify(body) : undefined,
+    headers: buildHeaders(token, hasBody ? { "Content-Type": "application/json", ...headers } : headers),
+    body: hasBody ? JSON.stringify(body) : undefined,
+    signal,
   });
-  const isJson = response.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await response.json() : await response.text();
+  const payload = await parseResponse(response);
   if (!response.ok) {
     const detail = typeof payload === "string" ? payload : payload?.detail || "Request failed";
     const error = new Error(detail);
@@ -45,8 +56,7 @@ export async function apiUpload(path, { token, formData } = {}) {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
-  const isJson = response.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await response.json() : await response.text();
+  const payload = await parseResponse(response);
   if (!response.ok) {
     const detail = typeof payload === "string" ? payload : payload?.detail || "Upload failed";
     const error = new Error(detail);
