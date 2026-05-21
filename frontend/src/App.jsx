@@ -27,7 +27,7 @@ export default function App() {
         return;
       }
       try {
-        const userData = await apiRequest("/auth/me");
+        const userData = await apiRequest("/me");
         if (!active) return;
         setUser(userData);
         
