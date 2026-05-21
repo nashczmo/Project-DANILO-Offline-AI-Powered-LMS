@@ -21,8 +21,8 @@ export default function LoginView({ sessionError }) {
         method: "POST",
         body: { username, password },
       });
-      if (data.token) {
-        setToken(data.token);
+      if (data.accessToken) {
+        setToken(data.accessToken);
       }
     } catch (err) {
       if (err.status === 401) {

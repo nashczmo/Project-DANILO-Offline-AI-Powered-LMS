@@ -1,3 +1,5 @@
+import { useAppStore } from "./store/useAppStore";
+
 const RAW_API_BASE = (import.meta.env.VITE_API_BASE_URL || import.meta.env.API_BASE_URL || "").replace(/\/$/, "");
 
 function normalizePath(path) {
@@ -14,9 +16,10 @@ export function apiUrl(path) {
 }
 
 function buildHeaders(token, extras = {}) {
+  const finalToken = token || useAppStore.getState().token;
   return {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(finalToken ? { Authorization: `Bearer ${finalToken}` } : {}),
     ...extras
   };
 }
@@ -29,7 +32,8 @@ export function clearApiCache() {
 
 export async function apiRequest(path, { method = "GET", token, body, signal, noCache = false } = {}) {
   const isGet = method.toUpperCase() === "GET";
-  const cacheKey = `${token || ""}:${path}`;
+  const finalToken = token || useAppStore.getState().token;
+  const cacheKey = `${finalToken || ""}:${path}`;
 
   if (isGet && !noCache && queryCache.has(cacheKey)) {
     const cached = queryCache.get(cacheKey);
@@ -40,7 +44,7 @@ export async function apiRequest(path, { method = "GET", token, body, signal, no
 
   const response = await fetch(apiUrl(path), {
     method,
-    headers: buildHeaders(token),
+    headers: buildHeaders(finalToken),
     body: body ? JSON.stringify(body) : undefined,
     signal,
   });
@@ -61,9 +65,10 @@ export async function apiRequest(path, { method = "GET", token, body, signal, no
 }
 
 export async function apiUpload(path, { token, formData } = {}) {
+  const finalToken = token || useAppStore.getState().token;
   const response = await fetch(apiUrl(path), {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: finalToken ? { Authorization: `Bearer ${finalToken}` } : {},
     body: formData,
   });
   const isJson = response.headers.get("content-type")?.includes("application/json");
