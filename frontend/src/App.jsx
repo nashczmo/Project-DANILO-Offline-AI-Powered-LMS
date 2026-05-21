@@ -105,8 +105,12 @@ export default function App() {
       />
       {/* Fallback for authenticated users trying to access root or unknown paths */}
       <Route path="*" element={
-        <div className="min-h-screen bg-danilo-bg flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-danilo-primary animate-spin" />
+        <div className="min-h-screen bg-danilo-bg flex flex-col items-center justify-center space-y-4">
+          <h1 className="text-2xl font-bold text-danilo-text">404 - Page Not Found</h1>
+          <p className="text-danilo-text-muted">The page you are looking for does not exist.</p>
+          <button onClick={() => window.history.back()} className="px-4 py-2 bg-danilo-primary text-white rounded shadow hover:bg-danilo-primary-dark">
+            Go Back
+          </button>
         </div>
       } />
     </Routes>

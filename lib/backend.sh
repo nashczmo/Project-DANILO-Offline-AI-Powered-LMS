@@ -6,6 +6,7 @@ write_backend_files() {
   cat > "${APP_ROOT}/backend/requirements.txt" <<'EOF'
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
+slowapi==0.1.9
 sqlalchemy==2.0.40
 alembic==1.14.0
 psycopg[binary]==3.2.6
@@ -650,6 +651,15 @@ class TutorRequest(BaseModel):
     course_id: int | None = None
     session_id: int | None = None
     response_mode: str = "normal"
+
+    @field_validator("question")
+    @classmethod
+    def validate_safety(cls, value: str) -> str:
+        unsafe_keywords = ["ignore previous", "bypass", "system prompt", "jailbreak", "nsfw"]
+        val_lower = value.lower()
+        if any(kw in val_lower for kw in unsafe_keywords):
+            raise ValueError("Your question triggered our safety filters. Please rephrase.")
+        return value
 
     @field_validator("response_mode")
     @classmethod
