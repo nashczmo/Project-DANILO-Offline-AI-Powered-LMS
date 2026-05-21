@@ -1593,24 +1593,40 @@ def normalize_local_account(value: str) -> str:
 def generated_username_from_name(full_name: str, role: str = "student", section_name: str | None = None) -> str:
     parts = full_name.replace(".", " ").split()
     parts = [p.strip() for p in parts if p.strip()]
-    if len(parts) < 2:
-        raise HTTPException(status_code=400, detail="Full name must include at least first and last name")
-    initials = "".join(p[0].upper() for p in parts if p)
-    if role == "teacher":
-        prefix = "FAC"
-        return f"{prefix}-{initials}"
-    elif role == "admin":
-        prefix = "ADM"
-        return f"{prefix}-{initials}"
-    section_prefix = normalize_local_account(section_name or "").upper() if section_name else "LRN"
-    return f"{section_prefix}-{initials}"
+    if not parts:
+        base = "user"
+    elif len(parts) == 1:
+        base = parts[0].lower()
+    elif len(parts) == 2:
+        base = (parts[0][0] + parts[1]).lower()
+    else:
+        first_initial = parts[0][0].lower()
+        middle_initial = parts[-2][0].lower()
+        last_name = parts[-1].lower()
+        base = first_initial + middle_initial + last_name
+        
+    base = "".join(c for c in base if c.isalnum())
+    
+    if role == "student":
+        domain = "student.danilo.edu"
+    else:
+        domain = "danilo.edu"
+        
+    return f"{base}@{domain}"
 
 
 def unique_local_username(db: Session, base_username: str, user_id: int | None = None) -> str:
     import string
-    candidate = base_username
-    for suffix in [""] + list(string.ascii_lowercase):
-        attempt = f"{candidate}{suffix}" if suffix else candidate
+    
+    if "@" in base_username:
+        prefix, domain = base_username.split("@", 1)
+        suffix_domain = f"@{domain}"
+    else:
+        prefix = base_username
+        suffix_domain = ""
+
+    for suffix in [""] + list(string.ascii_lowercase) + [str(i) for i in range(1, 100)]:
+        attempt = f"{prefix}{suffix}{suffix_domain}"
         stmt = select(User).where(func.lower(User.username) == attempt.lower())
         if user_id:
             stmt = stmt.where(User.id != user_id)
@@ -3122,8 +3138,8 @@ def admin_create_user(payload: dict = Body(default={}), current_user: User = Dep
         education_level, grade_level, strand = validate_grade_path(education_level, grade_level, strand)
     section_name_val = clean_text(payload.get("sectionName") or payload.get("section_name"), required=False, max_length=120)
     username_override = clean_text(payload.get("username"), required=False, max_length=120)
-    username = username_override.upper() if username_override else unique_local_username(db, generated_username_from_name(full_name, role, section_name_val))
-    email = clean_text(payload.get("email"), required=False, max_length=255) or f"{username}@danilo.local"
+    username = username_override.lower() if username_override else unique_local_username(db, generated_username_from_name(full_name, role, section_name_val))
+    email = clean_text(payload.get("email"), required=False, max_length=255) or username
     if db.scalar(select(User).where(or_(func.lower(User.username) == username.lower(), func.lower(User.email) == email.lower()))):
         raise HTTPException(status_code=409, detail="Username or email already exists")
     password = clean_text(payload.get("password") or "danilo123", max_length=255)
