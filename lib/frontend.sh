@@ -23,11 +23,11 @@ write_frontend_files() {
 
   local font_dir="${APP_ROOT}/frontend/public/fonts"
   local source_font_dir="${SCRIPT_DIR}/assets/fonts"
-  local inter_files="Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2"
+  local nunito_files="Nunito-Regular.woff2 Nunito-Medium.woff2 Nunito-SemiBold.woff2 Nunito-Bold.woff2 Nunito-ExtraBold.woff2"
   local missing_fonts=()
   local font_file=""
 
-  for font_file in ${inter_files}; do
+  for font_file in ${nunito_files}; do
     if [[ -f "${source_font_dir}/${font_file}" ]]; then
       install -m 0644 "${source_font_dir}/${font_file}" "${font_dir}/${font_file}"
     else
@@ -36,7 +36,7 @@ write_frontend_files() {
   done
 
   if (( ${#missing_fonts[@]} > 0 )); then
-    printf 'Missing bundled Inter font files: %s\n' "${missing_fonts[*]}"
+    printf 'Missing bundled Nunito font files: %s\n' "${missing_fonts[*]}"
     printf 'Expected local font directory: %s\n' "${source_font_dir}"
     exit 1
   fi
@@ -119,15 +119,15 @@ validate_frontend_dist() {
     return 1
   fi
 
-  for font_file in Inter-Regular.woff2 Inter-Medium.woff2 Inter-SemiBold.woff2 Inter-Bold.woff2 Inter-ExtraBold.woff2; do
+  for font_file in Nunito-Regular.woff2 Nunito-Medium.woff2 Nunito-SemiBold.woff2 Nunito-Bold.woff2 Nunito-ExtraBold.woff2; do
     if [[ ! -s "${APP_ROOT}/frontend/dist/fonts/${font_file}" ]]; then
-      echo "Frontend dist is missing bundled Inter font: ${font_file}"
+      echo "Frontend dist is missing bundled Nunito font: ${font_file}"
       return 1
     fi
   done
 
-  if ! grep -Fq '"/fonts/Inter-Regular.woff2"' "${service_worker}"; then
-    echo "Frontend service worker does not precache Inter fonts."
+  if ! grep -Fq '"/fonts/Nunito-Regular.woff2"' "${service_worker}"; then
+    echo "Frontend service worker does not precache Nunito fonts."
     return 1
   fi
 
@@ -147,7 +147,7 @@ build_frontend_static() {
   run_step_command "Installing DANILO frontend dependencies" npm --prefix "${APP_ROOT}/frontend" install --no-audit --no-fund
   run_step_command "Building DANILO frontend static assets" npm --prefix "${APP_ROOT}/frontend" run build
   run_step_command "Setting readable permissions for gateway-served frontend assets" chmod -R a+rX "${APP_ROOT}/frontend/dist"
-  run_step_command "Setting local Inter font permissions" chmod -R a+rX "${APP_ROOT}/frontend/public/fonts"
+  run_step_command "Setting local Nunito font permissions" chmod -R a+rX "${APP_ROOT}/frontend/public/fonts"
   validate_frontend_dist
 }
 

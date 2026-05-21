@@ -2,15 +2,15 @@ const CACHE_NAME = "danilo-static-v6";
 const STATIC_FILES = [
   "/", "/offline.html", "/manifest.webmanifest",
   "/icons/icon-192.svg", "/icons/icon-512.svg",
-  "/fonts/Inter-Regular.woff2", "/fonts/Inter-Medium.woff2",
-  "/fonts/Inter-SemiBold.woff2", "/fonts/Inter-Bold.woff2",
-  "/fonts/Inter-ExtraBold.woff2",
+  "/fonts/Nunito-Regular.woff2", "/fonts/Nunito-Medium.woff2",
+  "/fonts/Nunito-SemiBold.woff2", "/fonts/Nunito-Bold.woff2",
+  "/fonts/Nunito-ExtraBold.woff2",
 ];
 
 const OFFLINE_HTML = `<!doctype html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>DANILO — Offline</title>
-<style>body{font-family:Inter,system-ui,sans-serif;background:#0F172A;color:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100dvh;margin:0}main{text-align:center;padding:2rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:0.5rem}p{font-size:.875rem;color:#CBD5E1;margin:0}</style>
+<style>body{font-family:Nunito,system-ui,sans-serif;background:#0F172A;color:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100dvh;margin:0}main{text-align:center;padding:2rem}h1{font-size:1.25rem;font-weight:600;margin-bottom:0.5rem}p{font-size:.875rem;color:#CBD5E1;margin:0}</style>
 </head><body><main><h1>DANILO is offline</h1><p>The local portal could not be reached. Refresh after the gateway is back online.</p></main></body></html>`;
 
 self.addEventListener("install", (event) => {
