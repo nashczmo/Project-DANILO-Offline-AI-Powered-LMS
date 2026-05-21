@@ -3530,6 +3530,34 @@ def admin_grades_report(current_user: User = Depends(get_current_user), db: Sess
     return Response(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=danilo-grades.csv"})
 
 
+@admin_router.get("/admin/reports/ai-analytics")
+def admin_ai_analytics_report(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_role(current_user, "admin")
+    total_sessions = db.query(ChatSession).count()
+    total_messages = db.query(ChatMessage).count()
+    active_users = db.query(StudentAIProfile.student_id).distinct().count()
+    
+    # Get top users
+    top_users = db.execute(
+        select(User.full_name, func.count(ChatMessage.id).label('msg_count'))
+        .join(ChatSession, ChatSession.student_id == User.id)
+        .join(ChatMessage, ChatMessage.session_id == ChatSession.id)
+        .where(ChatMessage.role == 'user')
+        .group_by(User.full_name)
+        .order_by(func.count(ChatMessage.id).desc())
+        .limit(5)
+    ).all()
+    
+    return {
+        "ok": True,
+        "metrics": {
+            "totalSessions": total_sessions,
+            "totalMessages": total_messages,
+            "activeUsers": active_users
+        },
+        "topUsers": [{"name": name, "messages": count} for name, count in top_users]
+    }
+
 @teacher_router.get("/teacher/dashboard")
 def teacher_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "teacher")
@@ -3731,6 +3759,51 @@ def teacher_delete_assignment(assignment_id: int, current_user: User = Depends(g
     db.commit()
     return {"ok": True}
 
+
+@teacher_router.post("/teacher/courses/{course_id}/quizzes/generate")
+async def teacher_generate_quiz(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    course = ensure_teacher_course(db, current_user, course_id)
+    topic = clean_text(payload.get("topic"))
+    if not topic:
+        raise HTTPException(status_code=400, detail="Topic is required")
+        
+    prompt = f"""You are an expert DepEd teacher. Generate a 5-item multiple-choice quiz based on the following topic.
+Each question must have exactly 4 options.
+Output the quiz in strict JSON format.
+
+Topic: {topic}
+Subject: {course.subject}
+Grade Level: {course.grade_level}
+
+JSON Schema:
+{{
+  "title": "Generated Quiz",
+  "questions": [
+    {{
+      "question": "Question text here?",
+      "choices": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+      "answerKey": "A) Option 1"
+    }}
+  ]
+}}
+
+Return ONLY valid JSON. Do not include markdown formatting or explanations.
+"""
+    result, metrics = await ask_ollama(prompt, mode="tutor", memory=None)
+    
+    try:
+        import re
+        json_str = result
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0]
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0]
+            
+        data = json.loads(json_str.strip())
+        return {"ok": True, "quiz": data, "metrics": metrics}
+    except Exception as e:
+        ai_logger.error("Failed to parse quiz JSON: %s. Response was: %s", str(e), result)
+        raise HTTPException(status_code=500, detail="AI failed to generate a valid quiz format. Please try again.")
 
 @teacher_router.post("/teacher/courses/{course_id}/quizzes")
 def teacher_create_quiz(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
