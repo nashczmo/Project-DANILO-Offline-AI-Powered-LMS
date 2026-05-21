@@ -112,7 +112,6 @@ export default function TeacherClasses() {
           </Card>
         </div>
       </div>
-      </div>
 
       {showQuizModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
