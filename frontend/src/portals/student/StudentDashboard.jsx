@@ -5,7 +5,17 @@ import { FileText, ClipboardList, TrendingUp, Sparkles } from "lucide-react";
 export default function StudentDashboard() {
   const dashboard = useAppStore((s) => s.dashboard);
   const loading = !dashboard;
-  const data = dashboard || { performanceTasks: [], writtenWorks: [], streak: 0, insights: "" };
+  const data = dashboard || {};
+
+  const stream = data.stream || [];
+  const grades = data.grades || [];
+  const aiProfile = data.aiProfile || {};
+  
+  const performanceTasks = stream.filter(s => s.postType === "assignment").slice(0, 5);
+  const recentGrades = grades.slice(0, 5);
+  const insights = aiProfile.personality_preference 
+    ? `Your AI tutor is configured for a ${aiProfile.personality_preference} learning style.` 
+    : "Keep up the good work! We'll provide more insights as you interact with the platform.";
 
   return (
     <div className="space-y-6">
@@ -26,8 +36,8 @@ export default function StudentDashboard() {
             <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-3">
               <TrendingUp className="w-6 h-6" />
             </div>
-            <h3 className="text-3xl font-bold text-danilo-text">{data.streak || 0} Days</h3>
-            <p className="text-sm text-danilo-text-secondary mt-1">Study Streak</p>
+            <h3 className="text-3xl font-bold text-danilo-text">Active</h3>
+            <p className="text-sm text-danilo-text-secondary mt-1">Study Status</p>
           </Card>
           
           <Card className="md:col-span-2 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
@@ -37,7 +47,7 @@ export default function StudentDashboard() {
               </div>
               <div>
                 <h3 className="font-bold text-blue-900 mb-1">AI Insights</h3>
-                <p className="text-sm text-blue-800 leading-relaxed">{data.insights || "Keep up the good work! We'll provide more insights as you interact with the platform."}</p>
+                <p className="text-sm text-blue-800 leading-relaxed">{insights}</p>
               </div>
             </div>
           </Card>
@@ -55,16 +65,16 @@ export default function StudentDashboard() {
               <Skeleton className="h-16" />
               <Skeleton className="h-16" />
             </div>
-          ) : data.performanceTasks && data.performanceTasks.length > 0 ? (
+          ) : performanceTasks.length > 0 ? (
             <div className="space-y-3">
-              {data.performanceTasks.map(task => (
+              {performanceTasks.map(task => (
                 <div key={task.id} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
                   <div>
                     <h4 className="font-medium text-danilo-text">{task.title}</h4>
-                    <p className="text-xs text-danilo-text-secondary">{task.subject}</p>
+                    <p className="text-xs text-danilo-text-secondary">{task.courseTitle}</p>
                   </div>
                   <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-1 rounded-md">
-                    Due {task.due}
+                    Pending
                   </span>
                 </div>
               ))}
@@ -88,16 +98,16 @@ export default function StudentDashboard() {
               <Skeleton className="h-16" />
               <Skeleton className="h-16" />
             </div>
-          ) : data.writtenWorks && data.writtenWorks.length > 0 ? (
+          ) : recentGrades.length > 0 ? (
             <div className="space-y-3">
-              {data.writtenWorks.map(work => (
-                <div key={work.id} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
+              {recentGrades.map(work => (
+                <div key={work.id || Math.random()} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
                   <div>
-                    <h4 className="font-medium text-danilo-text">{work.title}</h4>
-                    <p className="text-xs text-danilo-text-secondary">{work.subject}</p>
+                    <h4 className="font-medium text-danilo-text">{work.component || "Assessment"}</h4>
+                    <p className="text-xs text-danilo-text-secondary">{work.courseCode}</p>
                   </div>
                   <span className="text-sm font-bold text-danilo-primary">
-                    {work.score}
+                    {work.score} / {work.maxScore}
                   </span>
                 </div>
               ))}

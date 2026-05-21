@@ -13,7 +13,7 @@ export default function AdminReports() {
       setLoading(true);
       try {
         const [data, ai] = await Promise.all([
-          apiRequest("/admin/reports").catch(() => null),
+          apiRequest("/admin/overview").catch(() => null),
           apiRequest("/admin/reports/ai-analytics").catch(() => null)
         ]);
         setReportsData(data);

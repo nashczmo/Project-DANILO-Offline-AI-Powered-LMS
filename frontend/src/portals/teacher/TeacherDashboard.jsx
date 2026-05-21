@@ -21,7 +21,9 @@ export default function TeacherDashboard() {
   }
 
   const courses = dashboard.courses || [];
-  const assignments = dashboard.assignments || [];
+  const stream = dashboard.stream || [];
+  const assignments = stream.filter(s => s.postType === "assignment");
+  const avgAttendance = dashboard.avgAttendance || "N/A";
 
   if (courses.length === 0) {
     return (
@@ -68,7 +70,7 @@ export default function TeacherDashboard() {
             </div>
             <h3 className="text-sm font-medium text-danilo-text-secondary">Avg. Attendance</h3>
           </div>
-          <p className="text-3xl font-bold text-danilo-text mt-auto">{dashboard.avgAttendance || 0}%</p>
+          <p className="text-3xl font-bold text-danilo-text mt-auto">{avgAttendance}</p>
         </Card>
       </div>
 
@@ -80,10 +82,10 @@ export default function TeacherDashboard() {
               <div key={assignment.id || Math.random()} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
                 <div>
                   <h4 className="font-medium text-danilo-text">{assignment.title || 'Untitled Assignment'}</h4>
-                  <p className="text-xs text-danilo-text-secondary">{assignment.courseName || 'Course'}</p>
+                  <p className="text-xs text-danilo-text-secondary">{assignment.courseTitle || 'Course'}</p>
                 </div>
                 <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-1 rounded-md">
-                  Due {assignment.dueDate || 'N/A'}
+                  Pending Review
                 </span>
               </div>
             ))}
