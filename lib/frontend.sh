@@ -55,25 +55,42 @@ validate_frontend_files() {
   validate_generated_file "${APP_ROOT}/frontend/src/main.jsx" "frontend main.jsx"
   validate_generated_file "${APP_ROOT}/frontend/src/index.css" "frontend design system CSS"
   validate_generated_file "${APP_ROOT}/frontend/src/api.js" "frontend API client"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/shared.jsx" "frontend shared components"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/AdminPages.jsx" "frontend admin pages"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/InstallBanner.jsx" "frontend install banner"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/StreamView.jsx" "frontend stream view"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/ContentView.jsx" "frontend content view"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/GradesView.jsx" "frontend grades view"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/TutorView.jsx" "frontend tutor view"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/ConfirmDialog.jsx" "frontend confirm dialog"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/MarkdownRenderer.jsx" "frontend markdown renderer"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/Skeleton.jsx" "frontend loading skeletons"
-  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/ToastContainer.jsx" "frontend toast container"
+
+  # Auth components
+  validate_generated_file "${APP_ROOT}/frontend/src/components/auth/LoginView.jsx" "frontend login view"
+  validate_generated_file "${APP_ROOT}/frontend/src/components/auth/ProtectedRoute.jsx" "frontend protected route"
+
+  # UI components
+  validate_generated_file "${APP_ROOT}/frontend/src/components/ui/index.jsx" "frontend UI package"
+
+  # Admin Portal components
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminDashboard.jsx" "frontend admin dashboard"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminDirectory.jsx" "frontend admin directory"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminEnrollments.jsx" "frontend admin enrollments"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminLayout.jsx" "frontend admin layout"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminPortal.jsx" "frontend admin portal"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminReports.jsx" "frontend admin reports"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/admin/AdminSystem.jsx" "frontend admin system"
+
+  # Student Portal components
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/student/StudentClasses.jsx" "frontend student classes"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/student/StudentDashboard.jsx" "frontend student dashboard"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/student/StudentGrades.jsx" "frontend student grades"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/student/StudentLayout.jsx" "frontend student layout"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/student/StudentPortal.jsx" "frontend student portal"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/student/StudentTutor.jsx" "frontend student tutor"
+
+  # Teacher Portal components
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/teacher/TeacherAnnouncements.jsx" "frontend teacher announcements"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/teacher/TeacherClasses.jsx" "frontend teacher classes"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/teacher/TeacherDashboard.jsx" "frontend teacher dashboard"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/teacher/TeacherGrades.jsx" "frontend teacher grades"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/teacher/TeacherLayout.jsx" "frontend teacher layout"
+  validate_generated_file "${APP_ROOT}/frontend/src/portals/teacher/TeacherPortal.jsx" "frontend teacher portal"
+
+  # Common infrastructure
   validate_generated_file "${APP_ROOT}/frontend/src/hooks/usePath.js" "frontend path hook"
-  validate_generated_file "${APP_ROOT}/frontend/src/layout/Sidebar.jsx" "frontend sidebar"
-  validate_generated_file "${APP_ROOT}/frontend/src/layout/TopBar.jsx" "frontend top bar"
-  validate_generated_file "${APP_ROOT}/frontend/src/layout/MobileDrawer.jsx" "frontend mobile drawer"
-  validate_generated_file "${APP_ROOT}/frontend/src/layout/MobileNav.jsx" "frontend mobile nav"
   validate_generated_file "${APP_ROOT}/frontend/src/lib/utils.js" "frontend utilities"
-  validate_generated_file "${APP_ROOT}/frontend/src/pages/Dashboard.jsx" "frontend dashboard"
-  validate_generated_file "${APP_ROOT}/frontend/src/pages/LoginView.jsx" "frontend login page"
   validate_generated_file "${APP_ROOT}/frontend/src/store/useAppStore.js" "frontend app store"
 }
 
