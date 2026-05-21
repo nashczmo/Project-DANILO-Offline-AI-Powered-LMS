@@ -11,7 +11,7 @@ export default function TeacherClasses() {
     <div className="space-y-6">
       <PageHeader 
         title="My Classes" 
-        description="Manage your assigned courses and materials." 
+        description="Manage your assigned instructional courses and pedagogical materials." 
         action={<Button>Create Class</Button>}
       />
 
@@ -26,7 +26,7 @@ export default function TeacherClasses() {
             <EmptyState 
               icon={BookOpen} 
               title="No Classes Yet" 
-              description="You have not been assigned to any classes." 
+              description="You have not been assigned to any instructional classes." 
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

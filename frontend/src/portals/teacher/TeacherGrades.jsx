@@ -11,7 +11,7 @@ export default function TeacherGrades() {
     <div className="space-y-6">
       <PageHeader 
         title="Grades & Assessments" 
-        description="Manage gradebooks and student performance." 
+        description="Manage academic gradebooks and evaluate student performance." 
         action={
           <Button variant="secondary" className="gap-2" disabled={loading || courses.length === 0}>
             <Download className="w-4 h-4" />
@@ -31,13 +31,13 @@ export default function TeacherGrades() {
           <EmptyState 
             icon={BookOpen} 
             title="No Classes Yet" 
-            description="You need to have classes assigned before you can manage grades."
+            description="Academic classes must be assigned prior to managing gradebooks."
           />
         ) : (
           <EmptyState 
             icon={FileSpreadsheet} 
             title="Gradebook is Empty" 
-            description="Select a class to start entering grades or import a grading sheet."
+            description="Select an academic class to input grades, or import an official grading sheet."
             action={<Button className="mt-4">Import Grades</Button>}
           />
         )}

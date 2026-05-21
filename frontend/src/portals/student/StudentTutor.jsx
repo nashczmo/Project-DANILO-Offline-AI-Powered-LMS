@@ -102,7 +102,7 @@ export default function StudentTutor() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader 
         title="AI Tutor" 
-        description="Ask questions, get explanations, and practice your lessons."
+        description="Engage in academic inquiry, request detailed explanations, and practice course materials."
       />
 
       <Card className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 rounded-2xl">

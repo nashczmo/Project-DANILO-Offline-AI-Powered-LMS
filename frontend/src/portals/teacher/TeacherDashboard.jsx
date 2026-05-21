@@ -9,7 +9,7 @@ export default function TeacherDashboard() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Overview" description="Welcome back to your dashboard." />
+        <PageHeader title="Overview" description="Welcome to the faculty portal. Your academic overview is presented below." />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
@@ -26,11 +26,11 @@ export default function TeacherDashboard() {
   if (courses.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Overview" description="Welcome back to your dashboard." />
+        <PageHeader title="Overview" description="Welcome to the faculty portal. Your academic overview is presented below." />
         <EmptyState 
           icon={Activity} 
           title="No Data Available" 
-          description="It looks like you haven't been assigned any sections yet." 
+          description="You have not been assigned to any instructional sections." 
         />
       </div>
     );
@@ -38,7 +38,7 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Overview" description="Here's what's happening in your classes today." />
+      <PageHeader title="Overview" description="A summary of current academic activities is presented below." />
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="flex flex-col">
@@ -92,7 +92,7 @@ export default function TeacherDashboard() {
           <EmptyState 
             icon={Activity} 
             title="No Recent Activity" 
-            description="Your latest class activities and student submissions will appear here."
+            description="Recent academic activities and student submissions will be displayed here."
           />
         )}
       </Card>

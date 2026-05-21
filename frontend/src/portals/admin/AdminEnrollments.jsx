@@ -27,7 +27,7 @@ export default function AdminEnrollments() {
     <div className="space-y-6">
       <PageHeader 
         title="Batch Enrollments" 
-        description="Upload CSV files to batch enroll users into courses and sections."
+        description="Upload CSV files to batch enroll users into academic courses and sections."
       />
 
       <Card className="max-w-3xl mx-auto">
@@ -57,7 +57,7 @@ export default function AdminEnrollments() {
             <EmptyState 
               icon={FileSpreadsheet}
               title="File Ready for Processing"
-              description={`You have selected ${file.name}. Click process to begin batch enrollment.`}
+              description={`You have selected ${file.name}. Click process to initiate batch enrollment.`}
               action={
                 <div className="flex gap-4">
                   <Button variant="ghost" onClick={() => setFile(null)}>Cancel</Button>
@@ -74,7 +74,7 @@ export default function AdminEnrollments() {
         <EmptyState 
           icon={Users}
           title="No recent enrollments"
-          description="Batch enrollment history will appear here once processed."
+          description="Batch enrollment history will be documented here upon completion."
         />
       </div>
     </div>

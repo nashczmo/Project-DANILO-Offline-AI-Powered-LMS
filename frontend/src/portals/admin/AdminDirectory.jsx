@@ -45,7 +45,7 @@ export default function AdminDirectory() {
     <div className="space-y-6">
       <PageHeader 
         title="Directory" 
-        description="Manage users, classes, sections, and departments."
+        description="Administrate users, academic classes, sections, and departmental records."
         action={<Button variant="primary">Add New</Button>}
       />
 
@@ -95,7 +95,7 @@ export default function AdminDirectory() {
             <EmptyState 
               icon={tabs.find(t => t.id === activeTab).icon}
               title={`No ${activeTab} found`}
-              description={`There are currently no ${activeTab} in the system. Add some to get started.`}
+              description={`There are currently no ${activeTab} registered in the system. Please add initial data to proceed.`}
               action={<Button variant="primary">Add {activeTab.slice(0, -1)}</Button>}
             />
           )}

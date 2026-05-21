@@ -11,7 +11,7 @@ export default function StudentDashboard() {
     <div className="space-y-6">
       <PageHeader 
         title="My Overview" 
-        description="Here is your summary of upcoming DepEd requirements and performance."
+        description="A summary of your upcoming academic requirements and performance."
       />
 
       {loading ? (
@@ -73,7 +73,7 @@ export default function StudentDashboard() {
             <EmptyState 
               icon={ClipboardList} 
               title="No pending tasks" 
-              description="You have caught up with all your performance tasks!"
+              description="All pending performance tasks have been completed."
             />
           )}
         </Card>
@@ -106,7 +106,7 @@ export default function StudentDashboard() {
             <EmptyState 
               icon={FileText} 
               title="No written works" 
-              description="No recent written works recorded."
+              description="No recent written works have been recorded."
             />
           )}
         </Card>

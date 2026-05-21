@@ -28,7 +28,7 @@ export default function AdminSystem() {
     <div className="space-y-6">
       <PageHeader 
         title="System & DevOps" 
-        description="Monitor Docker containers, Ollama limits, and hardware utilization."
+        description="Monitor infrastructure parameters, server limits, and hardware utilization."
         action={<Button variant="primary">Restart Services</Button>}
       />
 
@@ -44,7 +44,7 @@ export default function AdminSystem() {
             <EmptyState
               icon={Server}
               title="No System Data"
-              description="Could not load system metrics."
+              description="System metrics could not be retrieved. Please verify the server status."
             />
           </div>
         ) : (

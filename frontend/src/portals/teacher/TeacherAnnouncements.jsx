@@ -6,7 +6,7 @@ export default function TeacherAnnouncements() {
     <div className="space-y-6">
       <PageHeader 
         title="Announcements" 
-        description="Broadcast messages to your classes." 
+        description="Broadcast official announcements to your instructional classes." 
         action={
           <Button className="gap-2">
             <Plus className="w-4 h-4" />
@@ -19,7 +19,7 @@ export default function TeacherAnnouncements() {
         <EmptyState 
           icon={Megaphone} 
           title="No Announcements" 
-          description="You haven't posted any announcements yet."
+          description="No official announcements have been posted yet."
           action={<Button variant="secondary" className="mt-4">Create your first announcement</Button>}
         />
       </Card>

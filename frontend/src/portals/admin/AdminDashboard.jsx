@@ -27,8 +27,8 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="Overview" 
-        description="System operations and high-level metrics." 
+        title="System Overview" 
+        description="System operations and high-level performance metrics." 
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -44,7 +44,7 @@ export default function AdminDashboard() {
             <EmptyState 
               icon={Activity}
               title="No Overview Data"
-              description="Could not load system overview data."
+              description="System overview data could not be retrieved. Please verify network connectivity."
             />
           </div>
         ) : (

@@ -28,7 +28,7 @@ export default function AdminReports() {
     <div className="space-y-6">
       <PageHeader 
         title="Institutional Reports" 
-        description="Analytics and insights across all departments and courses."
+        description="Institutional analytics and insights across all departments and courses."
         action={<Button variant="secondary">Export Report</Button>}
       />
 
@@ -44,7 +44,7 @@ export default function AdminReports() {
             <EmptyState
               icon={BarChart3}
               title="No Reports Data"
-              description="Could not load reports."
+              description="Analytical reports could not be generated. Please try reloading the page."
             />
           </div>
         ) : (
@@ -98,7 +98,7 @@ export default function AdminReports() {
               <EmptyState 
                 icon={BarChart3}
                 title="Insufficient Data"
-                description="Not enough historical data to generate enrollment trends. Check back next semester."
+                description="Insufficient historical data to calculate enrollment trends. Please check again next semester."
               />
             )}
           </div>
@@ -113,7 +113,7 @@ export default function AdminReports() {
               <EmptyState 
                 icon={BarChart3}
                 title="Insufficient Data"
-                description="Not enough assessment data to compare department performance."
+                description="Insufficient assessment data to compare departmental performance."
               />
             )}
           </div>

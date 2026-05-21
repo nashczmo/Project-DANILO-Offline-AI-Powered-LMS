@@ -33,7 +33,7 @@ export default function StudentGrades() {
     <div className="space-y-6">
       <PageHeader 
         title="Grades & Assessments" 
-        description="Track your performance across Written Works, Performance Tasks, and Quarterly Assessments."
+        description="Track your academic performance across Written Works, Performance Tasks, and Quarterly Assessments."
       />
 
       <Card>

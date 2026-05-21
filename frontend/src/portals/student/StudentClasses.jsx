@@ -11,7 +11,7 @@ export default function StudentClasses() {
     <div className="space-y-6">
       <PageHeader 
         title="My Classes" 
-        description="View your enrolled subjects and MELCs progression."
+        description="Review your enrolled subjects and monitor your MELCs progression."
       />
 
       {loading ? (
@@ -68,7 +68,7 @@ export default function StudentClasses() {
         <EmptyState 
           icon={BookOpen} 
           title="No classes yet" 
-          description="You are not enrolled in any classes at the moment."
+          description="You are not currently enrolled in any academic courses. Please consult your academic adviser."
         />
       )}
     </div>
