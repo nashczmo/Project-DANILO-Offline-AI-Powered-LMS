@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import { PageHeader, Card, Button, Skeleton, EmptyState } from "../../components/ui";
 import { BookOpen, FileText, Sparkles, Upload, FileSignature, X, Loader2 } from "lucide-react";
-import { apiRequest } from "../../api.js";
-
+import { useRef } from "react";
+import { apiRequest, apiUpload } from "../../api.js";
 export default function TeacherClasses() {
   const dashboard = useAppStore((s) => s.dashboard);
   const loading = !dashboard;
@@ -14,6 +14,40 @@ export default function TeacherClasses() {
   const [selectedCourse, setSelectedCourse] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuiz, setGeneratedQuiz] = useState(null);
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const [uploadAction, setUploadAction] = useState("summary");
+  const [generatedDocResult, setGeneratedDocResult] = useState(null);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!selectedCourse) {
+      alert("Please select a target class first by clicking 'Generate Quiz from Notes' to pick a class, or select a class.");
+      return;
+    }
+    
+    setIsUploading(true);
+    setGeneratedDocResult(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("action", uploadAction);
+    
+    try {
+      const data = await apiUpload(`/teacher/courses/${selectedCourse}/parse-document`, { formData });
+      if (data.ok) {
+        setGeneratedDocResult(data.result);
+        setShowQuizModal(true); // Reuse modal to show result
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to parse document: " + err.message);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleGenerateQuiz = async () => {
     if (!selectedCourse || !quizTopic) return;
@@ -40,7 +74,6 @@ export default function TeacherClasses() {
       <PageHeader 
         title="My Classes" 
         description="Manage your assigned instructional courses and pedagogical materials." 
-        action={<Button>Create Class</Button>}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -62,7 +95,7 @@ export default function TeacherClasses() {
                 <Card key={cls.id || Math.random()} className="hover:shadow-md transition-shadow cursor-pointer">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="text-lg font-bold text-danilo-text">{cls.name || cls.subject || 'Untitled Class'}</h3>
+                      <h3 className="dn-title">{cls.name || cls.subject || 'Untitled Class'}</h3>
                       <p className="text-sm text-danilo-text-secondary">{cls.code || 'NO CODE'}</p>
                     </div>
                     <span className="px-2 py-1 bg-danilo-bg-secondary text-xs font-medium rounded-md text-danilo-text-secondary">
@@ -85,28 +118,59 @@ export default function TeacherClasses() {
           <Card className="bg-gradient-to-br from-danilo-primary/5 to-purple-500/5 border-danilo-primary/20 sticky top-6">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-danilo-primary" />
-              <h3 className="text-lg font-bold text-danilo-text">Teacher AI Tools</h3>
+              <h3 className="dn-title">Teacher AI Tools</h3>
             </div>
             <p className="text-sm text-danilo-text-secondary mb-6">
               Generate lesson materials, quizzes, and summaries instantly from your PDFs.
             </p>
             
             <div className="space-y-3">
-              <Button variant="secondary" className="w-full justify-start gap-3 bg-white hover:bg-danilo-bg-secondary">
-                <Upload className="w-4 h-4 text-blue-500" />
-                Upload PDF for Summary
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                accept=".pdf,.docx,.txt" 
+                className="hidden" 
+              />
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start gap-3 bg-white hover:bg-danilo-bg-secondary"
+                disabled={isUploading}
+                onClick={() => {
+                  if (!classes.length) return alert("You have no classes to upload materials to.");
+                  if (!selectedCourse) setSelectedCourse(classes[0].id);
+                  setUploadAction("summary");
+                  fileInputRef.current?.click();
+                }}
+              >
+                {isUploading && uploadAction === "summary" ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" /> : <Upload className="w-4 h-4 text-blue-500" />}
+                {isUploading && uploadAction === "summary" ? "Analyzing Document..." : "Upload PDF for Summary"}
               </Button>
               <Button 
                 variant="secondary" 
                 className="w-full justify-start gap-3 bg-white hover:bg-danilo-bg-secondary"
-                onClick={() => setShowQuizModal(true)}
+                onClick={() => {
+                  setGeneratedDocResult(null);
+                  setGeneratedQuiz(null);
+                  setShowQuizModal(true);
+                }}
               >
                 <FileSignature className="w-4 h-4 text-orange-500" />
                 Generate Quiz from Notes
               </Button>
-              <Button variant="secondary" className="w-full justify-start gap-3 bg-white hover:bg-danilo-bg-secondary">
-                <FileText className="w-4 h-4 text-green-500" />
-                Draft Lesson Plan
+              <Button 
+                variant="secondary" 
+                className="w-full justify-start gap-3 bg-white hover:bg-danilo-bg-secondary"
+                disabled={isUploading}
+                onClick={() => {
+                  if (!classes.length) return alert("You have no classes to upload materials to.");
+                  if (!selectedCourse) setSelectedCourse(classes[0].id);
+                  setUploadAction("lesson_plan");
+                  fileInputRef.current?.click();
+                }}
+              >
+                {isUploading && uploadAction === "lesson_plan" ? <Loader2 className="w-4 h-4 animate-spin text-green-500" /> : <FileText className="w-4 h-4 text-green-500" />}
+                {isUploading && uploadAction === "lesson_plan" ? "Drafting Plan..." : "Draft Lesson Plan from PDF"}
               </Button>
             </div>
           </Card>
@@ -117,7 +181,7 @@ export default function TeacherClasses() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-bold text-lg flex items-center gap-2">
+              <h3 className="dn-heading-md flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-danilo-primary" /> 
                 AI Assessment Generator
               </h3>
@@ -127,12 +191,19 @@ export default function TeacherClasses() {
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {!generatedQuiz ? (
+              {generatedDocResult ? (
+                <div className="space-y-4">
+                  <h4 className="dn-title">AI Analysis Result</h4>
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-sm whitespace-pre-wrap">
+                    {generatedDocResult}
+                  </div>
+                </div>
+              ) : !generatedQuiz ? (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Select Target Class</label>
+                    <label className="dn-label">Select Target Class</label>
                     <select 
-                      className="w-full p-2 border rounded-md"
+                      className="dn-input"
                       value={selectedCourse}
                       onChange={(e) => setSelectedCourse(e.target.value)}
                     >
@@ -143,9 +214,9 @@ export default function TeacherClasses() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Topic or Lecture Notes</label>
+                    <label className="dn-label">Topic or Lecture Notes</label>
                     <textarea 
-                      className="w-full p-3 border rounded-md min-h-[150px]"
+                      className="dn-textarea"
                       placeholder="e.g., The water cycle and its three main stages..."
                       value={quizTopic}
                       onChange={(e) => setQuizTopic(e.target.value)}
@@ -154,7 +225,7 @@ export default function TeacherClasses() {
                 </>
               ) : (
                 <div className="space-y-6">
-                  <h4 className="font-bold text-xl">{generatedQuiz.title}</h4>
+                  <h4 className="dn-title">{generatedQuiz.title}</h4>
                   {generatedQuiz.questions?.map((q, idx) => (
                     <Card key={idx} className="bg-gray-50 border-none shadow-sm">
                       <p className="font-bold mb-3">{idx + 1}. {q.question}</p>
@@ -172,8 +243,8 @@ export default function TeacherClasses() {
             </div>
 
             <div className="p-4 border-t flex justify-end gap-3 bg-gray-50">
-              <Button variant="secondary" onClick={() => setShowQuizModal(false)}>Close</Button>
-              {!generatedQuiz ? (
+              <Button variant="secondary" onClick={() => { setShowQuizModal(false); setGeneratedDocResult(null); }}>Close</Button>
+              {generatedDocResult ? null : !generatedQuiz ? (
                 <Button 
                   onClick={handleGenerateQuiz} 
                   disabled={!selectedCourse || !quizTopic || isGenerating}

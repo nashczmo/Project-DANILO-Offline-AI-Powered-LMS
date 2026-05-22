@@ -175,8 +175,8 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE ${BACKEND_PORT:-8000}
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${BACKEND_PORT:-8000}"]
 EOF
 
   cat > "${APP_ROOT}/backend/app/__init__.py" <<'EOF'
@@ -274,9 +274,6 @@ from .database import Base
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (
-        CheckConstraint("role IN ('admin', 'teacher', 'student')", name="ck_users_role"),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
     role = Column(String(20), nullable=False)
@@ -674,7 +671,7 @@ EOF
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import User
+from .models import User, Course, Module, StreamPost, Enrollment, GradeEntry
 from .security import hash_password, verify_password
 
 
@@ -768,6 +765,70 @@ def seed_defaults(
         )
 
     session.commit()
+
+    # Generate Realistic Demo Accounts for Beta Release
+    teacher = get_or_create_user(
+        session,
+        role="teacher",
+        username="teacher1",
+        email=f"teacher1@{clean_portal_domain}",
+        full_name="Prof. Maria Santos",
+        password=clean_password,
+    )
+    student1 = get_or_create_user(
+        session,
+        role="student",
+        username="student1",
+        email=f"student1@{clean_portal_domain}",
+        full_name="Juan Dela Cruz",
+        password=clean_password,
+        grade_level="Grade 10",
+        section_name="Rizal"
+    )
+    student2 = get_or_create_user(
+        session,
+        role="student",
+        username="student2",
+        email=f"student2@{clean_portal_domain}",
+        full_name="Maria Clara",
+        password=clean_password,
+        grade_level="Grade 10",
+        section_name="Rizal"
+    )
+
+    # Generate Demo Course
+    demo_course = session.scalar(select(Course).where(Course.code == "SCI-10-DEMO"))
+    if not demo_course:
+        demo_course = Course(
+            code="SCI-10-DEMO",
+            title="Science 10: Earth & Space",
+            subject="Science",
+            education_level="Junior High School",
+            grade_level="Grade 10",
+            quarter="Q1",
+            school_year="2026-2027",
+            description="An interactive exploration of Earth and Space science.",
+            teacher_id=teacher.id,
+            is_active=True
+        )
+        session.add(demo_course)
+        session.flush()
+
+        # Enroll Students
+        session.add(Enrollment(course_id=demo_course.id, student_id=student1.id))
+        session.add(Enrollment(course_id=demo_course.id, student_id=student2.id))
+
+        # Generate Modules
+        session.add(Module(
+            course_id=demo_course.id, melc_code="S10ES-Ia-j-3.6", grade_level="Grade 10", subject="Science", quarter="Q1", week=1, sequence_order=1, folder_name="Plate_Tectonics", title="Module 1: Plate Tectonics", summary="Understanding the movement of Earth's lithospheric plates.", essential_question="How do moving plates shape the Earth?", content="# Plate Tectonics\\n\\nThe lithosphere is divided into tectonic plates..."
+        ))
+
+        # Stream Posts
+        session.add(StreamPost(
+            course_id=demo_course.id, author_id=teacher.id, title="Welcome to Science 10!", body="Please check Module 1 to begin our discussion on Plate Tectonics. You can use the AI Tutor if you have any questions.", post_type="announcement"
+        ))
+
+        session.commit()
 EOF
 
   cat > "${APP_ROOT}/backend/app/student_insights.py" <<'EOF'
@@ -779,9 +840,9 @@ from sqlalchemy.orm import Session
 
 from .models import AIConversation, Assignment, Course, Enrollment, GradeEntry, Module, Quiz, QuizAttempt, QuizQuestion, Submission, User
 
-LOW_SCORE_THRESHOLD = 75.0
-ATTENTION_THRESHOLD = 80.0
-RISK_THRESHOLD = 70.0
+LOW_SCORE_THRESHOLD = float(os.getenv("DANILO_LOW_SCORE_THRESHOLD", "75.0"))
+ATTENTION_THRESHOLD = float(os.getenv("DANILO_ATTENTION_THRESHOLD", "80.0"))
+RISK_THRESHOLD = float(os.getenv("DANILO_RISK_THRESHOLD", "70.0"))
 
 
 def percentage(score: float | None, max_score: float | None) -> float | None:
@@ -1184,7 +1245,9 @@ _PROFILE_DEFAULTS = _profile_defaults()
 JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
 DANILO_AI_RUNTIME = "ollama"
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
+OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
+OLLAMA_URL = os.getenv("OLLAMA_URL", f"http://{OLLAMA_HOST}:{OLLAMA_PORT}")
 _OLLAMA_MODEL_ENV = (os.getenv("OLLAMA_MODEL") or os.getenv("DANILO_OLLAMA_MODEL") or "").strip()
 OLLAMA_MODEL = _PROFILE_DEFAULTS["model"] if _OLLAMA_MODEL_ENV.lower() in {"", "auto"} else _OLLAMA_MODEL_ENV
 DANILO_AI_PRIMARY_MODEL = os.getenv("DANILO_AI_PRIMARY_MODEL", "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf")
@@ -1209,9 +1272,19 @@ ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip() or "admin"
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 CORS_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "http://danilo.local,http://localhost:5173,http://127.0.0.1:5173").split(",")
+    for origin in os.getenv("CORS_ORIGINS", os.getenv("DANILO_DEFAULT_CORS_DOMAINS", "http://danilo.local")).split(",")
     if origin.strip()
 ]
+DANILO_ROLES = set(
+    role.strip().lower()
+    for role in os.getenv("DANILO_ROLES", "admin,teacher,student").split(",")
+    if role.strip()
+)
+if "admin" not in DANILO_ROLES:
+    DANILO_ROLES.add("admin")
+
+ROLE_DISPLAY = {role: role.capitalize() for role in DANILO_ROLES}
+ROLE_DISPLAY.update({"student": "Learner", "teacher": "Faculty", "admin": "Admin"})
 
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET must be set by the installer environment")
@@ -1491,7 +1564,7 @@ def get_current_user(
     return user
 
 
-ROLE_DISPLAY = {"student": "Learner", "teacher": "Faculty", "admin": "Admin"}
+# ROLE_DISPLAY is generated dynamically above.
 
 
 def serialize_user(user: User) -> dict:
@@ -2160,7 +2233,7 @@ def build_pdf_document(title: str, lines: list[str]) -> bytes:
     return pdf
 
 
-SYSTEM_PROMPT = (
+DEFAULT_SYSTEM_PROMPT = (
     "You are DANILO, an offline AI-native learning operating system for Filipino students (Grades 1-12). "
     "Use the current lesson, curriculum excerpts, and student learning profile before answering. "
     "Be concise, accurate, encouraging, and age-appropriate. Never invent curriculum facts.\n"
@@ -2169,6 +2242,7 @@ SYSTEM_PROMPT = (
     "Rules: No violent, sexual, or harmful content. No weapons, drugs, self-harm, or illegal info. "
     "If off-topic or unsafe, redirect politely to the lesson."
 )
+SYSTEM_PROMPT = os.getenv("DANILO_SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
 SAFETY_KEYWORDS = {
     "kill", "suicide", "bomb", "weapon", "drug", "sex", "porn", "nude", "hack",
     "exploit", "violence", "murder", "abuse", "self-harm", "cutting", "anorexia",
@@ -2179,7 +2253,7 @@ SAFETY_REDIRECT = (
     "Let's focus on your lessons — what subject would you like help with?"
 )
 ROLLING_MEMORY_LIMIT = _env_int("DANILO_ROLLING_MEMORY", 4 if _HARDWARE["profile"] in {"constrained", "balanced"} else 6, minimum=0, maximum=12)
-RESPONSE_MODE_OPTIONS = {
+DEFAULT_RESPONSE_MODE_OPTIONS = {
     "short":        {"num_predict": int(os.getenv("DANILO_TOKENS_SHORT",    "140")), "instruction": "Answer in 1 short direct answer, 1 brief explanation, and 1 example."},
     "normal":       {"num_predict": int(os.getenv("DANILO_TOKENS_NORMAL",   "280")), "instruction": "Use short sections: Direct answer, Explanation, Example, and Practice if helpful."},
     "detailed":     {"num_predict": int(os.getenv("DANILO_TOKENS_DETAILED", "520")), "instruction": "Give a step-by-step teaching response with short sections, an example, and a quick practice task."},
@@ -2191,6 +2265,14 @@ RESPONSE_MODE_OPTIONS = {
     "practice":     {"num_predict": 400, "instruction": "Provide 2 practice problems related to this topic with a small hint for each."},
     "real_life":    {"num_predict": 400, "instruction": "Explain the concept by providing 2 or 3 concrete real-life examples of how this is used in the real world."},
 }
+
+import json
+RESPONSE_MODE_OPTIONS = DEFAULT_RESPONSE_MODE_OPTIONS
+if "DANILO_RESPONSE_MODES_JSON" in os.environ:
+    try:
+        RESPONSE_MODE_OPTIONS = json.loads(os.environ["DANILO_RESPONSE_MODES_JSON"])
+    except Exception as e:
+        logger.error(f"Failed to parse DANILO_RESPONSE_MODES_JSON: {e}")
 
 
 def check_safety(question: str) -> bool:
@@ -2990,19 +3072,25 @@ def change_password(payload: dict = Body(default={}), current_user: User = Depen
     return {"ok": True, "message": "Password changed successfully"}
 
 
+DASHBOARD_REGISTRY = {
+    "admin": lambda db, u: build_admin_course_cards(db),
+    "teacher": lambda db, u: build_teacher_course_cards(db, u.id),
+    "student": lambda db, u: build_student_course_cards(db, u.id),
+}
+
 @router.get("/dashboard", tags=["dashboard"])
 def dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     logger.info("/api/dashboard accessed by user_id=%s role=%s", current_user.id, current_user.role)
     try:
         stream_items = build_stream(db, current_user)
-        grade_summary = build_grade_summary(db, current_user.id) if current_user.role == "student" else []
-        ai_profile = build_student_ai_profile(db, current_user, persist=True) if current_user.role == "student" else None
-        if current_user.role == "admin":
-            courses = build_admin_course_cards(db)
-        elif current_user.role == "teacher":
-            courses = build_teacher_course_cards(db, current_user.id)
-        else:
-            courses = build_student_course_cards(db, current_user.id)
+        # Check features instead of hardcoded roles
+        has_grades = hasattr(current_user, "role") and current_user.role not in ("admin", "teacher")
+        grade_summary = build_grade_summary(db, current_user.id) if has_grades else []
+        ai_profile = build_student_ai_profile(db, current_user, persist=True) if has_grades else None
+        
+        course_builder = DASHBOARD_REGISTRY.get(current_user.role, DASHBOARD_REGISTRY["student"])
+        courses = course_builder(db, current_user)
+        
         content_items = build_content_tree(db, user=current_user)
         workflow_status = build_content_workflow_status()
         if ai_profile is not None:
@@ -3138,8 +3226,8 @@ def admin_users(role: str | None = None, current_user: User = Depends(get_curren
 def admin_create_user(payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "admin")
     role = clean_text(payload.get("role"), max_length=20)
-    if role not in {"admin", "teacher", "student"}:
-        raise HTTPException(status_code=400, detail="Role must be admin, teacher, or student")
+    if role not in DANILO_ROLES:
+        raise HTTPException(status_code=400, detail=f"Role must be one of: {', '.join(DANILO_ROLES)}")
     full_name = clean_text(payload.get("fullName") or payload.get("full_name"), max_length=255)
     education_level = clean_text(payload.get("educationLevel") or payload.get("education_level"), required=False, max_length=40)
     grade_level = clean_text(payload.get("gradeLevel") or payload.get("grade_level"), required=False, max_length=50)
@@ -3571,20 +3659,8 @@ def admin_ai_analytics_report(current_user: User = Depends(get_current_user), db
 @teacher_router.get("/teacher/dashboard")
 def teacher_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "teacher")
-    courses = build_teacher_course_cards(db, current_user.id)
-    return {
-        "user": serialize_user(current_user),
-        "courses": courses,
-        "totals": {"classes": len(courses), "students": sum(item["studentTotal"] for item in courses), "modules": sum(item["moduleTotal"] for item in courses)},
-        "stream": build_stream(db, current_user),
-        "contentFolders": build_content_tree(db, user=current_user),
-        "network": {"ssid": SSID, "portal": f"http://{PORTAL_DOMAIN}", "mode": "offline-first captive portal"},
-        "operationsHighlights": [
-            {"label": "Portal", "value": f"http://{PORTAL_DOMAIN}"},
-            {"label": "SSID", "value": SSID},
-            {"label": "AI Model", "value": DANILO_AI_ACTIVE_MODEL},
-        ],
-    }
+    # Delegate to unified dashboard
+    return dashboard(current_user, db)
 
 
 @teacher_router.get("/teacher/courses")
@@ -3769,6 +3845,64 @@ def teacher_delete_assignment(assignment_id: int, current_user: User = Depends(g
     db.commit()
     return {"ok": True}
 
+import io
+from fastapi import UploadFile, File, Form
+
+@teacher_router.post("/teacher/courses/{course_id}/parse-document")
+async def teacher_parse_document(
+    course_id: int, 
+    action: str = Form("summary"),
+    file: UploadFile = File(...), 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+) -> dict:
+    course = ensure_teacher_course(db, current_user, course_id)
+    content = await file.read()
+    filename = file.filename.lower()
+    text = ""
+    
+    try:
+        if filename.endswith(".pdf"):
+            import pypdf
+            pdf = pypdf.PdfReader(io.BytesIO(content))
+            text = "\\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+        elif filename.endswith(".docx"):
+            import docx
+            doc = docx.Document(io.BytesIO(content))
+            text = "\\n".join(para.text for para in doc.paragraphs)
+        elif filename.endswith(".txt") or filename.endswith(".md") or filename.endswith(".csv"):
+            text = content.decode("utf-8")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Please upload PDF, DOCX, or TXT.")
+    except Exception as e:
+        ai_logger.error("Document parsing failed: %s", str(e))
+        raise HTTPException(status_code=400, detail="Failed to parse document. Ensure it is not corrupted or password-protected.")
+        
+    text = text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="The uploaded document contains no readable text.")
+
+    # Limit text length to avoid context overflow
+    max_chars = int(os.getenv("DANILO_AI_MAX_DOC_CHARS", "20000"))
+    text = text[:max_chars]
+
+    if action == "summary":
+        prompt = f"Summarize the following educational document. Provide the main concepts and key takeaways suitable for students.\\n\\nDocument text:\\n{text}"
+    elif action == "lesson_plan":
+        prompt = f"Create a detailed lesson plan based on the following document text. Include Objectives, Subject Matter, Procedure, and Evaluation.\\n\\nDocument text:\\n{text}"
+    else: # quiz
+        prompt = f"Generate 5 key review points and 3 practice questions based on this document.\\n\\nDocument text:\\n{text}"
+
+    result, metrics = await ask_ollama(prompt, mode="tutor", memory=None)
+    
+    return {
+        "ok": True,
+        "action": action,
+        "filename": file.filename,
+        "result": result,
+        "metrics": metrics
+    }
+
 
 @teacher_router.post("/teacher/courses/{course_id}/quizzes/generate")
 async def teacher_generate_quiz(course_id: int, payload: dict = Body(default={}), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
@@ -3935,7 +4069,10 @@ def teacher_delete_grade(grade_id: int, current_user: User = Depends(get_current
 @student_router.get("/student/dashboard")
 def student_dashboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     require_role(current_user, "student")
-    return {"user": serialize_user(current_user), "courses": build_student_course_cards(db, current_user.id), "grades": build_grade_summary(db, current_user.id), "assignments": student_assignments(current_user, db)}
+    # Delegate to unified dashboard
+    result = dashboard(current_user, db)
+    result["assignments"] = student_assignments(current_user, db)
+    return result
 
 
 @student_router.get("/student/courses")

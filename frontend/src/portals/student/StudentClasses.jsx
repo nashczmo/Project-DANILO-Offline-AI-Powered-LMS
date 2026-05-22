@@ -30,7 +30,7 @@ export default function StudentClasses() {
                 </div>
               </div>
               
-              <h3 className="text-xl font-bold text-danilo-text mb-1">{cls.subject}</h3>
+              <h3 className="dn-heading-md mb-1">{cls.subject}</h3>
               
               <div className="space-y-2 mt-4 mb-6">
                 <div className="flex items-center gap-2 text-sm text-danilo-text-secondary">

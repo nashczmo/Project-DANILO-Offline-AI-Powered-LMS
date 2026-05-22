@@ -18,12 +18,12 @@ EOF
 # Handles: captive portal, SPA serving, API proxying, PWA caching
 
 upstream danilo_backend {
-  server backend:8000;
+  server ${BACKEND_HOST:-backend}:${BACKEND_PORT:-8000};
   keepalive 32;
 }
 
 server {
-  listen 80 default_server;
+  listen ${FRONTEND_PORT:-80} default_server;
   server_name ${PORTAL_DOMAIN};
   root  /opt/danilo/app/frontend/dist;
   index index.html;
@@ -132,13 +132,13 @@ server {
 
 # Covers any unrecognized hostname that arrives on port 80 (captive portal trap)
 server {
-  listen 80;
+  listen ${FRONTEND_PORT:-80};
   server_name _;
   return 302 http://${PORTAL_DOMAIN}\$request_uri;
 }
 
 server {
-  listen 80;
+  listen ${FRONTEND_PORT:-80};
   server_name connectivitycheck.gstatic.com
               clients3.google.com
               connectivity-check.ubuntu.com;
@@ -146,21 +146,21 @@ server {
 }
 
 server {
-  listen 80;
+  listen ${FRONTEND_PORT:-80};
   server_name connect.rom.miui.com
               captive.v2.rom.miui.com;
   return 302 http://${PORTAL_DOMAIN}/;
 }
 
 server {
-  listen 80;
+  listen ${FRONTEND_PORT:-80};
   server_name connectivitycheck.platform.hicloud.com
               connectivitycheck.cloud.huawei.com;
   return 302 http://${PORTAL_DOMAIN}/;
 }
 
 server {
-  listen 80;
+  listen ${FRONTEND_PORT:-80};
   server_name www.msftncsi.com
               msftncsi.com
               dns.msftncsi.com;
@@ -201,7 +201,7 @@ services:
       - ai_index:/var/lib/danilo
       - ./models:/models:ro
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=20)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:${BACKEND_PORT:-8000}/api/health', timeout=20)\""]
       interval: 30s
       timeout: 25s
       retries: 40
@@ -242,7 +242,7 @@ services:
       backend:
         condition: service_started
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-80}:80"
     volumes:
       - ./frontend/dist:/opt/danilo/app/frontend/dist:ro
     read_only: true
@@ -273,14 +273,14 @@ JWT_SECRET=change-me
 DATABASE_URL=
 FRONTEND_URL=
 API_BASE_URL=
-CORS_ORIGINS=http://danilo.local,http://localhost:5173,http://127.0.0.1:5173
+CORS_ORIGINS=http://danilo.local,http://localhost:${VITE_DEV_PORT:-5173},http://127.0.0.1:${VITE_DEV_PORT:-5173}
 POSTGRES_DB=danilo
 POSTGRES_USER=danilo
 POSTGRES_PASSWORD=change-me
 JWT_EXPIRE_MINUTES=720
 COMPOSE_PROFILES=ollama
 DANILO_AI_RUNTIME=ollama
-OLLAMA_URL=http://ollama:11434
+OLLAMA_URL=http://${OLLAMA_HOST:-ollama}:${OLLAMA_PORT:-11434}
 DANILO_OLLAMA_MODEL=auto
 OLLAMA_MODEL=auto
 DANILO_AI_PRIMARY_MODEL=microsoft_Phi-4-mini-instruct-Q4_K_M.gguf
@@ -576,7 +576,7 @@ wait_for_stack_readiness() {
 
   note "Checking Ollama API response"
   attempts=0
-  until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:11434/api/tags" >/dev/null 2>&1; do
+  until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:${OLLAMA_PORT:-11434}/api/tags" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     if [[ "${attempts}" -gt 30 ]]; then
       echo "Ollama is running but its API did not answer on /api/tags."

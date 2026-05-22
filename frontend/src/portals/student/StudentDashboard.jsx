@@ -32,22 +32,28 @@ export default function StudentDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-3">
-              <TrendingUp className="w-6 h-6" />
+          <Card className="flex flex-col justify-between" hover>
+            <div>
+              <div className="w-12 h-12 bg-danilo-success-subtle text-danilo-success rounded-full flex items-center justify-center mb-4">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <h3 className="dn-heading-lg">Active</h3>
+              <p className="dn-subtitle mt-1">Study Status</p>
             </div>
-            <h3 className="text-3xl font-bold text-danilo-text">Active</h3>
-            <p className="text-sm text-danilo-text-secondary mt-1">Study Status</p>
+            <div className="mt-4 pt-4 border-t border-danilo-border">
+              <span className="dn-caption font-medium text-danilo-success">On track this week</span>
+            </div>
           </Card>
           
-          <Card className="md:col-span-2 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-5 h-5" />
+          <Card className="md:col-span-2 dn-gradient-ai border-blue-100 relative overflow-hidden" hover>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+            <div className="flex items-start gap-5 relative z-10">
+              <div className="w-12 h-12 bg-white/60 backdrop-blur text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm border border-white">
+                <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-blue-900 mb-1">AI Insights</h3>
-                <p className="text-sm text-blue-800 leading-relaxed">{insights}</p>
+                <h3 className="dn-heading-md text-blue-900 mb-2">AI Learning Insights</h3>
+                <p className="text-[15px] text-blue-800/90 leading-relaxed max-w-2xl">{insights}</p>
               </div>
             </div>
           </Card>
@@ -58,7 +64,7 @@ export default function StudentDashboard() {
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <ClipboardList className="w-5 h-5 text-danilo-primary" />
-            <h2 className="text-lg font-bold text-danilo-text">Upcoming Performance Tasks</h2>
+            <h2 className="dn-title">Upcoming Performance Tasks</h2>
           </div>
           {loading ? (
             <div className="space-y-3">
@@ -68,12 +74,17 @@ export default function StudentDashboard() {
           ) : performanceTasks.length > 0 ? (
             <div className="space-y-3">
               {performanceTasks.map(task => (
-                <div key={task.id} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
-                  <div>
-                    <h4 className="font-medium text-danilo-text">{task.title}</h4>
-                    <p className="text-xs text-danilo-text-secondary">{task.courseTitle}</p>
+                <div key={task.id} className="p-4 bg-white hover:bg-danilo-bg-secondary rounded-xl border border-danilo-border transition-colors flex justify-between items-center group cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-danilo-warning-subtle text-danilo-warning flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
+                      <ClipboardList className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-danilo-text">{task.title}</h4>
+                      <p className="dn-caption">{task.courseTitle}</p>
+                    </div>
                   </div>
-                  <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-1 rounded-md">
+                  <span className="dn-chip bg-danilo-warning-subtle text-danilo-warning border-transparent">
                     Pending
                   </span>
                 </div>
@@ -91,7 +102,7 @@ export default function StudentDashboard() {
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-danilo-primary" />
-            <h2 className="text-lg font-bold text-danilo-text">Recent Written Works</h2>
+            <h2 className="dn-title">Recent Written Works</h2>
           </div>
           {loading ? (
             <div className="space-y-3">
@@ -101,14 +112,22 @@ export default function StudentDashboard() {
           ) : recentGrades.length > 0 ? (
             <div className="space-y-3">
               {recentGrades.map(work => (
-                <div key={work.id || Math.random()} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
-                  <div>
-                    <h4 className="font-medium text-danilo-text">{work.component || "Assessment"}</h4>
-                    <p className="text-xs text-danilo-text-secondary">{work.courseCode}</p>
+                <div key={work.id || Math.random()} className="p-4 bg-white hover:bg-danilo-bg-secondary rounded-xl border border-danilo-border transition-colors flex justify-between items-center group cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-danilo-bg-tertiary flex items-center justify-center text-danilo-text-secondary group-hover:bg-white group-hover:shadow-sm transition-all">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-danilo-text">{work.component || "Assessment"}</h4>
+                      <p className="dn-caption">{work.courseCode}</p>
+                    </div>
                   </div>
-                  <span className="text-sm font-bold text-danilo-primary">
-                    {work.score} / {work.maxScore}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-lg font-bold text-danilo-primary">
+                      {work.score} <span className="text-sm text-danilo-text-muted font-normal">/ {work.maxScore}</span>
+                    </span>
+                    <span className="dn-caption text-danilo-success">Graded</span>
+                  </div>
                 </div>
               ))}
             </div>

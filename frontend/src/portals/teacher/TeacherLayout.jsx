@@ -38,11 +38,7 @@ export default function TeacherLayout({ children }) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                  isActive
-                    ? "bg-danilo-primary text-white font-medium shadow-sm"
-                    : "text-danilo-text-secondary hover:bg-danilo-bg-secondary hover:text-danilo-text"
-                }`}
+                className={`dn-nav-item ${isActive ? "active" : ""}`}
               >
                 <Icon className="w-5 h-5" />
                 {item.name}
@@ -55,7 +51,7 @@ export default function TeacherLayout({ children }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="h-16 bg-white border-b border-danilo-border flex items-center justify-between px-6 shrink-0">
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-danilo-border flex items-center justify-between px-4 sm:px-6 z-10 sticky top-0">
           <div className="flex items-center md:hidden">
             <Button variant="ghost" className="p-2 -ml-2">
               <Menu className="w-5 h-5" />

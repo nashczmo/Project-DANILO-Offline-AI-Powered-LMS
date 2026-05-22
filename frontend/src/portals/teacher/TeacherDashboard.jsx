@@ -43,48 +43,53 @@ export default function TeacherDashboard() {
       <PageHeader title="Overview" description="A summary of current academic activities is presented below." />
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <Users className="w-5 h-5" />
+        <Card className="flex flex-col justify-between" hover>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+              <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-medium text-danilo-text-secondary">Active Sections</h3>
+            <h3 className="dn-heading-md">Active Sections</h3>
           </div>
-          <p className="text-3xl font-bold text-danilo-text mt-auto">{courses.length}</p>
+          <p className="text-4xl font-bold text-danilo-text mt-auto">{courses.length}</p>
         </Card>
         
-        <Card className="flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-              <FileText className="w-5 h-5" />
+        <Card className="flex flex-col justify-between" hover>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-danilo-warning-subtle text-danilo-warning rounded-xl">
+              <FileText className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-medium text-danilo-text-secondary">Items to Mark</h3>
+            <h3 className="dn-heading-md">Items to Mark</h3>
           </div>
-          <p className="text-3xl font-bold text-danilo-text mt-auto">{assignments.length}</p>
+          <p className="text-4xl font-bold text-danilo-text mt-auto">{assignments.length}</p>
         </Card>
         
-        <Card className="flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-              <Activity className="w-5 h-5" />
+        <Card className="flex flex-col justify-between" hover>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-danilo-success-subtle text-danilo-success rounded-xl">
+              <Activity className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-medium text-danilo-text-secondary">Avg. Attendance</h3>
+            <h3 className="dn-heading-md">Avg. Attendance</h3>
           </div>
-          <p className="text-3xl font-bold text-danilo-text mt-auto">{avgAttendance}</p>
+          <p className="text-4xl font-bold text-danilo-text mt-auto">{avgAttendance}</p>
         </Card>
       </div>
 
       <Card>
-        <h3 className="text-lg font-bold text-danilo-text mb-4">Recent Activity</h3>
+        <h3 className="dn-title mb-4">Recent Activity</h3>
         {assignments.length > 0 ? (
           <div className="space-y-3">
             {assignments.slice(0, 5).map(assignment => (
-              <div key={assignment.id || Math.random()} className="p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
-                <div>
-                  <h4 className="font-medium text-danilo-text">{assignment.title || 'Untitled Assignment'}</h4>
-                  <p className="text-xs text-danilo-text-secondary">{assignment.courseTitle || 'Course'}</p>
+              <div key={assignment.id || Math.random()} className="p-4 bg-white hover:bg-danilo-bg-secondary rounded-xl border border-danilo-border transition-colors flex justify-between items-center group cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-danilo-warning-subtle text-danilo-warning flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-danilo-text">{assignment.title || 'Untitled Assignment'}</h4>
+                    <p className="dn-caption">{assignment.courseTitle || 'Course'}</p>
+                  </div>
                 </div>
-                <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-1 rounded-md">
+                <span className="dn-chip bg-danilo-warning-subtle text-danilo-warning border-transparent">
                   Pending Review
                 </span>
               </div>

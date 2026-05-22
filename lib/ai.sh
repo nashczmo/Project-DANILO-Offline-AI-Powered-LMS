@@ -1,16 +1,16 @@
 # Project DANILO installer module: ai.sh
 
-DANILO_AI_MODEL_LOW="${DANILO_AI_MODEL_LOW:-qwen2.5:1.5b}"
-DANILO_AI_MODEL_BALANCED="${DANILO_AI_MODEL_BALANCED:-qwen2.5:3b}"
-DANILO_AI_MODEL_GPU="${DANILO_AI_MODEL_GPU:-qwen2.5:7b}"
-DANILO_AI_MODEL_HIGH="${DANILO_AI_MODEL_HIGH:-qwen2.5:14b}"
+DANILO_AI_MODEL_LOW="${DANILO_AI_MODEL_LOW:-}"
+DANILO_AI_MODEL_BALANCED="${DANILO_AI_MODEL_BALANCED:-}"
+DANILO_AI_MODEL_GPU="${DANILO_AI_MODEL_GPU:-}"
+DANILO_AI_MODEL_HIGH="${DANILO_AI_MODEL_HIGH:-}"
 DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-${DANILO_AI_MODEL_BALANCED}}}"
 DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-}"
 DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-}"
 DANILO_AI_RUNTIME="ollama"
-DANILO_AI_PRIMARY_MODEL="${DANILO_AI_PRIMARY_MODEL:-microsoft_Phi-4-mini-instruct-Q4_K_M.gguf}"
+DANILO_AI_PRIMARY_MODEL="${DANILO_AI_PRIMARY_MODEL:-}"
 DANILO_AI_FALLBACK_MODEL="${DANILO_AI_FALLBACK_MODEL:-}"
-DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-phi4-mini}"
+DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-}"
 DANILO_CUSTOM_GGUF_PATH="${DANILO_CUSTOM_GGUF_PATH:-}"
 DANILO_CUSTOM_MODELFILE="${DANILO_CUSTOM_MODELFILE:-}"
 
@@ -124,13 +124,20 @@ detect_ai_hardware_profile() {
 
   DANILO_AI_RUNTIME="ollama"
 
-  if (( gpu_vram_mb >= 16384 && (cuda_supported == 1 || rocm_supported == 1) && storage_available_mb >= 20480 )); then
+  local vram_large="${DANILO_VRAM_LARGE_THRESHOLD:-16384}"
+  local vram_gpu="${DANILO_VRAM_GPU_THRESHOLD:-8192}"
+  local ram_high="${DANILO_RAM_HIGH_THRESHOLD:-16384}"
+  local ram_balanced="${DANILO_RAM_BALANCED_THRESHOLD:-8192}"
+  local cpu_high="${DANILO_CPU_HIGH_THRESHOLD:-6}"
+  local cpu_balanced="${DANILO_CPU_BALANCED_THRESHOLD:-4}"
+
+  if (( gpu_vram_mb >= vram_large && (cuda_supported == 1 || rocm_supported == 1) && storage_available_mb >= 20480 )); then
     profile="large-gpu"
-  elif (( gpu_vram_mb >= 8192 && (cuda_supported == 1 || rocm_supported == 1) && storage_available_mb >= 12288 )); then
+  elif (( gpu_vram_mb >= vram_gpu && (cuda_supported == 1 || rocm_supported == 1) && storage_available_mb >= 12288 )); then
     profile="gpu-accelerated"
-  elif (( mem_mb >= 16384 && cpu_count >= 6 )); then
+  elif (( mem_mb >= ram_high && cpu_count >= cpu_high )); then
     profile="high-memory"
-  elif (( mem_mb >= 8192 && cpu_count >= 4 )); then
+  elif (( mem_mb >= ram_balanced && cpu_count >= cpu_balanced )); then
     profile="balanced"
   else
     profile="constrained"
@@ -353,15 +360,15 @@ configure_ollama_model() {
       cat > "${modelfile}" <<EOF
 FROM ${gguf_path}
 
-PARAMETER temperature 0.3
-PARAMETER top_p 0.9
-PARAMETER repeat_penalty 1.1
+PARAMETER temperature ${DANILO_AI_TEMP:-0.3}
+PARAMETER top_p ${DANILO_AI_TOP_P:-0.9}
+PARAMETER repeat_penalty ${DANILO_AI_REPEAT_PENALTY:-1.1}
 PARAMETER num_ctx ${OLLAMA_NUM_CTX}
 PARAMETER num_batch ${OLLAMA_NUM_BATCH}
 PARAMETER num_gpu ${OLLAMA_NUM_GPU}
-PARAMETER num_predict 220
+PARAMETER num_predict ${DANILO_AI_NUM_PREDICT:-220}
 
-SYSTEM You are DANILO, an offline DepEd AI tutor for Filipino students (Grades 1-12). Be clear, concise, and accurate. Use lesson context when provided. Never guess or hallucinate. Rules: No violent, sexual, or harmful content. Redirect off-topic questions politely. Tone: encouraging, age-appropriate, patient.
+SYSTEM \${DANILO_SYSTEM_PROMPT}
 EOF
 
     export DANILO_CUSTOM_GGUF_PATH="${gguf_path}"
@@ -400,15 +407,15 @@ preload_ollama_model() {
     run_step_command "Writing container Modelfile for DANILO custom model" docker exec "${container}" sh -c "cat > '${container_models_dir}/Modelfile' <<'EOF'
 FROM ${container_models_dir}/custom.gguf
 
-PARAMETER temperature 0.3
-PARAMETER top_p 0.9
-PARAMETER repeat_penalty 1.1
+PARAMETER temperature ${DANILO_AI_TEMP:-0.3}
+PARAMETER top_p ${DANILO_AI_TOP_P:-0.9}
+PARAMETER repeat_penalty ${DANILO_AI_REPEAT_PENALTY:-1.1}
 PARAMETER num_ctx ${OLLAMA_NUM_CTX}
 PARAMETER num_batch ${OLLAMA_NUM_BATCH}
 PARAMETER num_gpu ${OLLAMA_NUM_GPU}
-PARAMETER num_predict 220
+PARAMETER num_predict ${DANILO_AI_NUM_PREDICT:-220}
 
-SYSTEM You are DANILO, an offline DepEd AI tutor for Filipino students (Grades 1-12). Be clear, concise, and accurate. Use lesson context when provided. Never guess or hallucinate. Rules: No violent, sexual, or harmful content. Redirect off-topic questions politely. Tone: encouraging, age-appropriate, patient.
+SYSTEM \${DANILO_SYSTEM_PROMPT}
 EOF"
 
     if run_step_command "Creating Ollama custom model ${DANILO_CUSTOM_OLLAMA_MODEL}" docker exec "${container}" ollama create "${DANILO_CUSTOM_OLLAMA_MODEL}" -f "${container_models_dir}/Modelfile"; then

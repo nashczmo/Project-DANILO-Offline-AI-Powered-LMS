@@ -5,6 +5,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/lib"
 export DANILO_INSTALLER_DIR="${SCRIPT_DIR}"
 
+if [[ -f "${SCRIPT_DIR}/danilo.conf" ]]; then
+  source "${SCRIPT_DIR}/danilo.conf"
+fi
+
 source "${LIB_DIR}/common.sh"
 source "${LIB_DIR}/logging.sh"
 source "${LIB_DIR}/cleanup.sh"
@@ -19,6 +23,7 @@ source "${LIB_DIR}/ai.sh"
 source "${LIB_DIR}/services.sh"
 source "${LIB_DIR}/sync.sh"
 source "${LIB_DIR}/verify.sh"
+source "${LIB_DIR}/recovery.sh"
 
 show_help() {
   cat <<EOF
@@ -251,7 +256,7 @@ main() {
   parse_args "$@"
   init_logging
   require_root
-  trap 'on_error $? ${LINENO} "$BASH_COMMAND"' ERR
+  trap 'handle_fatal_error $? ${LINENO} "$BASH_COMMAND"' ERR
   run_step_command "Validating installer Bash syntax" bash -n "$0"
   for module in "${LIB_DIR}"/*.sh; do
     run_step_command "Validating module Bash syntax: $(basename "${module}")" bash -n "${module}"

@@ -11,10 +11,10 @@ require_command() {
   if command_missing "${cmd}"; then
     if [[ "${cmd}" == "docker" ]]; then
       if declare -f install_docker >/dev/null; then
-        note "Required command 'docker' is missing. Attempting self-healing installation of Docker..."
+        note_status "WAIT" "Required command 'docker' is missing. Attempting self-healing installation..."
         install_docker
         if command_missing docker; then
-          echo "Docker could not be auto-installed. Please check your internet connection or install docker manually."
+          fail "Docker could not be auto-installed. Check internet or install manually."
           exit 1
         fi
         return 0
@@ -23,10 +23,10 @@ require_command() {
       fi
     elif [[ "${cmd}" == "npm" || "${cmd}" == "node" ]]; then
       if declare -f install_node >/dev/null; then
-        note "Required command '${cmd}' is missing. Attempting self-healing installation of Node.js..."
+        note_status "WAIT" "Required command '${cmd}' is missing. Attempting self-healing installation..."
         install_node
         if command_missing "${cmd}"; then
-          echo "Node.js/npm could not be auto-installed. Please check your internet connection or install nodejs/npm manually."
+          fail "Node.js/npm could not be auto-installed. Check internet or install manually."
           exit 1
         fi
         return 0
@@ -43,23 +43,15 @@ require_command() {
     if [[ "${cmd}" == "free" ]]; then pkg="procps"; fi
     if [[ "${cmd}" == "systemctl" ]]; then pkg="systemd"; fi
 
-    note "Required command '${cmd}' is missing. Attempting self-healing installation..."
+    note_status "WAIT" "Required command '${cmd}' is missing. Attempting self-healing installation of '${pkg}'..."
     export DEBIAN_FRONTEND=noninteractive
     
-    # Try installing without update first (faster)
-    if apt-get install -y -qq "${pkg}" >/dev/null 2>&1; then
-      ok "Self-healed missing command '${cmd}' by installing '${pkg}'"
+    # Try installing with our new resilient wrapper, which handles locks and broken packages
+    if run_resilient_command "Installing ${pkg}" apt-get install -y -qq "${pkg}"; then
+      ok "Self-healed missing command '${cmd}'"
       return 0
-    fi
-    
-    # If that fails, do a quick apt update and retry
-    note "Refreshing package list to locate '${pkg}'..."
-    apt-get update -y -qq >/dev/null 2>&1 || true
-    if apt-get install -y -qq "${pkg}"; then
-      ok "Self-healed missing command '${cmd}' by installing '${pkg}'"
     else
-      echo "Required command is missing and could not be auto-installed: ${cmd} (package: ${pkg})"
-      echo "Install the base Ubuntu packages or reconnect internet, then re-run this installer."
+      fail "Required command is missing and could not be auto-installed: ${cmd} (package: ${pkg})"
       exit 1
     fi
   fi
@@ -227,10 +219,10 @@ prepare_apt() {
     rm -f /etc/apt/sources.list.d/nodesource.list
   fi
 
-  if ! run_step_command "Refreshing apt package lists" apt-get update -y -qq; then
+  if ! run_resilient_command "Refreshing apt package lists" apt-get update -y -qq; then
     warn "apt update failed; attempting install from the local package cache"
   fi
-  apt_install apt-transport-https ca-certificates curl gnupg software-properties-common \
+  run_resilient_command "Installing base OS dependencies" apt-get install -y -qq apt-transport-https ca-certificates curl gnupg software-properties-common \
     lsb-release jq unzip git build-essential rfkill iw net-tools avahi-daemon \
     network-manager hostapd dnsmasq iptables-persistent netfilter-persistent \
     python3 python3-venv python3-pip openssl e2fsprogs psmisc logrotate rsync pciutils \

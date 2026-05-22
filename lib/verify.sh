@@ -218,7 +218,7 @@ verify_ollama_api() {
   fi
 
   tags_body="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T backend \
-    python -c "import urllib.request; print(urllib.request.urlopen('http://ollama:11434/api/tags', timeout=5).read().decode())" 2>/dev/null || true)"
+    python -c "import urllib.request; print(urllib.request.urlopen('http://${OLLAMA_HOST:-ollama}:${OLLAMA_PORT:-11434}/api/tags', timeout=5).read().decode())" 2>/dev/null || true)"
   if [[ "${tags_body}" == *'"models"'* ]]; then
     verify_pass "Ollama API reachable"
   else
@@ -257,7 +257,7 @@ verify_backend_direct_health() {
   fi
 
   verify_compose_command "Backend direct health endpoint returns 200" exec -T backend \
-    python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"
+    python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${BACKEND_PORT:-8000}/api/health', timeout=5)"
 }
 
 verify_database_schema() {

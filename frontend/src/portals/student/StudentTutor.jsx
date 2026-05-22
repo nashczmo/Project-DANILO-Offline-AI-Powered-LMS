@@ -4,6 +4,35 @@ import { Send, Bot, User, Sparkles } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { apiUrl } from "../../api";
 
+const MarkdownRenderer = ({ content }) => {
+  if (!content) return null;
+  const parts = content.split(/(```[\s\S]*?```|\*\*.*?\*\*|\n- .*)/g);
+  return (
+    <div className="text-sm leading-relaxed space-y-1">
+      {parts.map((part, index) => {
+        if (!part) return null;
+        if (part.startsWith('```') && part.endsWith('```')) {
+          return (
+            <pre key={index} className="bg-[#0f172a] text-gray-200 p-4 rounded-xl overflow-x-auto text-xs font-mono my-3 shadow-inner">
+              {part.slice(3, -3).replace(/^[a-z]+\n/, '')}
+            </pre>
+          );
+        } else if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={index} className="font-bold text-inherit">{part.slice(2, -2)}</strong>;
+        } else if (part.startsWith('\n- ')) {
+          return (
+            <div key={index} className="flex gap-2.5 my-1 ml-2">
+              <span className="text-current opacity-60 mt-0.5 text-xs">•</span>
+              <span>{part.slice(3)}</span>
+            </div>
+          );
+        }
+        return <span key={index} className="whitespace-pre-wrap">{part}</span>;
+      })}
+    </div>
+  );
+};
+
 export default function StudentTutor() {
   const [messages, setMessages] = useState([
     { id: 1, role: "assistant", content: "Hello! I am your DANILO AI Tutor. How can I help you with your lessons today?" }
@@ -64,15 +93,20 @@ export default function StudentTutor() {
       let done = false;
       setIsTyping(false);
 
+      let buffer = "";
+
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         done = readerDone;
         if (value) {
-          const chunkString = decoder.decode(value, { stream: true });
-          const lines = chunkString.split('\n');
+          buffer += decoder.decode(value, { stream: true });
           let appendedText = "";
+          let newIndex;
           
-          for (const line of lines) {
+          while ((newIndex = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, newIndex);
+            buffer = buffer.slice(newIndex + 1);
+            
             if (line.startsWith('data: ')) {
               const dataStr = line.substring(6);
               if (dataStr.trim() === "[DONE]") continue;
@@ -115,12 +149,12 @@ export default function StudentTutor() {
               }`}>
                 {msg.role === "user" ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
               </div>
-              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+              <div className={`max-w-[85%] sm:max-w-[75%] ${
                 msg.role === "user" 
-                  ? "bg-danilo-primary text-white rounded-tr-none" 
-                  : "bg-danilo-bg-secondary border border-danilo-border text-danilo-text rounded-tl-none"
+                  ? "bg-danilo-primary text-white rounded-2xl rounded-tr-sm px-5 py-4 text-[15px] shadow-sm leading-relaxed" 
+                  : "dn-ai-bubble text-[15px] p-5 shadow-sm bg-white border-danilo-border"
               }`}>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+                <MarkdownRenderer content={msg.content} />
               </div>
             </div>
           ))}
@@ -129,12 +163,10 @@ export default function StudentTutor() {
               <div className="w-8 h-8 rounded-full bg-danilo-bg-tertiary text-danilo-primary flex items-center justify-center flex-shrink-0">
                 <Bot className="w-5 h-5" />
               </div>
-              <div className="max-w-[80%] rounded-2xl px-4 py-3 bg-danilo-bg-secondary border border-danilo-border rounded-tl-none flex items-center gap-2">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 rounded-full bg-danilo-text-placeholder animate-bounce"></div>
-                  <div className="w-2 h-2 rounded-full bg-danilo-text-placeholder animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 rounded-full bg-danilo-text-placeholder animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                </div>
+              <div className="max-w-[80%] dn-ai-bubble flex items-center gap-1.5 h-[46px] px-5 bg-white border-danilo-border shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-danilo-primary/60 animate-[typingDot_1.4s_infinite_ease-in-out_both]"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-danilo-primary/60 animate-[typingDot_1.4s_infinite_ease-in-out_both]" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-danilo-primary/60 animate-[typingDot_1.4s_infinite_ease-in-out_both]" style={{ animationDelay: '0.4s' }}></div>
               </div>
             </div>
           )}
@@ -147,9 +179,9 @@ export default function StudentTutor() {
               <button
                 key={idx}
                 onClick={() => handleSend(action.label, action.hiddenInstruction)}
-                className="text-xs font-medium px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center gap-1"
+                className="dn-chip hover:bg-danilo-primary-subtle hover:text-danilo-primary hover:border-danilo-primary/20 transition-all cursor-pointer"
               >
-                <Sparkles className="w-3 h-3" />
+                <Sparkles className="w-3.5 h-3.5 text-danilo-primary" />
                 {action.label}
               </button>
             ))}
@@ -164,7 +196,7 @@ export default function StudentTutor() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type your question..."
-              className="flex-1 px-4 py-2 border border-danilo-border rounded-xl focus:outline-none focus:ring-2 focus:ring-danilo-primary focus:border-transparent text-sm"
+              className="dn-input"
             />
             <Button type="submit" disabled={!input.trim() || isTyping}>
               <Send className="w-4 h-4" />

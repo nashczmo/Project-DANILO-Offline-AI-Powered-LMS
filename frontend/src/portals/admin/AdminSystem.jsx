@@ -27,9 +27,8 @@ export default function AdminSystem() {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="System & DevOps" 
-        description="Monitor infrastructure parameters, server limits, and hardware utilization."
-        action={<Button variant="primary">Restart Services</Button>}
+        title="System Configuration" 
+        description="Manage core platform settings, database backups, and AI runtimes."
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -52,7 +51,7 @@ export default function AdminSystem() {
             <Card>
               <div className="flex items-center gap-3 mb-4">
                 <Cpu className="w-5 h-5 text-blue-500" />
-                <h3 className="font-bold">Ollama AI Engine</h3>
+                <h3 className="dn-title">Ollama AI Engine</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -78,7 +77,7 @@ export default function AdminSystem() {
             <Card>
               <div className="flex items-center gap-3 mb-4">
                 <Server className="w-5 h-5 text-purple-500" />
-                <h3 className="font-bold">Docker Health</h3>
+                <h3 className="dn-title">Docker Health</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -104,7 +103,7 @@ export default function AdminSystem() {
             <Card>
               <div className="flex items-center gap-3 mb-4">
                 <HardDrive className="w-5 h-5 text-orange-500" />
-                <h3 className="font-bold">Storage Volumes</h3>
+                <h3 className="dn-title">Storage Volumes</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -133,7 +132,7 @@ export default function AdminSystem() {
       <Card className="min-h-[300px]">
         <div className="flex items-center gap-2 mb-4">
           <Terminal className="w-5 h-5 text-danilo-text-secondary" />
-          <h3 className="text-lg font-bold">System Logs</h3>
+          <h3 className="dn-title">System Logs</h3>
         </div>
         
         {loading ? (

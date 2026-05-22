@@ -1,30 +1,37 @@
 import { Loader2 } from "lucide-react";
 
-export function Card({ children, className = "" }) {
+export function Card({ children, className = "", glass = false, hover = false }) {
+  const base = glass ? "dn-card-glass" : "dn-card";
+  const hoverClass = hover ? "dn-card-hover" : "";
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-danilo-border p-6 ${className}`}>
+    <div className={`${base} ${hoverClass} p-6 ${className}`}>
       {children}
     </div>
   );
 }
 
-export function Button({ children, variant = "primary", className = "", ...props }) {
-  const base = "inline-flex items-center justify-center font-medium transition-colors rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1";
+export function Button({ children, variant = "primary", size = "md", className = "", ...props }) {
   const variants = {
-    primary: "bg-danilo-primary text-white hover:bg-danilo-primary-hover focus:ring-danilo-primary",
-    secondary: "bg-danilo-bg-tertiary text-danilo-text hover:bg-danilo-border focus:ring-danilo-border",
-    danger: "bg-danilo-error text-white hover:bg-danilo-error-hover focus:ring-danilo-error",
-    ghost: "bg-transparent text-danilo-text-secondary hover:bg-danilo-bg-secondary hover:text-danilo-text focus:ring-danilo-border",
+    primary: "dn-btn-primary",
+    secondary: "dn-btn-secondary",
+    danger: "dn-btn-danger",
+    ghost: "dn-btn-ghost",
+    icon: "dn-btn-icon",
+  };
+  const sizes = {
+    sm: "dn-btn-sm",
+    md: "",
+    lg: "dn-btn-lg",
   };
   return (
-    <button className={`${base} ${variants[variant]} ${className}`} {...props}>
+    <button className={`dn-btn ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
       {children}
     </button>
   );
 }
 
 export function Skeleton({ className = "" }) {
-  return <div className={`animate-pulse bg-danilo-bg-tertiary rounded-lg ${className}`} />;
+  return <div className={`dn-shimmer ${className}`} />;
 }
 
 export function EmptyState({ icon: Icon, title, description, action }) {
@@ -42,10 +49,10 @@ export function EmptyState({ icon: Icon, title, description, action }) {
 
 export function PageHeader({ title, description, action }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
       <div>
-        <h1 className="text-2xl font-bold text-danilo-text tracking-tight">{title}</h1>
-        {description && <p className="text-sm text-danilo-text-secondary mt-1">{description}</p>}
+        <h1 className="dn-heading-lg">{title}</h1>
+        {description && <p className="dn-subtitle mt-2">{description}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

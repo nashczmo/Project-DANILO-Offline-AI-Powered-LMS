@@ -3,8 +3,9 @@
 init_logging() {
   umask 077
   mkdir -p "$(dirname -- "${LOG_FILE}")" 2>/dev/null || true
+  # Only send output to the log file by default, keeping terminal clean
   exec 3>&1
-  exec > >(tee -a "${LOG_FILE}") 2>&1
+  exec >> "${LOG_FILE}" 2>&1
 }
 
 format_duration() {
@@ -20,107 +21,76 @@ format_duration() {
   hours=$(( total_seconds / 3600 ))
   minutes=$(( (total_seconds % 3600) / 60 ))
   seconds=$(( total_seconds % 60 ))
-  printf '%02d:%02d:%02d' "${hours}" "${minutes}" "${seconds}"
+  if (( hours > 0 )); then
+    printf '%02d:%02d:%02d' "${hours}" "${minutes}" "${seconds}"
+  else
+    printf '%02d:%02d' "${minutes}" "${seconds}"
+  fi
 }
 
 rule() {
-  printf '%s' '------------------------------------------------------------'
-}
-
-progress_bar() {
-  local current="$1"
-  local total="$2"
-  local width=28
-  local filled=0
-  local i=0
-
-  if (( total > 0 )); then
-    filled=$(( current * width / total ))
-  fi
-
-  if (( filled > width )); then
-    filled="${width}"
-  fi
-
-  printf '['
-  for (( i = 0; i < width; i++ )); do
-    if (( i < filled )); then
-      printf '█'
-    else
-      printf '░'
-    fi
-  done
-  printf ']'
+  printf '%s' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 }
 
 print_install_intro() {
-  printf '\n%s\n' "$(rule)"
-  printf '%s%s' "${BOLD}" "${CYAN}"
-  cat <<'EOF'
-  ____                   _           _      ____    _    _   _ ___ _     ___  
- |  _ \ _ __ ___  ___   (_) ___  ___| |_   |  _ \  / \  | \ | |_ _| |   / _ \ 
- | |_) | '__/ _ \/ __|  | |/ _ \/ __| __|  | | | |/ _ \ |  \| || || |  | | | |
- |  __/| | | (_) \__ \  | |  __/ (__| |_   | |_| / ___ \| |\  || || |__| |_| |
- |_|   |_|  \___/|___/ _/ |\___|\___|\__|  |____/_/   \_\_| \_|___|_____\___/ 
-                      |__/                                                    
-EOF
-  printf '%s\n' "${RESET}"
-  printf '%s%sSETUP WIZARD v2.0 (Strict RBAC & Offline AI)%s\n' "${BOLD}" "${CYAN}" "${RESET}"
-  printf '%sDigital Assistant Network for Interactive Learning Offline%s\n' "${DIM}" "${RESET}"
-  printf '%sA clean, offline-first DepEd school portal installer for the 91%% learning poverty crisis%s\n' "${GREEN}" "${RESET}"
-  printf '%slog%s     %s\n' "${DIM}" "${RESET}" "${LOG_FILE}"
-  printf '%sstarted%s %s\n' "${DIM}" "${RESET}" "$(date '+%Y-%m-%d %H:%M:%S')"
+  # Output intro to the original console (fd 3)
+  printf '\n' >&3
+  printf '%s%s   Project DANILO Setup%s\n' "${BOLD}" "${CYAN}" "${RESET}" >&3
+  printf '%s   Offline AI-Powered Learning Management System%s\n' "${DIM}" "${RESET}" >&3
+  printf '   %s%s\n' "${DIM}" "$(rule)" >&3
+  printf '   %sStarted:%s %s\n' "${DIM}" "${RESET}" "$(date '+%Y-%m-%d %H:%M:%S')" >&3
+  printf '   %sLog File:%s %s\n' "${DIM}" "${RESET}" "${LOG_FILE}" >&3
+  printf '   %s%s\n\n' "${DIM}" "$(rule)" >&3
 }
 
 step() {
   local current="$1"
   local total="$2"
   local message="$3"
-  local now=0
-  local elapsed=0
-  local completed=0
-  local remaining=0
-  local eta_text="--:--:--"
-  local percent=0
-
+  
   CURRENT_STEP_INDEX="${current}"
   CURRENT_STEP_TOTAL="${total}"
   CURRENT_STEP_LABEL="${message}"
 
-  now="$(date +%s)"
-  elapsed=$(( now - INSTALL_STARTED_AT ))
-  completed=$(( current - 1 ))
-  remaining=$(( total - completed ))
-  percent=$(( current * 100 / total ))
+  printf '%s%s[%02d/%02d] %s%s\n' "${BOLD}" "${CYAN}" "${current}" "${total}" "${message}" "${RESET}" >&3
+}
 
-  if (( completed > 0 )); then
-    eta_text="$(format_duration $(( (elapsed / completed) * remaining )))"
-  fi
+note_status() {
+  local status="$1"
+  local msg="$2"
+  local color="${DIM}"
+  
+  case "${status}" in
+    OK) color="${GREEN}" ;;
+    FAIL) color="${RED}" ;;
+    WAIT) color="${YELLOW}" ;;
+    REPAIR) color="${CYAN}" ;;
+    SKIP) color="${DIM}" ;;
+    *) color="${DIM}" ;;
+  esac
 
-  printf '\n%s\n' "$(rule)"
-  printf '%s%sStep %02d of %02d%s %s\n' "${BOLD}" "${BLUE}" "${current}" "${total}" "${RESET}" "${message}"
-  printf '%s%s%s %3d%%\n' "${CYAN}" "$(progress_bar "${current}" "${total}")" "${RESET}" "${percent}"
-  printf '%selapsed%s %s   %seta%s %s\n' "${DIM}" "${RESET}" "$(format_duration "${elapsed}")" "${DIM}" "${RESET}" "${eta_text}"
+  # Left pad status to 6 chars
+  printf '   %s%6s%s %s\n' "${color}" "${status}" "${RESET}" "${msg}" >&3
 }
 
 note() {
-  printf '  %s[run]%s %s\n' "${BLUE}" "${RESET}" "$1"
+  note_status "WAIT" "$1"
 }
 
 ok() {
-  printf '  %s[ok]%s %s\n' "${GREEN}" "${RESET}" "$1"
+  note_status "OK" "$1"
 }
 
 warn() {
-  printf '  %s[warn]%s %s\n' "${YELLOW}" "${RESET}" "$1"
+  note_status "WARN" "$1"
 }
 
 skip() {
-  printf '  %s[skip]%s %s\n' "${DIM}" "${RESET}" "$1"
+  note_status "SKIP" "$1"
 }
 
 fail() {
-  printf '  %s[fail]%s %s\n' "${RED}" "${RESET}" "$1"
+  note_status "FAIL" "$1"
 }
 
 sanitize_text() {
@@ -141,12 +111,14 @@ read_env_value() {
   grep -E "^${key}=" "${env_file}" | tail -n1 | cut -d= -f2- || true
 }
 
-run_step_command() {
+run_resilient_command() {
   local description="$1"
   shift
   local command_text=""
   local safe_command=""
   local exit_code=0
+  local attempt=1
+  local max_attempts=3
 
   printf -v command_text '%q ' "$@"
   command_text="${command_text% }"
@@ -156,53 +128,55 @@ run_step_command() {
   LAST_RUN_COMMAND="${safe_command}"
   note "${description}"
 
-  if "$@"; then
-    ok "${description}"
-    LAST_RUN_DESCRIPTION=""
-    LAST_RUN_COMMAND=""
-    return 0
-  fi
+  while (( attempt <= max_attempts )); do
+    if "$@" >> "${LOG_FILE}" 2>&1; then
+      ok "${description}"
+      LAST_RUN_DESCRIPTION=""
+      LAST_RUN_COMMAND=""
+      return 0
+    fi
 
-  exit_code=$?
+    exit_code=$?
+    
+    if declare -f diagnose_and_repair >/dev/null; then
+      if diagnose_and_repair "${command_text}" "${exit_code}"; then
+        note_status "REPAIR" "Self-healing applied. Retrying command..."
+        (( attempt++ ))
+        continue
+      fi
+    fi
+
+    if (( attempt < max_attempts )); then
+      warn "Command failed (exit ${exit_code}), retrying in 3s..."
+      sleep 3
+    fi
+    (( attempt++ ))
+  done
+
   LAST_FAILED_DESCRIPTION="${description}"
   LAST_FAILED_COMMAND="${safe_command}"
-  fail "${description}"
-  printf '  %s[fail]%s command: %s\n' "${RED}" "${RESET}" "${safe_command}"
+  fail "${description} (Failed after ${max_attempts} attempts)"
   return "${exit_code}"
+}
+
+run_step_command() {
+  run_resilient_command "$@"
 }
 
 run_logged_function() {
   local label="$1"
   shift
-  note "Starting ${label}"
-  "$@"
-  ok "Finished ${label}"
-}
-
-retry_step_command() {
-  local max_attempts="${1:-3}"
-  local delay="${2:-5}"
-  local description="$3"
-  shift 3
-  local attempt=1
-  local exit_code=0
-
-  while (( attempt <= max_attempts )); do
-    note "${description} (attempt ${attempt}/${max_attempts})"
-    if "$@"; then
-      ok "${description}"
-      return 0
-    fi
-    exit_code=$?
-    if (( attempt < max_attempts )); then
-      warn "${description} failed (exit ${exit_code}), retrying in ${delay}s..."
-      sleep "${delay}"
-    fi
-    (( attempt++ ))
-  done
-
-  fail "${description} failed after ${max_attempts} attempts (exit ${exit_code})"
-  return "${exit_code}"
+  # We don't print "Starting..." to keep UI clean, we let inner commands print.
+  # But if there are no inner commands, we can just run it.
+  "$@" >> "${LOG_FILE}" 2>&1
+  # We check exit status. If failed, we don't say OK.
+  local exit_code=$?
+  if [[ "${exit_code}" -eq 0 ]]; then
+    return 0
+  else
+    fail "Module ${label} failed internally."
+    return "${exit_code}"
+  fi
 }
 
 print_failure() {
@@ -219,25 +193,19 @@ print_failure() {
   if [[ -n "${LAST_FAILED_COMMAND}" ]]; then
     safe_command="${LAST_FAILED_COMMAND}"
   fi
-  printf '\n%s\n' "$(rule)"
-  printf '%s%sProject DANILO setup needs attention.%s\n' "${BOLD}" "${RED}" "${RESET}"
-  printf 'The installer stopped during step %02d/%02d: %s\n' "${CURRENT_STEP_INDEX}" "${CURRENT_STEP_TOTAL}" "${CURRENT_STEP_LABEL}"
-  printf '  %s[help]%s Nothing was left half-configured intentionally; rollback has been attempted.\n' "${YELLOW}" "${RESET}"
-  printf '  %s[fail]%s section: %s\n' "${RED}" "${RESET}" "${failed_description}"
-  printf '  %s[fail]%s line: %s\n' "${RED}" "${RESET}" "${line_number}"
+  
+  printf '\n   %s%s%s\n' "${BOLD}" "${RED}" "Installation Encountered an Error" >&3
+  printf '   %s%s\n' "${DIM}" "$(rule)" >&3
+  printf '   %sIssue:%s %s\n' "${BOLD}" "${RESET}" "${failed_description}" >&3
+  printf '   %sLine:%s  %s\n' "${BOLD}" "${RESET}" "${line_number}" >&3
   if [[ -n "${safe_command}" ]]; then
-    printf '  %s[fail]%s command: %s\n' "${RED}" "${RESET}" "${safe_command}"
+    printf '   %sCmd:%s   %s\n' "${BOLD}" "${RESET}" "${safe_command}" >&3
   fi
-  printf '  %s[fail]%s exit code: %s\n' "${RED}" "${RESET}" "${exit_code}"
-  printf '  %s[help]%s Full log: %s\n' "${YELLOW}" "${RESET}" "${LOG_FILE}"
-  printf '  [help] Last 60 log lines\n' >&3
-  if [[ -r "${LOG_FILE}" ]]; then
-    tail -n 60 "${LOG_FILE}" >&3 || true
-  else
-    printf '  [help] Log file is not readable yet.\n' >&3
-  fi
-  printf '  %s[help]%s elapsed: %s\n' "${YELLOW}" "${RESET}" "$(format_duration "${elapsed}")"
-  exit "${exit_code}"
+  printf '   %sExit:%s  %s\n' "${BOLD}" "${RESET}" "${exit_code}" >&3
+  printf '\n   %sAuto-Recovery Failed:%s The installer attempted to self-heal but was unable to resolve the issue.\n' "${YELLOW}" "${RESET}" >&3
+  printf '   %sNext Steps:%s Check the full log file for detailed errors:\n' "${YELLOW}" "${RESET}" >&3
+  printf '   %s%s%s\n' "${DIM}" "${LOG_FILE}" "${RESET}" >&3
+  printf '   %s%s\n\n' "${DIM}" "$(rule)" >&3
 }
 
 active_ai_model() {
@@ -307,7 +275,7 @@ print_success() {
   elapsed=$(( $(date +%s) - INSTALL_STARTED_AT ))
 
   if [[ "${RESOLVER_PUBLIC_FALLBACK_USED}" -eq 1 ]]; then
-    restore_preferred_resolver_if_possible || note "Continuing with temporary public DNS because no local upstream resolver is available yet"
+    restore_preferred_resolver_if_possible || note "Continuing with temporary public DNS"
   fi
 
   active_model="$(active_ai_model)"
@@ -316,58 +284,31 @@ print_success() {
 
   cat >&3 <<EOF
 
-${BOLD}${GREEN}DANILO Installation Complete${RESET}
-$(rule)
-${BOLD}Username:${RESET} ${ADMIN_USERNAME:-admin}
-${BOLD}Password:${RESET} ${ADMIN_PASSWORD}
+   ${BOLD}${GREEN}Deployment Complete${RESET}
+   ${DIM}$(rule)${RESET}
+   
+   ${BOLD}Admin Login${RESET}
+   Username: ${ADMIN_USERNAME:-admin}
+   Password: ${ADMIN_PASSWORD}
+   ${DIM}(Change this password upon first login)${RESET}
 
-${BOLD}Access URL:${RESET}
-http://${access_ip}
-http://${PORTAL_DOMAIN}
+   ${BOLD}Platform Access${RESET}
+   Wi-Fi SSID:  ${SSID}
+   Wi-Fi Pass:  ${WIFI_PASSPHRASE}
+   Portal URL:  http://${PORTAL_DOMAIN}
+   Gateway IP:  ${LAN_IP}
 
-${BOLD}AI Model:${RESET}
-${active_model} (${model_status})
+   ${BOLD}AI Hardware Optimization${RESET}
+   Detected Profile: ${DANILO_AI_HARDWARE_PROFILE:-auto}
+   Selected Model:   ${active_model} (${model_status})
 
-${BOLD}wifi${RESET}      ${SSID}
-${BOLD}password${RESET}  ${WIFI_PASSPHRASE}
-${BOLD}elapsed${RESET}   $(format_duration "${elapsed}")
-${DIM}log${RESET}       ${LOG_FILE}
-
-${BOLD}mission${RESET}
-Project DANILO helps Philippine schools address the 91% learning poverty rate with local lessons, teacher tools, and safe AI tutoring that continue working offline.
-
-${BOLD}access flow${RESET}
-1. Join the Wi-Fi network shown above.
-2. Enter the password exactly as written above if prompted.
-3. Open ${BOLD}http://${PORTAL_DOMAIN}${RESET} if the portal does not appear automatically.
-
-${BOLD}admin account${RESET}
-- Admin username: ${BOLD}${ADMIN_USERNAME:-admin}${RESET}
-- Admin password: ${BOLD}${ADMIN_PASSWORD}${RESET}
-- Created/repaired by: backend startup seed_defaults()
-${BOLD}${YELLOW}warning${RESET} Change the admin password after first login.
-${BOLD}important${RESET} Save this password. A root-only copy was saved to ${CREDENTIALS_FILE}.
-${DIM}note${RESET} The admin password is printed only on this operator console after a successful install and is not written to the install log.
-
-${BOLD}demo role accounts${RESET}
-$(if [[ "${DANILO_SEED_DEMO}" == "1" ]]; then printf '%s\n%s\n%s' '- Teacher: teacher1 / teacher123' '- Teacher: teacher2 / teacher123' '- Students: student1 through student10 / student123'; else printf '%s' '- Disabled. Reinstall with DANILO_SEED_DEMO=1 to create sample LMS data.'; fi)
-
-${BOLD}services${RESET}
-- Gateway IP: ${LAN_IP}
-- Portal URL: http://${PORTAL_DOMAIN}
-- Backend status: healthy at http://${PORTAL_DOMAIN}/api/health
-- Database status: PostgreSQL healthy; users table migrated and admin verified
-- AI model status: ${active_model} (${model_status})
-- Credentials file: ${CREDENTIALS_FILE} (root-only)
-- Access Point interface: ${AP_WIFI_IFACE}
-- Internet download interface used during install: ${UPLINK_WIFI_IFACE:-current system uplink}
-- Installed stack root: ${PROJECT_ROOT}
+   ${DIM}Time Elapsed: $(format_duration "${elapsed}")
+   Log File:     ${LOG_FILE}${RESET}
 EOF
 }
 
 finalize_success() {
   INSTALL_SUCCEEDED=1
   trap - ERR
-  note "All readiness checks passed; printing final deployment summary to the operator console"
   print_success
 }

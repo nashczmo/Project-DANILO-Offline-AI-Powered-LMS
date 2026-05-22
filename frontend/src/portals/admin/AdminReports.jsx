@@ -32,9 +32,8 @@ export default function AdminReports() {
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="Institutional Reports" 
-        description="Institutional analytics and insights across all departments and courses."
-        action={<Button variant="secondary">Export Report</Button>}
+        title="System Reports" 
+        description="Generate and analyze platform usage and academic performance data."
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -93,7 +92,7 @@ export default function AdminReports() {
         )}
       </div>
 
-      <h3 className="text-xl font-bold mt-8 mb-4">AI Tutor Usage Analytics</h3>
+      <h3 className="dn-heading-md mt-8 mb-4">AI Tutor Usage Analytics</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {loading ? (
           <>
@@ -152,7 +151,7 @@ export default function AdminReports() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
         <Card className="min-h-[400px] flex flex-col">
-          <h3 className="text-lg font-bold mb-4">Enrollment Trends</h3>
+          <h3 className="dn-title mb-4">Enrollment Trends</h3>
           <div className="flex-1 flex items-center justify-center">
             {loading ? (
               <Skeleton className="w-full h-full min-h-[300px]" />
@@ -167,7 +166,7 @@ export default function AdminReports() {
         </Card>
 
         <Card className="min-h-[400px] flex flex-col">
-          <h3 className="text-lg font-bold mb-4">Department Performance</h3>
+          <h3 className="dn-title mb-4">Department Performance</h3>
           <div className="flex-1 flex items-center justify-center">
             {loading ? (
               <Skeleton className="w-full h-full min-h-[300px]" />

@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <h3 className="text-lg font-bold mb-4">Recent Activity</h3>
+          <h3 className="dn-title mb-4">Recent Activity</h3>
           {loading ? (
             <div className="space-y-4">
               <Skeleton className="h-12" />
@@ -126,7 +126,7 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-          <h3 className="text-lg font-bold mb-4">Storage Usage</h3>
+          <h3 className="dn-title mb-4">Storage Usage</h3>
           {loading ? (
             <Skeleton className="h-48" />
           ) : (

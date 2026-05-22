@@ -37,11 +37,7 @@ export default function StudentLayout({ children }) {
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
-                  isActive
-                    ? "bg-danilo-primary text-white"
-                    : "text-danilo-text-secondary hover:bg-danilo-bg-secondary hover:text-danilo-text"
-                }`
+                `dn-nav-item ${isActive ? "active" : ""}`
               }
             >
               <link.icon className="w-5 h-5" />
@@ -54,7 +50,7 @@ export default function StudentLayout({ children }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="h-16 bg-white border-b border-danilo-border flex items-center justify-between px-4 sm:px-6 z-10">
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-danilo-border flex items-center justify-between px-4 sm:px-6 z-10 sticky top-0">
           <div className="flex items-center md:hidden">
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 -ml-2 text-danilo-text-secondary hover:text-danilo-text focus:outline-none">
               <Menu className="w-6 h-6" />
@@ -106,11 +102,7 @@ export default function StudentLayout({ children }) {
                   to={link.to}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-xl font-medium ${
-                      isActive
-                        ? "bg-danilo-primary text-white"
-                        : "text-danilo-text-secondary hover:bg-danilo-bg-secondary"
-                    }`
+                    `dn-nav-item ${isActive ? "active" : ""}`
                   }
                 >
                   <link.icon className="w-5 h-5" />

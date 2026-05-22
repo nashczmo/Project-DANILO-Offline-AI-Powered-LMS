@@ -46,11 +46,7 @@ export default function AdminLayout({ children }) {
               to={item.path}
               end={item.path === '.'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-danilo-primary text-white'
-                    : 'text-danilo-text-secondary hover:bg-danilo-bg-secondary hover:text-danilo-text'
-                }`
+                `dn-nav-item ${isActive ? "active" : ""}`
               }
             >
               <item.icon className="w-5 h-5" />
@@ -63,7 +59,7 @@ export default function AdminLayout({ children }) {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="h-16 bg-white border-b border-danilo-border flex items-center justify-between px-6 shrink-0">
+        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-danilo-border flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
           <div className="flex items-center md:hidden">
             <Menu className="w-6 h-6 text-danilo-text-secondary" />
           </div>
@@ -110,11 +106,7 @@ export default function AdminLayout({ children }) {
                 to={item.path}
                 end={item.path === '.'}
                 className={({ isActive }) =>
-                  `flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                    isActive
-                      ? 'bg-danilo-primary text-white'
-                      : 'text-danilo-text-secondary'
-                  }`
+                  `dn-nav-item ${isActive ? "active" : ""}`
                 }
               >
                 <item.icon className="w-4 h-4" />
