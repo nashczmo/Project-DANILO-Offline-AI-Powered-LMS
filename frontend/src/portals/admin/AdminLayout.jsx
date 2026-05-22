@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { 
   LayoutDashboard, 
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui';
 
-export default function AdminLayout() {
+export default function AdminLayout({ children }) {
   const { user, logout } = useAppStore();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -124,7 +124,7 @@ export default function AdminLayout() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <Outlet />
+          {children}
         </div>
       </main>
     </div>
