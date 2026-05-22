@@ -7,7 +7,7 @@ import StudentPortal from "./portals/student/StudentPortal";
 import TeacherPortal from "./portals/teacher/TeacherPortal";
 import AdminPortal from "./portals/admin/AdminPortal";
 import { apiRequest } from "./api";
-import { Loader2 } from "lucide-react";
+import { ErrorBoundary } from "./components/ui";
 
 export default function App() {
   const token = useAppStore((s) => s.token);
@@ -78,7 +78,8 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <ErrorBoundary>
+      <Routes>
       <Route 
         path="/student/*" 
         element={
@@ -113,6 +114,7 @@ export default function App() {
           </button>
         </div>
       } />
-    </Routes>
+      </Routes>
+    </ErrorBoundary>
   );
 }

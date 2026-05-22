@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Card, Button, PageHeader } from "../../components/ui";
 import { Send, Bot, User, Sparkles } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
+import { apiUrl } from "../../api";
 
 export default function StudentTutor() {
   const [messages, setMessages] = useState([
@@ -46,7 +47,7 @@ export default function StudentTutor() {
         query = `${text}\n\n[System Instruction: ${hiddenInstruction}]`;
       }
 
-      const response = await fetch('/api/ai/tutor/stream', {
+      const response = await fetch(apiUrl('/ai/tutor/stream'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

@@ -55,3 +55,5 @@ export function PageHeader({ title, description, action }) {
 export function Spinner({ className = "" }) {
   return <Loader2 className={`animate-spin text-danilo-primary ${className}`} />;
 }
+
+export { ErrorBoundary } from "./ErrorBoundary";
