@@ -23,8 +23,8 @@ validate_ubuntu_version() {
   fi
 
   . /etc/os-release
-  if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
-    echo "Unsupported OS: ${PRETTY_NAME:-unknown}. Project DANILO targets Ubuntu 24.04."
+  if [[ "${ID:-}" != "ubuntu" ]]; then
+    echo "Unsupported OS: ${PRETTY_NAME:-unknown}. Project DANILO targets Ubuntu."
     exit 1
   fi
 }
