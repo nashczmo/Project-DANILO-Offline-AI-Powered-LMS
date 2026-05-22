@@ -161,11 +161,20 @@ apt_install() {
 
 prepare_apt() {
   export DEBIAN_FRONTEND=noninteractive
+  # Fix broken apt lists from previous failed runs
+  if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+    rm -f /etc/apt/sources.list.d/docker.list
+  fi
+  if [[ ! -f /etc/apt/keyrings/nodesource.gpg ]]; then
+    rm -f /etc/apt/sources.list.d/nodesource.list
+  fi
+
   if ! run_step_command "Refreshing apt package lists" apt-get update -y -qq; then
     warn "apt update failed; attempting install from the local package cache"
   fi
   apt_install apt-transport-https ca-certificates curl gnupg software-properties-common \
     lsb-release jq unzip git build-essential rfkill iw net-tools avahi-daemon \
     network-manager hostapd dnsmasq iptables-persistent netfilter-persistent \
-    python3.12 python3.12-venv python3-pip openssl e2fsprogs psmisc logrotate rsync pciutils
+    python3 python3-venv python3-pip openssl e2fsprogs psmisc logrotate rsync pciutils \
+    nodejs npm
 }
