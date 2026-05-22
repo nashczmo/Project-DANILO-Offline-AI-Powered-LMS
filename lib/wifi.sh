@@ -1,7 +1,35 @@
 # Project DANILO installer module: wifi.sh
 
 list_wifi_interfaces() {
-  iw dev 2>/dev/null | awk '$1 == "Interface" { print $2 }'
+  local iface=""
+  local seen=()
+  
+  while read -r iface; do
+    if [[ -n "${iface}" ]]; then
+      echo "${iface}"
+      seen+=("${iface}")
+    fi
+  done < <(iw dev 2>/dev/null | awk '$1 == "Interface" { print $2 }')
+
+  for dev_dir in /sys/class/net/*; do
+    [[ -e "${dev_dir}" ]] || continue
+    iface="$(basename "${dev_dir}")"
+    [[ "${iface}" == "lo" ]] && continue
+    
+    local already_seen=0
+    for s in "${seen[@]}"; do
+      if [[ "${s}" == "${iface}" ]]; then
+        already_seen=1
+        break
+      fi
+    done
+    [[ "${already_seen}" -eq 1 ]] && continue
+
+    if [[ -d "${dev_dir}/wireless" ]] || [[ -d "${dev_dir}/phy80211" ]]; then
+      echo "${iface}"
+      seen+=("${iface}")
+    fi
+  done
 }
 
 interface_bus_type() {
@@ -95,14 +123,9 @@ detect_wifi_roles() {
     sleep 5
     detect_wifi_roles_inner
     if [[ -z "${AP_WIFI_IFACE}" ]]; then
-      fail "Unable to detect a Wi-Fi interface for the DANILO access point."
-      echo ""
-      echo "Troubleshooting:"
-      echo "  1. Ensure a USB Wi-Fi adapter is plugged in"
-      echo "  2. Run 'lsusb' to confirm it is recognized"
-      echo "  3. Run 'iw dev' to list Wi-Fi interfaces"
-      echo "  4. Override manually: DANILO_WIFI_IFACE=wlan0 sudo bash danilo.sh --install"
-      exit 1
+      warn "Unable to detect any Wi-Fi interface. Falling back to LAPTOP/LOCAL-ONLY mode."
+      LAPTOP_LOCAL_MODE=1
+      AP_WIFI_IFACE="lo"
     fi
   fi
 }
@@ -134,10 +157,35 @@ prepare_wifi_hardware() {
   run_step_command "Restarting NetworkManager before Wi-Fi detection" systemctl restart NetworkManager
   sleep 4
 
+  # Force a re-scan by resetting LAPTOP_LOCAL_MODE to 0 at the start of the step
+  LAPTOP_LOCAL_MODE=0
+
   detect_wifi_roles
 
   mkdir -p "${RUNTIME_ROOT}"
-  validate_wifi_capability "${AP_WIFI_IFACE}"
+
+  if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]]; then
+    echo "1" > "${RUNTIME_ROOT}/local_mode"
+    echo "lo" > "${RUNTIME_ROOT}/wifi_iface"
+    echo "" > "${RUNTIME_ROOT}/internal_wifi_iface"
+    echo "00:00:00:00:00:00" > "${RUNTIME_ROOT}/wifi_mac"
+    note "Project DANILO is configured in LAPTOP/LOCAL-ONLY mode fallback. AP networking will be bypassed."
+    return 0
+  fi
+
+  if ! validate_wifi_capability "${AP_WIFI_IFACE}"; then
+    warn "Wi-Fi interface '${AP_WIFI_IFACE}' does not support AP mode. Falling back to LAPTOP/LOCAL-ONLY mode."
+    LAPTOP_LOCAL_MODE=1
+    echo "1" > "${RUNTIME_ROOT}/local_mode"
+    echo "lo" > "${RUNTIME_ROOT}/wifi_iface"
+    echo "" > "${RUNTIME_ROOT}/internal_wifi_iface"
+    echo "00:00:00:00:00:00" > "${RUNTIME_ROOT}/wifi_mac"
+    return 0
+  fi
+
+  # Successfully validated AP hardware capability! Remove any stale local_mode markers
+  rm -f "${RUNTIME_ROOT}/local_mode"
+
   validate_wifi_passphrase
   WIFI_IFACE="${AP_WIFI_IFACE}"
   echo "${AP_WIFI_IFACE}" > "${RUNTIME_ROOT}/wifi_iface"

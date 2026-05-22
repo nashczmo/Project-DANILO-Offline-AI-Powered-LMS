@@ -1,6 +1,7 @@
 # Project DANILO installer module: docker.sh
 
 install_docker() {
+  require_command curl
   if command_missing docker || ! docker compose version >/dev/null 2>&1; then
     note "Installing Docker Engine and Docker Compose plugin"
     run_step_command "Creating apt keyrings directory" install -d -m 0755 /etc/apt/keyrings
@@ -13,6 +14,7 @@ install_docker() {
     cat >/etc/apt/sources.list.d/docker.list <<EOF
 deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${VERSION_CODENAME}") stable
 EOF
+    chmod 0644 /etc/apt/sources.list.d/docker.list
     run_step_command "Refreshing apt package lists for Docker" apt-get update -y -qq
     apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     run_step_command "Starting Docker daemon" systemctl enable --now docker
@@ -22,6 +24,8 @@ EOF
 }
 
 install_node() {
+  require_command curl
+  require_command gpg gnupg
   local current_major="0"
   if command -v node >/dev/null 2>&1; then
     current_major="$(node -p 'process.versions.node.split(".")[0]')"
@@ -40,6 +44,7 @@ install_node() {
     cat >/etc/apt/sources.list.d/nodesource.list <<EOF
 deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main
 EOF
+    chmod 0644 /etc/apt/sources.list.d/nodesource.list
     run_step_command "Refreshing apt package lists for Node.js" apt-get update -y -qq
     apt_install nodejs
   else
@@ -67,6 +72,7 @@ ${LOG_FILE} {
   create 0640 root adm
 }
 EOF
+  chmod 0644 /etc/logrotate.d/danilo-install
 }
 
 write_compose_file() {

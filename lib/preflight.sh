@@ -5,12 +5,66 @@ command_missing() {
 }
 
 require_command() {
-  if command_missing "$1"; then
-    echo "Required command is missing: $1"
-    echo "Install the base Ubuntu packages or reconnect internet, then re-run this installer."
-    exit 1
+  local cmd="$1"
+  local pkg="${2:-$1}"
+
+  if command_missing "${cmd}"; then
+    if [[ "${cmd}" == "docker" ]]; then
+      if declare -f install_docker >/dev/null; then
+        note "Required command 'docker' is missing. Attempting self-healing installation of Docker..."
+        install_docker
+        if command_missing docker; then
+          echo "Docker could not be auto-installed. Please check your internet connection or install docker manually."
+          exit 1
+        fi
+        return 0
+      else
+        pkg="docker.io"
+      fi
+    elif [[ "${cmd}" == "npm" || "${cmd}" == "node" ]]; then
+      if declare -f install_node >/dev/null; then
+        note "Required command '${cmd}' is missing. Attempting self-healing installation of Node.js..."
+        install_node
+        if command_missing "${cmd}"; then
+          echo "Node.js/npm could not be auto-installed. Please check your internet connection or install nodejs/npm manually."
+          exit 1
+        fi
+        return 0
+      else
+        pkg="nodejs"
+      fi
+    fi
+
+    # Map other standard commands to their packages
+    if [[ "${cmd}" == "awk" ]]; then pkg="gawk"; fi
+    if [[ "${cmd}" == "ip" ]]; then pkg="iproute2"; fi
+    if [[ "${cmd}" == "ss" ]]; then pkg="iproute2"; fi
+    if [[ "${cmd}" == "df" ]]; then pkg="coreutils"; fi
+    if [[ "${cmd}" == "free" ]]; then pkg="procps"; fi
+    if [[ "${cmd}" == "systemctl" ]]; then pkg="systemd"; fi
+
+    note "Required command '${cmd}' is missing. Attempting self-healing installation..."
+    export DEBIAN_FRONTEND=noninteractive
+    
+    # Try installing without update first (faster)
+    if apt-get install -y -qq "${pkg}" >/dev/null 2>&1; then
+      ok "Self-healed missing command '${cmd}' by installing '${pkg}'"
+      return 0
+    fi
+    
+    # If that fails, do a quick apt update and retry
+    note "Refreshing package list to locate '${pkg}'..."
+    apt-get update -y -qq >/dev/null 2>&1 || true
+    if apt-get install -y -qq "${pkg}"; then
+      ok "Self-healed missing command '${cmd}' by installing '${pkg}'"
+    else
+      echo "Required command is missing and could not be auto-installed: ${cmd} (package: ${pkg})"
+      echo "Install the base Ubuntu packages or reconnect internet, then re-run this installer."
+      exit 1
+    fi
   fi
 }
+
 
 # -----------------------------------------------------------------------------
 # Preflight and dependency installation
@@ -32,24 +86,28 @@ validate_ubuntu_version() {
 validate_disk_space() {
   local available_kb=0
   local required_kb="${DANILO_MIN_FREE_KB:-31457280}"
-  available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+  available_kb="$(df -Pk / 2>/dev/null | awk 'NR == 2 { print $4 }' || echo 0)"
+  [[ "${available_kb}" =~ ^[0-9]+$ ]] || available_kb=0
   if (( available_kb < required_kb )); then
-    echo "Not enough free disk space under /opt. Need at least $((required_kb / 1024 / 1024)) GB free."
-    exit 1
+    warn "Low disk space under /opt. Has $((available_kb / 1024 / 1024)) GB free (Project DANILO recommends at least $((required_kb / 1024 / 1024)) GB for containers and AI models)."
+    warn "Proceeding with installation on your hardware anyway."
+  else
+    note "Disk space check passed: $((available_kb / 1024 / 1024)) GB free"
   fi
 }
 
 validate_wifi_capability() {
   local iface="$1"
   if [[ -z "${iface}" || ! -d "/sys/class/net/${iface}" ]]; then
-    echo "Configured access-point interface is not present: ${iface:-none}"
-    exit 1
+    warn "Configured access-point interface is not present: ${iface:-none}"
+    return 1
   fi
 
   if ! iw list 2>/dev/null | awk '/Supported interface modes:/,/Band [0-9]+:/' | grep -q '\* AP'; then
-    echo "No AP-capable Wi-Fi interface was detected. Use DANILO_WIFI_IFACE to select a known AP-capable adapter."
-    exit 1
+    warn "No AP-capable Wi-Fi interface was detected."
+    return 1
   fi
+  return 0
 }
 
 validate_wifi_passphrase() {

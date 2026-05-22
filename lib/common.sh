@@ -108,6 +108,13 @@ umask 077
 INSTALL_MODE="install"
 VERIFY_FAILED=0
 
+if [[ -f "${RUNTIME_ROOT}/local_mode" ]]; then
+  LAPTOP_LOCAL_MODE=1
+else
+  LAPTOP_LOCAL_MODE=0
+fi
+
+
 require_root() {
   if [[ "${EUID}" -ne 0 ]]; then
     echo "This installer must be run as root or with sudo."

@@ -1,6 +1,10 @@
 # Project DANILO installer module: network.sh
 
 clear_port_53_and_restore_upstream_dns() {
+  if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]]; then
+    note "Laptop/Local mode active: bypassing systemd-resolved port 53 / dnsmasq conflicts"
+    return 0
+  fi
   local resolv_backup=""
 
   note "Disabling the systemd-resolved stub listener on port 53"
@@ -13,6 +17,7 @@ clear_port_53_and_restore_upstream_dns() {
 [Resolve]
 DNSStubListener=no
 EOF
+  chmod 0644 /etc/systemd/resolved.conf.d/no-stub.conf
 
   run_step_command "Restarting systemd-resolved without the stub listener" systemctl restart systemd-resolved
   chattr -i /etc/resolv.conf >/dev/null 2>&1 || true
@@ -28,6 +33,7 @@ EOF
   else
     note "No usable local resolver found; using public DNS as a temporary install fallback"
     printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+    chmod 0644 /etc/resolv.conf
     RESOLVER_PUBLIC_FALLBACK_USED=1
   fi
 }
@@ -65,12 +71,39 @@ reset_dnsmasq_master_config() {
     :
   else
     echo "conf-dir=/etc/dnsmasq.d/,*.conf" > /etc/dnsmasq.conf
+    chmod 0644 /etc/dnsmasq.conf
   fi
   backup_managed_file /etc/dnsmasq.d/danilo.conf
   rm -f /etc/dnsmasq.d/danilo.conf
 }
 
 write_network_scripts() {
+  if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]]; then
+    note "Laptop/Local mode active: writing dummy/no-op AP network scripts"
+    
+    backup_managed_file /usr/local/bin/danilo-network-up.sh
+    cat > /usr/local/bin/danilo-network-up.sh <<'EOF'
+#!/usr/bin/env bash
+echo "Laptop Mode: AP networking is bypassed."
+exit 0
+EOF
+    chmod +x /usr/local/bin/danilo-network-up.sh
+
+    backup_managed_file /usr/local/bin/danilo-network-down.sh
+    cat > /usr/local/bin/danilo-network-down.sh <<'EOF'
+#!/usr/bin/env bash
+echo "Laptop Mode: AP networking is bypassed."
+exit 0
+EOF
+    chmod +x /usr/local/bin/danilo-network-down.sh
+
+    if ! grep -q "danilo.local" /etc/hosts; then
+      note "Adding local hostname mapping for danilo.local to /etc/hosts"
+      echo "127.0.0.1 danilo.local" >> /etc/hosts
+    fi
+    return 0
+  fi
+
   reset_dnsmasq_master_config
 
   backup_managed_file /etc/NetworkManager/conf.d/99-danilo.conf
@@ -79,6 +112,7 @@ write_network_scripts() {
 match-device=mac:${WIFI_MAC}
 managed=0
 EOF
+  chmod 0644 /etc/NetworkManager/conf.d/99-danilo.conf
   systemctl restart NetworkManager >/dev/null 2>&1 || true
 
   mkdir -p /etc/dnsmasq.d /etc/hostapd
@@ -100,6 +134,7 @@ address=/clients3.google.com/${LAN_IP}
 log-queries
 log-dhcp
 EOF
+  chmod 0644 /etc/dnsmasq.d/danilo.conf
 
   backup_managed_file /etc/hostapd/danilo.conf
   cat > /etc/hostapd/danilo.conf <<EOF
@@ -117,16 +152,19 @@ wpa_passphrase=${WIFI_PASSPHRASE}
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 EOF
+  chmod 0644 /etc/hostapd/danilo.conf
 
   backup_managed_file /etc/default/hostapd
   cat >/etc/default/hostapd <<'EOF'
 DAEMON_CONF="/etc/hostapd/danilo.conf"
 EOF
+  chmod 0644 /etc/default/hostapd
 
   backup_managed_file /etc/sysctl.d/98-danilo-ipforward.conf
   cat >/etc/sysctl.d/98-danilo-ipforward.conf <<'EOF'
 net.ipv4.ip_forward=1
 EOF
+  chmod 0644 /etc/sysctl.d/98-danilo-ipforward.conf
 
   backup_managed_file /usr/local/bin/danilo-network-up.sh
   cat > /usr/local/bin/danilo-network-up.sh <<EOF

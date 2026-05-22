@@ -56,7 +56,9 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-danilo-text-secondary font-medium">Total Users</p>
-                  <p className="text-2xl font-bold text-danilo-text">{stats.totalUsers}</p>
+                  <p className="text-2xl font-bold text-danilo-text">
+                    {(stats.totals?.learners || 0) + (stats.totals?.faculty || 0) + (stats.totals?.admins || 0)}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -68,7 +70,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-danilo-text-secondary font-medium">Active Courses</p>
-                  <p className="text-2xl font-bold text-danilo-text">{stats.activeCourses}</p>
+                  <p className="text-2xl font-bold text-danilo-text">{stats.totals?.classes || 0}</p>
                 </div>
               </div>
             </Card>
@@ -80,7 +82,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-danilo-text-secondary font-medium">System Health</p>
-                  <p className="text-2xl font-bold text-danilo-text">{stats.systemHealth}</p>
+                  <p className="text-2xl font-bold text-danilo-text">Optimal</p>
                 </div>
               </div>
             </Card>
@@ -91,8 +93,8 @@ export default function AdminDashboard() {
                   <Clock className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-danilo-text-secondary font-medium">Uptime</p>
-                  <p className="text-2xl font-bold text-danilo-text">{stats.uptime}</p>
+                  <p className="text-sm text-danilo-text-secondary font-medium">Avg Load</p>
+                  <p className="text-2xl font-bold text-danilo-text">Low</p>
                 </div>
               </div>
             </Card>

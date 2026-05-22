@@ -498,6 +498,7 @@ ExecStop=/usr/local/bin/danilo-network-down.sh
 [Install]
 WantedBy=multi-user.target
 EOF
+  chmod 0644 /etc/systemd/system/danilo-ap.service
 
   backup_managed_file /etc/systemd/system/danilo-stack.service
   cat >/etc/systemd/system/danilo-stack.service <<EOF
@@ -522,6 +523,7 @@ TimeoutStartSec=0
 [Install]
 WantedBy=multi-user.target
 EOF
+  chmod 0644 /etc/systemd/system/danilo-stack.service
 
   run_step_command "Reloading systemd units for DANILO services" systemctl daemon-reload
   run_step_command "Enabling DANILO systemd services" systemctl enable danilo-ap.service danilo-stack.service

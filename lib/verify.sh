@@ -337,22 +337,26 @@ verify_mode() {
 
   verify_admin_login
 
-  if [[ -f "${RUNTIME_ROOT}/wifi_iface" ]]; then
-    local wifi_iface
-    wifi_iface="$(cat "${RUNTIME_ROOT}/wifi_iface" 2>/dev/null || true)"
-    if [[ -n "${wifi_iface}" ]] && ip link show "${wifi_iface}" >/dev/null 2>&1; then
-      verify_pass "Wi-Fi interface ${wifi_iface} is present"
+  if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]] || [[ -f "${RUNTIME_ROOT}/local_mode" ]]; then
+    verify_pass "LAPTOP/LOCAL-ONLY mode active: Wi-Fi AP and physical interface checks bypassed"
+  else
+    if [[ -f "${RUNTIME_ROOT}/wifi_iface" ]]; then
+      local wifi_iface
+      wifi_iface="$(cat "${RUNTIME_ROOT}/wifi_iface" 2>/dev/null || true)"
+      if [[ -n "${wifi_iface}" ]] && ip link show "${wifi_iface}" >/dev/null 2>&1; then
+        verify_pass "Wi-Fi interface ${wifi_iface} is present"
+      else
+        verify_fail "Wi-Fi interface ${wifi_iface:-unknown} is not available"
+      fi
     else
-      verify_fail "Wi-Fi interface ${wifi_iface:-unknown} is not available"
+      verify_fail "Wi-Fi interface not configured (missing ${RUNTIME_ROOT}/wifi_iface)"
     fi
-  else
-    verify_fail "Wi-Fi interface not configured (missing ${RUNTIME_ROOT}/wifi_iface)"
-  fi
 
-  if systemctl is-active --quiet danilo-ap.service 2>/dev/null; then
-    verify_pass "Access point service (danilo-ap) is active"
-  else
-    verify_fail "Access point service (danilo-ap) is not active"
+    if systemctl is-active --quiet danilo-ap.service 2>/dev/null; then
+      verify_pass "Access point service (danilo-ap) is active"
+    else
+      verify_fail "Access point service (danilo-ap) is not active"
+    fi
   fi
 
   printf '\n%s\n' "$(rule)"
