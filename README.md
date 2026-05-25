@@ -1,7 +1,6 @@
 # Project DANILO
 
 ![Status](https://img.shields.io/badge/Status-Beta-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
 
 Project DANILO is a complete, offline-first, AI-native Learning Management System (LMS) engineered for low-connectivity environments. It features a premium, role-based UI (Student, Teacher, Admin), live dynamic hardware benchmarking for optimized offline AI (via WhichLLM), and is designed for strict educational alignment.
 
