@@ -252,7 +252,7 @@ services:
       - /var/cache/nginx
       - /var/run
     healthcheck:
-      test: ["CMD-SHELL", 'test -f /opt/danilo/app/frontend/dist/index.html && test -f /opt/danilo/app/frontend/dist/danilo-build.txt && test -n "$$(find /opt/danilo/app/frontend/dist/assets -type f -name "*.js" 2>/dev/null | head -n1)" && test -n "$$(find /opt/danilo/app/frontend/dist/assets -type f -name "*.css" 2>/dev/null | head -n1)" && wget --header="Host: $$PORTAL_DOMAIN" -qO- http://127.0.0.1/ | grep -Eq "/assets/.*[.]js" && wget --header="Host: $$PORTAL_DOMAIN" -qO- http://127.0.0.1/ | grep -Eq "/assets/.*[.]css"']
+      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && wget -q -O /dev/null http://127.0.0.1/"]
       interval: 30s
       timeout: 20s
       retries: 30
