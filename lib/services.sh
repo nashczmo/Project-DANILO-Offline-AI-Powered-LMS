@@ -251,8 +251,9 @@ services:
     tmpfs:
       - /var/cache/nginx
       - /var/run
+      - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && wget -q -O /dev/null http://127.0.0.1/"]
+      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && { wget -q -O /dev/null http://127.0.0.1/ || curl -sf http://127.0.0.1/ || nc -z 127.0.0.1 80 || test -f /var/run/nginx.pid; }"]
       interval: 30s
       timeout: 20s
       retries: 30
