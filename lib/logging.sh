@@ -239,6 +239,11 @@ print_failure() {
   printf '\n  %sAuto-Healing Failure:%s The self-recovery pipeline was unable to repair this step.\n' "${YELLOW}" "${RESET}" >&3
   printf '  %sDiagnostics:%s Please check the system installation log for absolute details:\n' "${YELLOW}" "${RESET}" >&3
   printf '  %s%s%s\n' "${DIM}" "${LOG_FILE}" "${RESET}" >&3
+  printf '  %s────────────────────────────────────────────────────────%s\n' "${DIM}" "${RESET}" >&3
+  printf '  %sLast 15 lines of the log file:%s\n' "${BOLD}" "${RESET}" >&3
+  tail -n 15 "${LOG_FILE}" | while read -r line; do
+    printf '  %s%s%s\n' "${DIM}" "${line}" "${RESET}" >&3
+  done
   printf '  %s────────────────────────────────────────────────────────%s\n\n' "${DIM}" "${RESET}" >&3
 }
 

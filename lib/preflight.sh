@@ -214,7 +214,7 @@ preflight_checks() {
 }
 
 apt_install() {
-  run_step_command "Installing apt packages" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"
+  run_step_command "Installing apt packages" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -o DPkg::Lock::Timeout=120 "$@"
 }
 
 apt_update_once() {
@@ -260,7 +260,7 @@ install_base_dependencies() {
     python3 python3-venv python3-pip
   )
 
-  if ! run_resilient_command "Installing base OS dependencies" apt-get install -y -qq "${packages[@]}"; then
+  if ! run_resilient_command "Installing base OS dependencies" apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -o DPkg::Lock::Timeout=120 "${packages[@]}"; then
     fail "Failed to install base dependencies. Please check your internet connection or apt sources."
     exit 1
   fi
