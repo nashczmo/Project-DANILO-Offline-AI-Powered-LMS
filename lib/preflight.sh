@@ -256,7 +256,7 @@ install_base_dependencies() {
     apt-transport-https ca-certificates curl wget gnupg gpg software-properties-common
     lsb-release jq unzip tar git build-essential pkg-config
     iproute2 iptables iptables-persistent netfilter-persistent net-tools dnsutils network-manager dnsmasq hostapd
-    rfkill wireless-tools pciutils usbutils lshw e2fsprogs psmisc logrotate rsync openssl avahi-daemon
+    rfkill iw pciutils usbutils lshw e2fsprogs psmisc logrotate rsync openssl avahi-daemon
     python3 python3-venv python3-pip
   )
 
