@@ -47,7 +47,7 @@ def action_for(status: str, weak_topic: str | None, missing_count: int) -> str:
     return "Keep the learner engaged with enrichment or peer support tasks."
 
 
-def analyze_student_performance(db: Session, class_id: int) -> dict:
+def analyze_student_performance(db: Session, class_id: str) -> dict:
     course = db.get(Course, class_id)
     if not course:
         return {"course": None, "students": [], "classWeakTopics": [], "stats": {}}

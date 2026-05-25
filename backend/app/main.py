@@ -593,7 +593,7 @@ def generated_username_from_name(full_name: str, role: str='student', section_na
         domain = 'danilo.edu'
     return f'{base}@{domain}'
 
-def unique_local_username(db: Session, base_username: str, user_id: int | None=None) -> str:
+def unique_local_username(db: Session, base_username: str, user_id: str | None=None) -> str:
     import string
     if '@' in base_username:
         prefix, domain = base_username.split('@', 1)
@@ -642,7 +642,7 @@ def validate_assessment_type(value: str | None) -> str | None:
         raise HTTPException(status_code=400, detail='Assessment type must be a supported classroom assessment')
     return assessment_type
 
-def get_user_class(db: Session, user: User, course_id: int) -> Course:
+def get_user_class(db: Session, user: User, course_id: str) -> Course:
     """Return a course if the user is its assigned teacher or an enrolled student.
     Admin accounts use dedicated /admin/courses/* endpoints and are intentionally
     excluded here to enforce strict role separation."""
@@ -675,10 +675,10 @@ def summarize_grade_entries(course: Course, rows: list[GradeEntry], student_name
         summary.append(bucket)
     return sorted(summary, key=lambda item: item['quarter'])
 
-def log_action(db: Session, actor: User | None, action: str, entity_type: str, entity_id: int | None=None, details: str | None=None) -> None:
+def log_action(db: Session, actor: User | None, action: str, entity_type: str, entity_id: str | None=None, details: str | None=None) -> None:
     db.add(AuditLog(actor_id=actor.id if actor else None, action=action, entity_type=entity_type, entity_id=entity_id, details=details))
 
-def ensure_teacher_course(db: Session, teacher: User, course_id: int) -> Course:
+def ensure_teacher_course(db: Session, teacher: User, course_id: str) -> Course:
     course = db.get(Course, course_id)
     if not course or not course.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Class not found')
@@ -686,7 +686,7 @@ def ensure_teacher_course(db: Session, teacher: User, course_id: int) -> Course:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='You can only manage assigned classes')
     return course
 
-def ensure_student_enrolled(db: Session, student: User, course_id: int) -> Course:
+def ensure_student_enrolled(db: Session, student: User, course_id: str) -> Course:
     course = db.get(Course, course_id)
     enrolled = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student.id, Enrollment.status == 'active'))
     if not course or not course.is_active or (not enrolled):
@@ -779,7 +779,7 @@ async def generated_lesson_from_text(course: Course, filename: str, text: str, m
         content = f'# {title}\n\n{text[:3000]}'
     return {'melcCode': 'AI-GENERATED', 'learningCompetency': f'DepEd-aligned competency for {course.subject}; teacher should review before class use.', 'lessonObjectives': objectives, 'assessmentType': 'Written Work', 'quarter': course.quarter, 'week': 1, 'sequenceOrder': 1, 'folderName': f'{course.code}/AI Generated', 'title': title, 'summary': summary, 'essentialQuestion': essential_question, 'content': content, 'fileUrl': None, 'aiGenerated': True, 'sourceFilename': filename}
 
-def build_grade_summary(db: Session, student_id: int) -> list[dict]:
+def build_grade_summary(db: Session, student_id: str) -> list[dict]:
     rows = db.execute(select(GradeEntry, Course).join(Course, GradeEntry.course_id == Course.id).where(GradeEntry.student_id == student_id).order_by(Course.subject.asc(), GradeEntry.quarter.asc(), GradeEntry.created_at.asc())).all()
     buckets: dict[tuple[int, str], dict] = {}
     for grade, course in rows:
@@ -828,7 +828,7 @@ def build_stream(db: Session, user: User | None=None) -> list[dict]:
     rows = db.execute(stmt).all()
     return [{'id': post.id, 'courseId': course.id, 'title': post.title, 'body': post.body, 'postType': post.post_type, 'createdAt': post.created_at.isoformat() if post.created_at else '', 'courseCode': course.code, 'courseTitle': course.title, 'authorName': author.full_name} for post, course, author in rows]
 
-def build_teacher_course_cards(db: Session, teacher_id: int) -> list[dict]:
+def build_teacher_course_cards(db: Session, teacher_id: str) -> list[dict]:
     courses = db.scalars(select(Course).where(Course.teacher_id == teacher_id, Course.is_active == True).order_by(Course.subject.asc())).all()
     cards = []
     for course in courses:
@@ -846,7 +846,7 @@ def build_admin_course_cards(db: Session) -> list[dict]:
         cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'quarter': course.quarter, 'studentTotal': student_total, 'moduleTotal': module_total, 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'description': course.description})
     return cards
 
-def build_student_course_cards(db: Session, student_id: int) -> list[dict]:
+def build_student_course_cards(db: Session, student_id: str) -> list[dict]:
     rows = db.execute(select(Course).join(Enrollment, Enrollment.course_id == Course.id).where(Enrollment.student_id == student_id, Enrollment.status == 'active', Course.is_active == True).order_by(Course.subject.asc())).scalars().all()
     return [{'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'quarter': course.quarter, 'description': course.description} for course in rows]
 
@@ -920,7 +920,7 @@ def check_safety(question: str) -> bool:
     words = set(question.lower().split())
     return bool(words & SAFETY_KEYWORDS)
 
-def build_rolling_memory(db: Session, user_id: int, course_id: int | None, limit: int) -> list[dict]:
+def build_rolling_memory(db: Session, user_id: str, course_id: str | None, limit: int) -> list[dict]:
     stmt = select(ChatMessage).join(ChatSession, ChatMessage.session_id == ChatSession.id).where(ChatSession.user_id == user_id, ChatSession.is_active == True).order_by(ChatMessage.created_at.desc()).limit(limit * 2)
     rows = db.scalars(stmt).all()
     memory = []
@@ -1046,7 +1046,7 @@ def rebuild_rag_index(db: Session) -> None:
         index_module_for_rag(module)
     ai_logger.info('RAG index ready modules=%s path=%s', len(modules), DANILO_AI_INDEX_PATH)
 
-def retrieve_lesson_context(query: str, course_id: int | None, module_id: int | None, limit: int=3) -> list[dict]:
+def retrieve_lesson_context(query: str, course_id: str | None, module_id: str | None, limit: int=3) -> list[dict]:
     if not query.strip() or not os.path.exists(DANILO_AI_INDEX_PATH):
         return []
     query_vector = _rag_vector(query)
@@ -1078,7 +1078,7 @@ def retrieve_lesson_context(query: str, course_id: int | None, module_id: int | 
     return scored[:limit]
 
 
-def retrieve_user_file_context(query: str, user_id: int, limit: int=3) -> list[dict]:
+def retrieve_user_file_context(query: str, user_id: str, limit: int=3) -> list[dict]:
     if not query.strip() or not os.path.exists(DANILO_AI_INDEX_PATH):
         return []
     query_vector = _rag_vector(query)
@@ -1304,7 +1304,7 @@ def build_tutor_prompt(db: Session, current_user: User, payload: TutorRequest) -
     user_prompt = payload.question.strip()
     return (system_prompt, user_prompt, module, course, grade_lines, mode)
 
-def save_ai_conversation(db: Session, *, user_id: int, course_id: int | None, module_id: int | None, question: str, answer: str) -> None:
+def save_ai_conversation(db: Session, *, user_id: str, course_id: str | None, module_id: str | None, question: str, answer: str) -> None:
     db.add(AIConversation(student_id=user_id, course_id=course_id, module_id=module_id, prompt=question.strip(), response=answer.strip()))
     db.commit()
 
@@ -1510,7 +1510,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 from fastapi import UploadFile, File, Form
 
-def _get_or_create_chat_session(db: Session, user_id: int, session_id: int | None, question: str) -> 'ChatSession':
+def _get_or_create_chat_session(db: Session, user_id: str, session_id: str | None, question: str) -> 'ChatSession':
     if session_id:
         session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id))
         if session:
@@ -1521,12 +1521,12 @@ def _get_or_create_chat_session(db: Session, user_id: int, session_id: int | Non
     db.flush()
     return session
 
-def _save_chat_messages(db: Session, session_id: int, question: str, answer: str, module_id: int | None, response_mode: str) -> None:
+def _save_chat_messages(db: Session, session_id: str, question: str, answer: str, module_id: str | None, response_mode: str) -> None:
     db.add(ChatMessage(session_id=session_id, role='user', content=question, module_id=module_id, response_mode=response_mode))
     db.add(ChatMessage(session_id=session_id, role='assistant', content=answer, module_id=module_id, response_mode=response_mode))
     db.execute(text('UPDATE chat_sessions SET updated_at = NOW() WHERE id = :sid'), {'sid': session_id})
 
-def _check_ai_rate_limit(user_id: int) -> None:
+def _check_ai_rate_limit(user_id: str) -> None:
     """Raise 429 if the user sent an AI request too recently. Also evicts stale entries."""
     _cleanup_stale_cooldowns()
     last = _AI_USER_LAST_REQUEST.get(user_id, 0.0)

@@ -75,7 +75,7 @@ def get_user_files(current_user: User = Depends(get_current_user)):
         return [dict(row) for row in rows]
 
 @ai_files_router.delete("/{file_id}")
-def delete_user_file(file_id: int, current_user: User = Depends(get_current_user)):
+def delete_user_file(file_id: str, current_user: User = Depends(get_current_user)):
     if not os.path.exists(DANILO_AI_INDEX_PATH):
         raise HTTPException(status_code=404, detail="File not found")
         

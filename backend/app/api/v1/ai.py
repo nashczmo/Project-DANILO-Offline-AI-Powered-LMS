@@ -151,7 +151,7 @@ def create_chat_session(payload: dict=Body(default={}), current_user: User=Depen
     return {'id': session.id, 'title': session.title, 'createdAt': session.created_at.isoformat(), 'updatedAt': session.updated_at.isoformat(), 'messageCount': 0}
 
 @ai_router.get('/ai/sessions/{session_id}/messages')
-def get_session_messages(session_id: int, offset: int=0, limit: int=60, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def get_session_messages(session_id: str, offset: int=0, limit: int=60, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
     if not session:
         raise HTTPException(status_code=404, detail='Session not found')

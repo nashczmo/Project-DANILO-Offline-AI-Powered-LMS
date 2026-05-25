@@ -18,13 +18,13 @@ def teacher_courses(current_user: User=Depends(get_current_user), db: Session=De
     return build_teacher_course_cards(db, current_user.id)
 
 @teacher_router.get('/teacher/courses/{course_id}/students')
-def teacher_course_students(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
+def teacher_course_students(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
     ensure_teacher_course(db, current_user, course_id)
     rows = db.execute(select(User, Enrollment).join(Enrollment, Enrollment.student_id == User.id).where(Enrollment.course_id == course_id, Enrollment.status == 'active').order_by(User.full_name)).all()
     return [{**serialize_user(student), 'enrollmentStatus': enrollment.status} for student, enrollment in rows]
 
 @teacher_router.post('/teacher/courses/{course_id}/announcements')
-def teacher_create_announcement(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_create_announcement(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     post = StreamPost(course_id=course.id, author_id=current_user.id, title=clean_text(payload.get('title'), max_length=255), body=clean_text(payload.get('body'), max_length=2000), post_type='announcement')
     db.add(post)
@@ -41,7 +41,7 @@ def teacher_create_announcement_compat(payload: dict=Body(default={}), current_u
     return teacher_create_announcement(course_id, payload, current_user, db)
 
 @teacher_router.post('/teacher/courses/{course_id}/modules')
-def teacher_create_module(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_create_module(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     module = Module(course_id=course.id, melc_code=clean_text(payload.get('melcCode') or payload.get('melc_code') or 'TEACHER-CREATED', max_length=120), learning_competency=clean_text(payload.get('learningCompetency') or payload.get('learning_competency'), required=False, max_length=2000), lesson_objectives=clean_text(payload.get('lessonObjectives') or payload.get('lesson_objectives'), required=False, max_length=2000), assessment_type=validate_assessment_type(payload.get('assessmentType') or payload.get('assessment_type')), grade_level=course.grade_level, subject=course.subject, quarter=validate_quarter(payload.get('quarter') or course.quarter), week=parse_int(payload.get('week') or 1, 'Week', minimum=1), sequence_order=parse_int(payload.get('sequenceOrder') or payload.get('sequence_order') or 1, 'Sequence order', minimum=1), folder_name=clean_text(payload.get('folderName') or payload.get('folder_name') or f'{course.code}/Lessons', max_length=255), title=clean_text(payload.get('title'), max_length=255), summary=clean_text(payload.get('summary') or 'Teacher-created lesson module.', max_length=2000), essential_question=clean_text(payload.get('essentialQuestion') or payload.get('essential_question') or 'What will you learn from this lesson?', max_length=1000), content=clean_text(payload.get('content'), required=False, max_length=5000), file_url=clean_text(payload.get('fileUrl') or payload.get('file_url'), required=False, max_length=500))
     db.add(module)
@@ -55,7 +55,7 @@ def teacher_create_module(course_id: int, payload: dict=Body(default={}), curren
     return {'ok': True, 'id': module.id}
 
 @teacher_router.post('/teacher/courses/{course_id}/materials/generate')
-async def teacher_generate_lesson_from_material(course_id: int, material: UploadFile=File(...), mode: str=Form('normal'), save: bool=True, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+async def teacher_generate_lesson_from_material(course_id: str, material: UploadFile=File(...), mode: str=Form('normal'), save: bool=True, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     filename = clean_text(material.filename or 'uploaded-material.txt', max_length=255)
     data = await material.read()
@@ -77,7 +77,7 @@ async def teacher_generate_lesson_from_material(course_id: int, material: Upload
     return {'ok': True, 'id': module_id, 'lesson': lesson, 'extractedChars': len(extracted), 'message': 'Lesson generated. Review and edit before teaching.'}
 
 @teacher_router.put('/teacher/modules/{module_id}')
-def teacher_update_module(module_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_update_module(module_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     module = db.get(Module, module_id)
     if not module:
         raise HTTPException(status_code=404, detail='Module not found')
@@ -96,7 +96,7 @@ def teacher_update_module(module_id: int, payload: dict=Body(default={}), curren
     return {'ok': True}
 
 @teacher_router.delete('/teacher/modules/{module_id}')
-def teacher_delete_module(module_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_delete_module(module_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     module = db.get(Module, module_id)
     if not module:
         raise HTTPException(status_code=404, detail='Module not found')
@@ -106,7 +106,7 @@ def teacher_delete_module(module_id: int, current_user: User=Depends(get_current
     return {'ok': True}
 
 @teacher_router.post('/teacher/courses/{course_id}/assignments')
-def teacher_create_assignment(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_create_assignment(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     assignment = Assignment(course_id=course.id, title=clean_text(payload.get('title'), max_length=255), instructions=clean_text(payload.get('instructions'), max_length=4000), points=parse_float(payload.get('points') or 100, 'Points', minimum=1), created_by=current_user.id)
     db.add(assignment)
@@ -115,7 +115,7 @@ def teacher_create_assignment(course_id: int, payload: dict=Body(default={}), cu
     return {'ok': True, 'id': assignment.id}
 
 @teacher_router.put('/teacher/assignments/{assignment_id}')
-def teacher_update_assignment(assignment_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_update_assignment(assignment_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail='Assignment not found')
@@ -131,7 +131,7 @@ def teacher_update_assignment(assignment_id: int, payload: dict=Body(default={})
     return {'ok': True}
 
 @teacher_router.delete('/teacher/assignments/{assignment_id}')
-def teacher_delete_assignment(assignment_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_delete_assignment(assignment_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail='Assignment not found')
@@ -141,7 +141,7 @@ def teacher_delete_assignment(assignment_id: int, current_user: User=Depends(get
     return {'ok': True}
 
 @teacher_router.post('/teacher/courses/{course_id}/parse-document')
-async def teacher_parse_document(course_id: int, action: str=Form('summary'), file: UploadFile=File(...), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+async def teacher_parse_document(course_id: str, action: str=Form('summary'), file: UploadFile=File(...), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     content = await file.read()
     filename = file.filename.lower()
@@ -177,7 +177,7 @@ async def teacher_parse_document(course_id: int, action: str=Form('summary'), fi
     return {'ok': True, 'action': action, 'filename': file.filename, 'result': result, 'metrics': metrics}
 
 @teacher_router.post('/teacher/courses/{course_id}/quizzes/generate')
-async def teacher_generate_quiz(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+async def teacher_generate_quiz(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     topic = clean_text(payload.get('topic'))
     if not topic:
@@ -198,7 +198,7 @@ async def teacher_generate_quiz(course_id: int, payload: dict=Body(default={}), 
         raise HTTPException(status_code=500, detail='AI failed to generate a valid quiz format. Please try again.')
 
 @teacher_router.post('/teacher/courses/{course_id}/quizzes')
-def teacher_create_quiz(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_create_quiz(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     quiz = Quiz(course_id=course.id, title=clean_text(payload.get('title') or 'Class Quiz', max_length=255), instructions=clean_text(payload.get('instructions') or 'Answer each question based on the current lesson.', max_length=2000), is_published=parse_bool(payload.get('isPublished'), 'Published status', default=False), created_by=current_user.id)
     db.add(quiz)
@@ -209,7 +209,7 @@ def teacher_create_quiz(course_id: int, payload: dict=Body(default={}), current_
     return {'ok': True, 'id': quiz.id}
 
 @teacher_router.get('/teacher/courses/{course_id}/gradebook')
-def teacher_gradebook(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_gradebook(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
     students = teacher_course_students(course_id, current_user, db)
     grades = db.execute(select(GradeEntry, User).join(User, GradeEntry.student_id == User.id).where(GradeEntry.course_id == course_id).order_by(User.full_name, GradeEntry.created_at)).all()
@@ -226,7 +226,7 @@ def teacher_gradebook(course_id: int, current_user: User=Depends(get_current_use
     return {'course': serialize_course(course), 'students': students, 'entries': [{'id': grade.id, 'studentId': student.id, 'studentName': student.full_name, 'quarter': grade.quarter, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or ''} for grade, student in grades], 'grades': summaries}
 
 @teacher_router.get('/teacher/insights')
-async def teacher_student_insights(class_id: int | None=None, subject: str | None=None, include_ai: bool=True, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+async def teacher_student_insights(class_id: str | None=None, subject: str | None=None, include_ai: bool=True, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     stmt = select(Course).where(Course.is_active == True, Course.teacher_id == current_user.id)
     if subject:
         stmt = stmt.where(Course.subject == subject)
@@ -253,7 +253,7 @@ async def teacher_student_insights(class_id: int | None=None, subject: str | Non
     return analysis
 
 @teacher_router.post('/teacher/courses/{course_id}/grades')
-def teacher_create_grade(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_create_grade(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     ensure_teacher_course(db, current_user, course_id)
     student_id = parse_int(payload.get('studentId') or payload.get('student_id'), 'Student', minimum=1)
     if not db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id, Enrollment.status == 'active')):
@@ -264,7 +264,7 @@ def teacher_create_grade(course_id: int, payload: dict=Body(default={}), current
     return {'ok': True, 'id': grade.id}
 
 @teacher_router.put('/teacher/grades/{grade_id}')
-def teacher_update_grade(grade_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_update_grade(grade_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     grade = db.get(GradeEntry, grade_id)
     if not grade:
         raise HTTPException(status_code=404, detail='Grade not found')
@@ -283,7 +283,7 @@ def teacher_update_grade(grade_id: int, payload: dict=Body(default={}), current_
     return {'ok': True}
 
 @teacher_router.delete('/teacher/grades/{grade_id}')
-def teacher_delete_grade(grade_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def teacher_delete_grade(grade_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     grade = db.get(GradeEntry, grade_id)
     if not grade:
         raise HTTPException(status_code=404, detail='Grade not found')

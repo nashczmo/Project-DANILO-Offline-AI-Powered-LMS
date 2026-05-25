@@ -30,7 +30,7 @@ def student_assignments(current_user: User=Depends(get_current_user), db: Sessio
     return [{'id': assignment.id, 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'title': assignment.title, 'instructions': assignment.instructions, 'points': assignment.points, 'status': submissions.get(assignment.id).status if submissions.get(assignment.id) else 'not_started', 'responseText': submissions.get(assignment.id).response_text if submissions.get(assignment.id) else ''} for assignment, course in rows]
 
 @student_router.post('/student/assignments/{assignment_id}/submit')
-def student_submit_assignment(assignment_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def student_submit_assignment(assignment_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail='Assignment not found')
@@ -45,7 +45,7 @@ def student_submit_assignment(assignment_id: int, payload: dict=Body(default={})
     return {'ok': True, 'submission': {'status': submission.status, 'responseText': submission.response_text, 'score': submission.score, 'feedback': submission.feedback or ''}}
 
 @student_router.post('/student/assignments/{assignment_id}/complete')
-def student_complete_assignment(assignment_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def student_complete_assignment(assignment_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail='Assignment not found')
@@ -59,7 +59,7 @@ def student_complete_assignment(assignment_id: int, current_user: User=Depends(g
     return {'ok': True, 'submission': {'status': submission.status, 'responseText': submission.response_text or '', 'score': submission.score, 'feedback': submission.feedback or ''}}
 
 @student_router.post('/student/quizzes/{quiz_id}/submit')
-def student_submit_quiz(quiz_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def student_submit_quiz(quiz_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     quiz = db.get(Quiz, quiz_id)
     if not quiz:
         raise HTTPException(status_code=404, detail='Quiz not found')

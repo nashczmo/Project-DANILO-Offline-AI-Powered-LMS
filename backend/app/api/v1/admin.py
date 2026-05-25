@@ -66,7 +66,7 @@ def admin_create_user(payload: dict=Body(default={}), current_user: User=Depends
     return serialize_user(user)
 
 @admin_router.put('/admin/users/{user_id}')
-def admin_update_user(user_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_update_user(user_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail='User not found')
@@ -90,7 +90,7 @@ def admin_update_user(user_id: int, payload: dict=Body(default={}), current_user
     return serialize_user(user)
 
 @admin_router.delete('/admin/users/{user_id}')
-def admin_delete_user(user_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_delete_user(user_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail='Admin cannot delete the active session account')
     user = db.get(User, user_id)
@@ -102,7 +102,7 @@ def admin_delete_user(user_id: int, current_user: User=Depends(get_current_user)
     return {'ok': True}
 
 @admin_router.post('/admin/users/{user_id}/reset-password')
-def admin_reset_password(user_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_reset_password(user_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail='User not found')
@@ -114,7 +114,7 @@ def admin_reset_password(user_id: int, payload: dict=Body(default={}), current_u
     return {'ok': True, 'message': 'Password reset'}
 
 @admin_router.delete('/admin/users/{user_id}/permanent')
-def admin_permanent_delete_user(user_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_permanent_delete_user(user_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail='Admin cannot delete the active session account')
     user = db.get(User, user_id)
@@ -162,7 +162,7 @@ def admin_create_section(payload: dict=Body(default={}), current_user: User=Depe
     return {'ok': True, 'id': section.id}
 
 @admin_router.put('/admin/sections/{section_id}')
-def admin_update_section(section_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_update_section(section_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     section = db.get(Section, section_id)
     if not section:
         raise HTTPException(status_code=404, detail='Section not found')
@@ -182,7 +182,7 @@ def admin_update_section(section_id: int, payload: dict=Body(default={}), curren
     return {'ok': True}
 
 @admin_router.delete('/admin/sections/{section_id}')
-def admin_delete_section(section_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_delete_section(section_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     section = db.get(Section, section_id)
     if not section:
         raise HTTPException(status_code=404, detail='Section not found')
@@ -192,7 +192,7 @@ def admin_delete_section(section_id: int, current_user: User=Depends(get_current
     return {'ok': True}
 
 @admin_router.post('/admin/sections/{section_id}/assign-students')
-def admin_assign_students_to_section(section_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_assign_students_to_section(section_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     section = db.get(Section, section_id)
     if not section or not section.is_active:
         raise HTTPException(status_code=404, detail='Section not found')
@@ -229,7 +229,7 @@ def admin_create_course(payload: dict=Body(default={}), current_user: User=Depen
     return serialize_course(course)
 
 @admin_router.put('/admin/courses/{course_id}')
-def admin_update_course(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_update_course(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=404, detail='Class not found')
@@ -259,7 +259,7 @@ def admin_update_course(course_id: int, payload: dict=Body(default={}), current_
     return {'ok': True}
 
 @admin_router.delete('/admin/courses/{course_id}')
-def admin_delete_course(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_delete_course(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=404, detail='Class not found')
@@ -269,7 +269,7 @@ def admin_delete_course(course_id: int, current_user: User=Depends(get_current_u
     return {'ok': True}
 
 @admin_router.delete('/admin/courses/{course_id}/permanent')
-def admin_permanent_delete_course(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_permanent_delete_course(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = db.get(Course, course_id)
     if not course:
         raise HTTPException(status_code=404, detail='Class not found')
@@ -289,7 +289,7 @@ def admin_permanent_delete_course(course_id: int, current_user: User=Depends(get
     return {'ok': True}
 
 @admin_router.post('/admin/courses/{course_id}/enroll')
-def admin_enroll_student(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_enroll_student(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     student_id = parse_int(payload.get('studentId') or payload.get('student_id'), 'Student', minimum=1)
     if not db.scalar(select(User).where(User.id == student_id, User.role == 'student')):
         raise HTTPException(status_code=400, detail='Student account not found')
@@ -303,7 +303,7 @@ def admin_enroll_student(course_id: int, payload: dict=Body(default={}), current
     return {'ok': True}
 
 @admin_router.delete('/admin/courses/{course_id}/enroll/{student_id}')
-def admin_unenroll_student(course_id: int, student_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_unenroll_student(course_id: str, student_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     enrollment = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id))
     if not enrollment:
         raise HTTPException(status_code=404, detail='Enrollment not found')
@@ -313,7 +313,7 @@ def admin_unenroll_student(course_id: int, student_id: int, current_user: User=D
     return {'ok': True}
 
 @admin_router.post('/admin/courses/{course_id}/assign-teacher')
-def admin_assign_teacher(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_assign_teacher(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     teacher_id = parse_int(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', minimum=1)
     if not db.scalar(select(User).where(User.id == teacher_id, User.role == 'teacher')):
         raise HTTPException(status_code=400, detail='Teacher account not found')
@@ -422,7 +422,7 @@ def admin_create_department(payload: dict=Body(default={}), current_user: User=D
     return {'ok': True, 'id': dept.id, 'name': dept.name, 'code': dept.code}
 
 @admin_router.put('/admin/departments/{dept_id}')
-def admin_update_department(dept_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_update_department(dept_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     dept = db.get(Department, dept_id)
     if not dept:
         raise HTTPException(status_code=404, detail='Department not found')
@@ -441,7 +441,7 @@ def admin_update_department(dept_id: int, payload: dict=Body(default={}), curren
     return {'ok': True}
 
 @admin_router.delete('/admin/departments/{dept_id}')
-def admin_delete_department(dept_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_delete_department(dept_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     dept = db.get(Department, dept_id)
     if not dept:
         raise HTTPException(status_code=404, detail='Department not found')
@@ -450,7 +450,7 @@ def admin_delete_department(dept_id: int, current_user: User=Depends(get_current
     return {'ok': True}
 
 @admin_router.post('/admin/courses/{course_id}/enroll-section')
-def admin_enroll_section(course_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def admin_enroll_section(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = db.get(Course, course_id)
     if not course or not course.is_active:
         raise HTTPException(status_code=404, detail='Course not found')

@@ -103,7 +103,7 @@ def grades(current_user: User=Depends(get_current_user), db: Session=Depends(get
     return build_grade_summary(db, current_user.id)
 
 @router.get('/content/{module_id}/pdf')
-def content_pdf(module_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> Response:
+def content_pdf(module_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> Response:
     module = db.get(Module, module_id)
     if not module:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Lesson module not found')
@@ -117,7 +117,7 @@ def content_pdf(module_id: int, current_user: User=Depends(get_current_user), db
     return Response(content=pdf_bytes, media_type='application/pdf', headers=headers)
 
 @router.put('/ai/sessions/{session_id}')
-def update_chat_session(session_id: int, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def update_chat_session(session_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
     if not session:
         raise HTTPException(status_code=404, detail='Session not found')
@@ -129,7 +129,7 @@ def update_chat_session(session_id: int, payload: dict=Body(default={}), current
     return {'ok': True}
 
 @router.delete('/ai/sessions/{session_id}')
-def delete_chat_session(session_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def delete_chat_session(session_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     session = db.scalar(select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id))
     if not session:
         raise HTTPException(status_code=404, detail='Session not found')

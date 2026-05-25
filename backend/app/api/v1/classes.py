@@ -10,18 +10,18 @@ import math
 classes_router = APIRouter(prefix='/api', tags=['classes'])
 
 @classes_router.get('/classes/{course_id}')
-def class_detail(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def class_detail(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     return serialize_course(course)
 
 @classes_router.get('/classes/{course_id}/stream')
-def class_stream(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
+def class_stream(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
     course = get_user_class(db, current_user, course_id)
     rows = db.execute(select(StreamPost, User).join(User, StreamPost.author_id == User.id).where(StreamPost.course_id == course.id).order_by(StreamPost.created_at.desc())).all()
     return [{'id': post.id, 'title': post.title, 'body': post.body, 'postType': post.post_type, 'createdAt': post.created_at.isoformat() if post.created_at else '', 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'authorName': author.full_name} for post, author in rows]
 
 @classes_router.get('/classes/{course_id}/classwork')
-def class_classwork(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def class_classwork(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     modules = build_content_tree(db, user=current_user)
     modules = [item for item in modules if item['courseId'] == course.id]
@@ -48,13 +48,13 @@ def class_classwork(course_id: int, current_user: User=Depends(get_current_user)
     return {'course': serialize_course(course), 'modules': modules, 'assignments': assignments, 'quizzes': quizzes}
 
 @classes_router.get('/classes/{course_id}/people')
-def class_people(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def class_people(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     rows = db.execute(select(User, Enrollment).join(Enrollment, Enrollment.student_id == User.id).where(Enrollment.course_id == course.id, Enrollment.status == 'active').order_by(User.full_name.asc())).all()
     return {'teacher': serialize_user(course.teacher) if course.teacher else None, 'students': [{**serialize_user(student), 'enrollmentStatus': enrollment.status} for student, enrollment in rows]}
 
 @classes_router.get('/classes/{course_id}/grades')
-def class_grades(course_id: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+def class_grades(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = get_user_class(db, current_user, course_id)
     if current_user.role == 'student':
         grades = db.scalars(select(GradeEntry).where(GradeEntry.course_id == course.id, GradeEntry.student_id == current_user.id).order_by(GradeEntry.created_at.asc())).all()
