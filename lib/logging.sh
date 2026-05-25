@@ -142,13 +142,18 @@ run_resilient_command() {
     # Custom high-performance terminal spinner
     local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
     local delay=0.08
+    local start_time=$(date +%s)
     
     # Make cursor invisible
     tput civis >&3 2>/dev/null || true
     
     while kill -0 "$pid" 2>/dev/null; do
+      local current_time=$(date +%s)
+      local elapsed=$((current_time - start_time))
+      local formatted_elapsed=$(format_duration "$elapsed")
+
       local temp=${spinstr#?}
-      printf "  ${CYAN}%s${RESET}  ${DIM}%s...${RESET}\r" "${spinstr:0:1}" "${description}" >&3
+      printf "  ${CYAN}%s${RESET}  ${DIM}%s... [%s]${RESET}\r" "${spinstr:0:1}" "${description}" "${formatted_elapsed}" >&3
       spinstr=$temp${spinstr%"$temp"}
       sleep $delay
     done
@@ -161,7 +166,10 @@ run_resilient_command() {
     exit_code=$?
     
     if [[ "${exit_code}" -eq 0 ]]; then
-      ok "${description}"
+      local final_time=$(date +%s)
+      local total_elapsed=$((final_time - start_time))
+      local formatted_total=$(format_duration "$total_elapsed")
+      ok "${description} (${formatted_total})"
       LAST_RUN_DESCRIPTION=""
       LAST_RUN_COMMAND=""
       return 0
