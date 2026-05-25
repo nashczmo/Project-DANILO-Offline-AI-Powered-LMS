@@ -93,14 +93,6 @@ sudo bash danilo.sh --uninstall          # Tear down systemd units and services
 
 For detailed troubleshooting or manual verification steps, consult [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) and [docs/VERIFY.md](docs/VERIFY.md).
 
-## Security
+## Development
 
-Please review our [SECURITY.md](SECURITY.md) policy before deploying to a production network. 
-
-## Contributing
-
-We welcome contributions! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) to get started safely. For developer setup instructions, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
+For developer setup instructions, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
