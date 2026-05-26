@@ -203,6 +203,30 @@ verify_container() {
   fi
 }
 
+verify_optional_container() {
+  local service="$1"
+  local container_id=""
+  local state=""
+
+  if [[ ! -f "${APP_ROOT}/docker-compose.yml" ]]; then
+    verify_warn "Container running: ${service} (Degraded: missing compose file)"
+    return 0
+  fi
+
+  container_id="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps -q "${service}" 2>/dev/null | head -n1 || true)"
+  if [[ -z "${container_id}" ]]; then
+    verify_warn "Container running: ${service} (Degraded: not found)"
+    return 0
+  fi
+
+  state="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null || true)"
+  if [[ "${state}" == "healthy" || "${state}" == "running" ]]; then
+    verify_pass "Container running: ${service}"
+  else
+    verify_warn "Container running: ${service} (Degraded: ${state:-unknown})"
+  fi
+}
+
 verify_active_model() {
   local runtime=""
   local active_model="${DANILO_OLLAMA_MODEL:-${OLLAMA_MODEL:-}}"
@@ -331,14 +355,12 @@ verify_mode() {
     verify_fail "Docker Compose file exists at ${APP_ROOT}/docker-compose.yml"
   fi
 
-  local ai_runtime=""
-  ai_runtime="$(active_ai_runtime)"
   local services=(postgres backend gateway)
   local service=""
-  services+=(ollama)
   for service in "${services[@]}"; do
     verify_container "${service}"
   done
+  verify_optional_container ollama
 
   verify_frontend_dist
   verify_backend_direct_health

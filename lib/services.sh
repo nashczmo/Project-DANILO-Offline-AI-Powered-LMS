@@ -253,7 +253,7 @@ services:
       - /var/run
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && nginx -t -q"]
+      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && test -s /var/run/nginx.pid && kill -0 \"$(cat /var/run/nginx.pid)\""]
       interval: 30s
       timeout: 20s
       retries: 30
@@ -555,14 +555,24 @@ wait_for_stack_readiness() {
   note "Checking compose services are running"
   wait_for_service_running postgres
   wait_for_service_running backend
-  wait_for_service_running ollama
   wait_for_service_running gateway
+  local ollama_available=0
+  if wait_for_service_running ollama 0 20; then
+    ollama_available=1
+  else
+    warn "Ollama service is not running yet; continuing with core LMS startup and degraded AI"
+  fi
 
   note "Checking compose health status"
   wait_for_container_healthy postgres "Postgres healthcheck"
   wait_for_container_healthy backend "Backend healthcheck"
-  wait_for_container_healthy ollama "Ollama service readiness"
   wait_for_container_healthy gateway "Gateway/frontend healthcheck"
+  if [[ "${ollama_available}" -eq 1 ]]; then
+    if ! wait_for_container_healthy ollama "Ollama service readiness" 0 60; then
+      warn "Ollama did not become healthy; continuing with core LMS startup and degraded AI"
+      ollama_available=0
+    fi
+  fi
 
   note "Checking Postgres database readiness"
   attempts=0
@@ -577,39 +587,44 @@ wait_for_stack_readiness() {
     sleep 2
   done
 
-  note "Checking Ollama API response"
-  attempts=0
-  until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:${OLLAMA_PORT:-11434}/api/tags" >/dev/null 2>&1; do
-    attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 30 ]]; then
-      echo "Ollama is running but its API did not answer on /api/tags."
-      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
-      exit 1
-    fi
-    sleep 2
-  done
-
-  note "Checking Ollama model availability"
-  attempts=0
-  until ollama_model_exists_in_compose "${OLLAMA_MODEL}"; do
-    attempts=$((attempts + 1))
-    if [[ "${attempts}" -eq 10 ]]; then
-      if internet_reachable_now; then
-        note "Configured model not yet present. Internet is available, so DANILO will try to pull it now."
-        if ! docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama pull "${OLLAMA_MODEL}" >/dev/null 2>&1; then
-          note "Automatic Ollama model pull did not complete yet; continuing readiness checks"
-        fi
-      else
-        note "Configured model not yet present and internet is not reachable. Waiting for a preloaded local model."
+  if [[ "${ollama_available}" -eq 1 ]]; then
+    note "Checking Ollama API response"
+    attempts=0
+    until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:${OLLAMA_PORT:-11434}/api/tags" >/dev/null 2>&1; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -gt 30 ]]; then
+        warn "Ollama is running but its API did not answer on /api/tags; continuing with degraded AI"
+        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
+        ollama_available=0
+        break
       fi
-    fi
-    if [[ "${attempts}" -gt 60 ]]; then
-      warn "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
-      warn "The core LMS will remain available, but AI features will be degraded."
-      break
-    fi
-    sleep 3
-  done
+      sleep 2
+    done
+  fi
+
+  if [[ "${ollama_available}" -eq 1 ]]; then
+    note "Checking Ollama model availability"
+    attempts=0
+    until ollama_model_exists_in_compose "${OLLAMA_MODEL}"; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -eq 10 ]]; then
+        if internet_reachable_now; then
+          note "Configured model not yet present. Internet is available, so DANILO will try to pull it now."
+          if ! docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama pull "${OLLAMA_MODEL}" >/dev/null 2>&1; then
+            note "Automatic Ollama model pull did not complete yet; continuing readiness checks"
+          fi
+        else
+          note "Configured model not yet present and internet is not reachable. Waiting for a preloaded local model."
+        fi
+      fi
+      if [[ "${attempts}" -gt 60 ]]; then
+        warn "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
+        warn "The core LMS will remain available, but AI features will be degraded."
+        break
+      fi
+      sleep 3
+    done
+  fi
 
   note "Checking backend API through gateway"
   attempts=0

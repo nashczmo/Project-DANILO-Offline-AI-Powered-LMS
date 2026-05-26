@@ -476,6 +476,8 @@ ollama_model_exists_in_compose() {
 }
 wait_for_service_running() {
   local service="$1"
+  local fatal="${2:-1}"
+  local max_attempts="${3:-60}"
   local attempts=0
   local container_id=""
   local running=""
@@ -489,11 +491,14 @@ wait_for_service_running() {
     fi
 
     attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 60 ]]; then
+    if [[ "${attempts}" -gt "${max_attempts}" ]]; then
       echo "DANILO service did not reach running state: ${service}"
       docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps || true
       docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 "${service}" || true
-      exit 1
+      if [[ "${fatal}" -eq 1 ]]; then
+        exit 1
+      fi
+      return 1
     fi
     sleep 3
   done
@@ -502,6 +507,8 @@ wait_for_service_running() {
 wait_for_container_healthy() {
   local service="$1"
   local label="$2"
+  local fatal="${3:-1}"
+  local max_attempts="${4:-180}"
   local attempts=0
   local container_id=""
   local health_status=""
@@ -539,11 +546,14 @@ wait_for_container_healthy() {
     fi
 
     attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 180 ]]; then
+    if [[ "${attempts}" -gt "${max_attempts}" ]]; then
       echo "${label} did not become healthy for service: ${service}"
       docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps || true
       docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=120 "${service}" || true
-      exit 1
+      if [[ "${fatal}" -eq 1 ]]; then
+        exit 1
+      fi
+      return 1
     fi
     sleep 3
   done
