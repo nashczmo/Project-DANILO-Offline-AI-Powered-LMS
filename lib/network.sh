@@ -78,6 +78,11 @@ reset_dnsmasq_master_config() {
 }
 
 write_network_scripts() {
+  if ! grep -q "${PORTAL_DOMAIN}" /etc/hosts 2>/dev/null; then
+    note "Adding local hostname mapping for ${PORTAL_DOMAIN} to /etc/hosts"
+    echo "127.0.0.1 ${PORTAL_DOMAIN}" >> /etc/hosts
+  fi
+
   if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]]; then
     note "Laptop/Local mode active: writing dummy/no-op AP network scripts"
     
@@ -97,10 +102,6 @@ exit 0
 EOF
     chmod +x /usr/local/bin/danilo-network-down.sh
 
-    if ! grep -q "danilo.local" /etc/hosts; then
-      note "Adding local hostname mapping for danilo.local to /etc/hosts"
-      echo "127.0.0.1 danilo.local" >> /etc/hosts
-    fi
     return 0
   fi
 
