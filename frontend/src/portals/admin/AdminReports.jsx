@@ -1,5 +1,5 @@
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton, EmptyState, Badge } from "../../components/ui";
+import { Card, PageHeader, Skeleton } from "../../components/ui";
 import { BarChart3, Users, Activity, MessageSquare } from "lucide-react";
 
 export default function AdminReports() {
@@ -31,8 +31,6 @@ export default function AdminReports() {
   }
 
   const totals = data?.totals || {};
-  const system = data?.system || {};
-
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" description="Platform analytics and usage reports." />
@@ -96,23 +94,6 @@ export default function AdminReports() {
         </div>
       </Card>
 
-      <Card>
-        <h3 className="dn-title mb-4">AI Status</h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-            <span className="text-sm text-danilo-text-secondary">Runtime</span>
-            <Badge color="success">{system.aiRuntime || "N/A"}</Badge>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-            <span className="text-sm text-danilo-text-secondary">Model</span>
-            <span className="text-sm font-medium text-danilo-text font-mono">{system.aiModel || "N/A"}</span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-            <span className="text-sm text-danilo-text-secondary">Mode</span>
-            <Badge color="primary">{system.mode || "N/A"}</Badge>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

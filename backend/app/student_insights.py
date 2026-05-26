@@ -9,7 +9,7 @@ from .models import AIConversation, Assignment, Course, Enrollment, GradeEntry, 
 
 LOW_SCORE_THRESHOLD = float(os.getenv("DANILO_LOW_SCORE_THRESHOLD", "75.0"))
 ATTENTION_THRESHOLD = float(os.getenv("DANILO_ATTENTION_THRESHOLD", "80.0"))
-RISK_THRESHOLD = float(os.getenv("DANILO_RISK_THRESHOLD", "70.0"))
+RISK_THRESHOLD = float(os.getenv("DANILO_RISK_THRESHOLD", "75.0"))
 
 
 def percentage(score: float | None, max_score: float | None) -> float | None:

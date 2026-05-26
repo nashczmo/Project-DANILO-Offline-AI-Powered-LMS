@@ -14,15 +14,30 @@ export default function TeacherAnnouncements() {
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("error");
 
+  const validateAnnouncement = () => {
+    if (!formData.courseId) return "Class is required.";
+    if (!formData.title) return "Title required.";
+    if (!formData.title.trim()) return "Title cannot be spaces.";
+    if (!formData.body) return "Body required.";
+    if (!formData.body.trim()) return "Body cannot be spaces.";
+    if (/[<>`{}]/.test(formData.title) || /[<>`{}]/.test(formData.body)) return "Invalid characters.";
+    return "";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.courseId || !formData.title || !formData.body) return;
+    const validationError = validateAnnouncement();
+    if (validationError) {
+      setNoticeType("error");
+      setNotice(validationError);
+      return;
+    }
     setSubmitting(true);
     setNotice("");
     try {
       await apiRequest("/teacher/announcements", {
         method: "POST",
-        body: { courseId: parseInt(formData.courseId), title: formData.title, body: formData.body },
+        body: { courseId: formData.courseId, title: formData.title, body: formData.body },
       });
       setShowForm(false);
       setFormData({});

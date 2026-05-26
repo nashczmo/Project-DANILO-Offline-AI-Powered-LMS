@@ -1,15 +1,42 @@
 import { useState } from "react";
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton, EmptyState, Badge } from "../../components/ui";
+import { apiRequest } from "../../api";
+import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
 import { AlertTriangle, Users, Cpu } from "lucide-react";
 
 export default function TeacherInsights() {
   const { data: courses } = useApi("/teacher/courses", { immediate: true });
   const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [chatInput, setChatInput] = useState("");
+  const [chatAnswer, setChatAnswer] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState("");
   const { data: insights, loading, error, refresh } = useApi(
     selectedCourseId ? `/teacher/insights?class_id=${selectedCourseId}&include_ai=true` : null,
     { immediate: !!selectedCourseId }
   );
+
+  const sendInsightChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    setChatLoading(true);
+    setChatError("");
+    try {
+      const result = await apiRequest("/ai/tutor", {
+        method: "POST",
+        body: {
+          question: chatInput,
+          course_id: selectedCourseId || undefined,
+          response_mode: "normal",
+        },
+      });
+      setChatAnswer(result.answer || "DANILO did not return a response.");
+    } catch (err) {
+      setChatError(err.message || "AI unavailable. Please try again.");
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -32,6 +59,16 @@ export default function TeacherInsights() {
             </option>
           ))}
         </select>
+      </Card>
+
+      <Card>
+        <h3 className="dn-title mb-4">Ask DANILO About This Class</h3>
+        <form onSubmit={sendInsightChat} className="flex flex-col sm:flex-row gap-2">
+          <input className="dn-input flex-1" placeholder="Ask for intervention ideas, rubric help, or subject planning..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} />
+          <Button type="submit" disabled={chatLoading || !chatInput.trim()}>{chatLoading ? "Thinking..." : "Send"}</Button>
+        </form>
+        {chatError && <div className="mt-3 p-3 rounded-xl bg-danilo-error-subtle border border-danilo-error/20 text-sm text-danilo-error">{chatError}</div>}
+        {chatAnswer && <p className="mt-4 text-sm text-danilo-text-secondary leading-relaxed whitespace-pre-line">{chatAnswer}</p>}
       </Card>
 
       {selectedCourseId && loading && (

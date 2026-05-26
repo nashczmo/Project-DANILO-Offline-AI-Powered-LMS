@@ -17,6 +17,36 @@ def teacher_dashboard(current_user: User=Depends(get_current_user), db: Session=
 def teacher_courses(current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
     return build_teacher_course_cards(db, current_user.id)
 
+@teacher_router.post('/teacher/courses')
+def teacher_create_course(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+    education_level, grade_level, strand = validate_grade_path(clean_text(payload.get('educationLevel') or payload.get('education_level') or 'Junior High School', max_length=40), clean_text(payload.get('gradeLevel') or payload.get('grade_level') or 'Grade 7', max_length=50), clean_text(payload.get('strand'), required=False, max_length=80))
+    code = validate_safe_text(payload.get('code') or f"{(payload.get('subject') or 'CLS')}-{current_user.username[:6]}", 'Class code', max_length=50)
+    if db.scalar(select(Course).where(func.lower(Course.code) == code.lower())):
+        raise HTTPException(status_code=409, detail='Class code already exists')
+    course = Course(code=code, title=validate_safe_text(payload.get('title'), 'Class name', max_length=255), subject=validate_deped_subject(payload.get('subject')), education_level=education_level, grade_level=grade_level, strand=strand, quarter=validate_quarter(payload.get('quarter') or 'Q1'), school_year=clean_text(payload.get('schoolYear') or payload.get('school_year') or '2026-2027', max_length=20), description=clean_text(payload.get('description') or 'Faculty-created DANILO class.', max_length=1000), teacher_id=current_user.id, is_active=True)
+    db.add(course)
+    db.flush()
+    log_action(db, current_user, 'create_class', 'course', course.id)
+    db.commit()
+    db.refresh(course)
+    return serialize_course(course)
+
+@teacher_router.put('/teacher/courses/{course_id}')
+def teacher_update_course(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+    course = ensure_teacher_course(db, current_user, course_id)
+    for attr, key, limit in [('title', 'title', 255), ('school_year', 'schoolYear', 20), ('description', 'description', 1000)]:
+        if key in payload:
+            setattr(course, attr, validate_safe_text(payload.get(key), key, max_length=limit) if attr == 'title' else clean_text(payload.get(key), max_length=limit))
+    if 'subject' in payload:
+        course.subject = validate_deped_subject(payload.get('subject'))
+    if 'quarter' in payload:
+        course.quarter = validate_quarter(payload.get('quarter'))
+    if {'educationLevel', 'gradeLevel', 'strand'} & set(payload.keys()):
+        course.education_level, course.grade_level, course.strand = validate_grade_path(clean_text(payload.get('educationLevel') or course.education_level, max_length=40), clean_text(payload.get('gradeLevel') or course.grade_level, max_length=50), clean_text(payload.get('strand') or course.strand, required=False, max_length=80))
+    log_action(db, current_user, 'update_class', 'course', course.id)
+    db.commit()
+    return serialize_course(course)
+
 @teacher_router.get('/teacher/courses/{course_id}/students')
 def teacher_course_students(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
     ensure_teacher_course(db, current_user, course_id)
@@ -26,7 +56,7 @@ def teacher_course_students(course_id: str, current_user: User=Depends(get_curre
 @teacher_router.post('/teacher/courses/{course_id}/announcements')
 def teacher_create_announcement(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)
-    post = StreamPost(course_id=course.id, author_id=current_user.id, title=clean_text(payload.get('title'), max_length=255), body=clean_text(payload.get('body'), max_length=2000), post_type='announcement')
+    post = StreamPost(course_id=course.id, author_id=current_user.id, title=validate_safe_text(payload.get('title'), 'Title', max_length=255), body=validate_safe_text(payload.get('body'), 'Body', max_length=2000), post_type='announcement')
     db.add(post)
     db.commit()
     return {'ok': True, 'id': post.id}
@@ -37,7 +67,7 @@ def teacher_list_announcements(current_user: User=Depends(get_current_user), db:
 
 @teacher_router.post('/teacher/announcements')
 def teacher_create_announcement_compat(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
-    course_id = parse_int(payload.get('courseId') or payload.get('course_id'), 'Class', minimum=1)
+    course_id = parse_id(payload.get('courseId') or payload.get('course_id'), 'Class')
     return teacher_create_announcement(course_id, payload, current_user, db)
 
 @teacher_router.post('/teacher/courses/{course_id}/modules')
@@ -255,7 +285,7 @@ async def teacher_student_insights(class_id: str | None=None, subject: str | Non
 @teacher_router.post('/teacher/courses/{course_id}/grades')
 def teacher_create_grade(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     ensure_teacher_course(db, current_user, course_id)
-    student_id = parse_int(payload.get('studentId') or payload.get('student_id'), 'Student', minimum=1)
+    student_id = parse_id(payload.get('studentId') or payload.get('student_id'), 'Student')
     if not db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id, Enrollment.status == 'active')):
         raise HTTPException(status_code=400, detail='Student is not enrolled in this class')
     grade = GradeEntry(student_id=student_id, course_id=course_id, quarter=validate_quarter(payload.get('quarter') or 'Q1'), component=clean_text(payload.get('component'), max_length=80), score=parse_float(payload.get('score'), 'Score', minimum=0), max_score=parse_float(payload.get('maxScore') or payload.get('max_score') or 100, 'Max score', minimum=1), weight=parse_float(payload.get('weight') or 1, 'Weight', minimum=0), remarks=clean_text(payload.get('remarks'), required=False, max_length=1000), recorded_by=current_user.id)
@@ -291,4 +321,3 @@ def teacher_delete_grade(grade_id: str, current_user: User=Depends(get_current_u
     db.delete(grade)
     db.commit()
     return {'ok': True}
-

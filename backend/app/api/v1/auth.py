@@ -28,6 +28,8 @@ def login(payload: dict=Body(default={}), db: Session=Depends(get_db)) -> dict:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid username or password')
         token = create_access_token({'sub': str(user.id), 'role': user.role}, JWT_SECRET, JWT_EXPIRE_MINUTES)
         logger.info('Login succeeded for user_id=%s username=%s role=%s', user.id, user.username, user.role)
+        log_action(db, user, f'{user.role}_login', 'session', user.id)
+        db.commit()
         if user.role == 'admin':
             logger.info('Successful admin login for user_id=%s username=%s', user.id, user.username)
         return {'accessToken': token, 'tokenType': 'Bearer', 'user': serialize_user(user), 'forcePasswordChange': bool(user.force_password_change)}
@@ -136,4 +138,3 @@ def delete_chat_session(session_id: str, current_user: User=Depends(get_current_
     session.is_active = False
     db.commit()
     return {'ok': True}
-

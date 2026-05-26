@@ -18,12 +18,12 @@ EOF
 # Handles: captive portal, SPA serving, API proxying, PWA caching
 
 upstream danilo_backend {
-  server backend:${BACKEND_PORT:-8000};
+  server backend:8000;
   keepalive 32;
 }
 
 server {
-  listen ${FRONTEND_PORT:-80} default_server;
+  listen 80 default_server;
   server_name ${PORTAL_DOMAIN};
   root  /opt/danilo/app/frontend/dist;
   index index.html;
@@ -201,7 +201,7 @@ services:
       - ai_index:/var/lib/danilo
       - ./models:/models:ro
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:${BACKEND_PORT:-8000}/api/health', timeout=20)\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=20)\""]
       interval: 30s
       timeout: 25s
       retries: 40
@@ -225,7 +225,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 && ollama ps >/dev/null 2>&1"]
       interval: 30s
       timeout: 20s
       retries: 40
@@ -253,7 +253,7 @@ services:
       - /var/run
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && test -s /var/run/nginx.pid && kill -0 \"$(cat /var/run/nginx.pid)\""]
+      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && wget -q -O /dev/null http://127.0.0.1/api/health"]
       interval: 30s
       timeout: 20s
       retries: 30
@@ -271,15 +271,15 @@ write_project_docs() {
 # Project DANILO local/deployment configuration
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=
-SECRET_KEY=change-me
-JWT_SECRET=change-me
+SECRET_KEY=
+JWT_SECRET=
 DATABASE_URL=
 FRONTEND_URL=
 API_BASE_URL=
-CORS_ORIGINS=http://danilo.local,http://localhost:${VITE_DEV_PORT:-5173},http://127.0.0.1:${VITE_DEV_PORT:-5173}
+CORS_ORIGINS=http://danilo.local
 POSTGRES_DB=danilo
 POSTGRES_USER=danilo
-POSTGRES_PASSWORD=change-me
+POSTGRES_PASSWORD=
 JWT_EXPIRE_MINUTES=720
 COMPOSE_PROFILES=ollama
 DANILO_AI_RUNTIME=ollama

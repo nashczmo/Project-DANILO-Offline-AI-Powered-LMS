@@ -20,6 +20,9 @@ export default function StudentDashboard() {
   const pendingAssignments = assignments.filter((a) => a.status === "not_started").slice(0, 5);
   const recentGrades = grades.slice(0, 5);
   const announcements = stream.filter((s) => s.postType === "announcement").slice(0, 3);
+  const suggestions = aiProfile?.recommendations?.length
+    ? aiProfile.recommendations.slice(0, 3)
+    : ["Ask DANILO to explain today lesson in simpler words.", "Review one weak topic for 10 minutes.", "Use Quiz Me mode before your next class."];
 
   return (
     <div className="space-y-6">
@@ -175,26 +178,45 @@ export default function StudentDashboard() {
         </Card>
       </div>
 
-      {announcements.length > 0 && (
-        <Card>
-          <div className="flex items-center gap-2 mb-4">
-            <AlertCircle className="w-5 h-5 text-danilo-primary" />
-            <h2 className="dn-title">Announcements</h2>
-          </div>
+      <Card>
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-5 h-5 text-danilo-primary" />
+          <h2 className="dn-title">AI Study Suggestions</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {suggestions.map((item, idx) => (
+            <div key={idx} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
+              <p className="text-sm text-danilo-text-secondary leading-relaxed">{item}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-center gap-2 mb-4">
+          <AlertCircle className="w-5 h-5 text-danilo-primary" />
+          <h2 className="dn-title">Announcements</h2>
+        </div>
+        {announcements.length > 0 ? (
           <div className="space-y-3">
             {announcements.map((item) => (
               <div key={item.id} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                <h4 className="font-semibold text-danilo-text text-sm">{item.title}</h4>
+                <div className="flex items-center gap-2">
+                  <Badge color="primary">Pinned</Badge>
+                  <h4 className="font-semibold text-danilo-text text-sm">{item.title}</h4>
+                </div>
                 <p className="text-sm text-danilo-text-secondary mt-1">{item.body}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="dn-caption">{item.courseTitle}</span>
-                  <span className="dn-caption">{item.authorName}</span>
+                  <span className="dn-caption">{item.courseTitle || "School"}</span>
+                  <span className="dn-caption">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}</span>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        ) : (
+          <EmptyState icon={AlertCircle} title="No announcements" description="Latest class and school announcements will appear here." />
+        )}
+      </Card>
     </div>
   );
 }

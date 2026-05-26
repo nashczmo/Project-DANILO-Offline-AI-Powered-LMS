@@ -27,7 +27,7 @@ export default function TeacherGrades() {
       await apiRequest(`/teacher/courses/${selectedCourseId}/grades`, {
         method: "POST",
         body: {
-          studentId: parseInt(formData.studentId),
+          studentId: formData.studentId,
           quarter: formData.quarter || "Q1",
           component: formData.component,
           score: parseFloat(formData.score) || 0,

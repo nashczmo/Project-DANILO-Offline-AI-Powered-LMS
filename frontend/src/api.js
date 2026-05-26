@@ -58,6 +58,9 @@ export async function apiRequest(path, { method = "GET", token, body, signal, no
     throw error;
   }
   
+  if (!isGet) {
+    clearApiCache();
+  }
   if (isGet && !noCache) {
     queryCache.set(cacheKey, { data: payload, timestamp: Date.now() });
   }

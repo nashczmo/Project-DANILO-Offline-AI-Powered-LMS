@@ -4,9 +4,17 @@ import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
 import { Users, Plus, UserCheck, UserX, RefreshCw } from "lucide-react";
 
+const GRADE_OPTIONS = {
+  Elementary: ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
+  "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
+  "Senior High School": ["Grade 11", "Grade 12"],
+  College: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"],
+};
+
 export default function AdminDirectory() {
   const [roleFilter, setRoleFilter] = useState("");
   const { data, loading, error, refresh } = useApi(`/admin/users${roleFilter ? `?role=${roleFilter}` : ""}`, { immediate: true, deps: [roleFilter] });
+  const { data: sections } = useApi("/admin/sections", { immediate: true });
   const users = data || [];
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({});
@@ -16,6 +24,11 @@ export default function AdminDirectory() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!formData.educationLevel || !formData.gradeLevel) {
+      setNoticeType("error");
+      setNotice("Education level and grade level are required.");
+      return;
+    }
     setSubmitting(true);
     setNotice("");
     try {
@@ -138,10 +151,24 @@ export default function AdminDirectory() {
             <input className="dn-input" placeholder="Email" value={formData.email || ""} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
             <input className="dn-input" placeholder="Username (optional)" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
             <input className="dn-input" placeholder="Password (optional)" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-            <input className="dn-input" placeholder="Education Level" value={formData.educationLevel || ""} onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value })} />
-            <input className="dn-input" placeholder="Grade Level" value={formData.gradeLevel || ""} onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })} />
+            <select className="dn-input" value={formData.educationLevel || ""} onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value, gradeLevel: "", strand: "" })} required>
+              <option value="">Education Level</option>
+              <option value="Elementary">Elementary</option>
+              <option value="Junior High School">Junior High</option>
+              <option value="Senior High School">Senior High</option>
+              <option value="College">College</option>
+            </select>
+            <select className="dn-input" value={formData.gradeLevel || ""} onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })} required>
+              <option value="">Grade Level</option>
+              {(GRADE_OPTIONS[formData.educationLevel] || []).map((grade) => <option key={grade} value={grade}>{grade}</option>)}
+            </select>
             <input className="dn-input" placeholder="Strand" value={formData.strand || ""} onChange={(e) => setFormData({ ...formData, strand: e.target.value })} />
-            <input className="dn-input" placeholder="Section Name" value={formData.sectionName || ""} onChange={(e) => setFormData({ ...formData, sectionName: e.target.value })} />
+            <select className="dn-input" value={formData.sectionName || ""} onChange={(e) => setFormData({ ...formData, sectionName: e.target.value })}>
+              <option value="">Section (optional)</option>
+              {(sections || []).filter((s) => !formData.gradeLevel || s.gradeLevel === formData.gradeLevel).map((section) => (
+                <option key={section.id} value={section.name}>{section.name} - {section.gradeLevel}</option>
+              ))}
+            </select>
             <div className="sm:col-span-2 lg:col-span-3 flex gap-2">
               <Button type="submit" size="sm" disabled={submitting}>{submitting ? "Creating..." : "Create User"}</Button>
               <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>

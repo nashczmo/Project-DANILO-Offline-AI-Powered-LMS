@@ -5,7 +5,7 @@ generate_secrets() {
 
   PORTAL_DOMAIN="${DANILO_PORTAL_DOMAIN:-${PORTAL_DOMAIN:-danilo.local}}"
   SSID="${DANILO_SSID:-${SSID:-PROJECT-DANILO}}"
-  WIFI_PASSPHRASE="${DANILO_WIFI_PASSPHRASE:-${WIFI_PASSPHRASE:-ProjectDANILO2026!}}"
+  WIFI_PASSPHRASE="${DANILO_WIFI_PASSPHRASE:-${WIFI_PASSPHRASE:-}}"
   DANILO_AI_RUNTIME="ollama"
   OLLAMA_MODEL="${DANILO_OLLAMA_MODEL:-${OLLAMA_MODEL:-auto}}"
   POSTGRES_DB="${DANILO_POSTGRES_DB:-${POSTGRES_DB:-danilo}}"
@@ -26,6 +26,7 @@ generate_secrets() {
 
   [[ -z "${JWT_SECRET:-}" ]] && JWT_SECRET="$(openssl rand -hex 32 | tr -d '\r\n')"
   [[ -z "${POSTGRES_PASSWORD:-}" ]] && POSTGRES_PASSWORD="$(openssl rand -hex 24 | tr -d '\r\n')"
+  [[ -z "${WIFI_PASSPHRASE:-}" ]] && WIFI_PASSPHRASE="$(openssl rand -base64 18 | tr -d '/+=\r\n' | head -c 20)"
   [[ -z "${ADMIN_USERNAME:-}" ]] && ADMIN_USERNAME="admin"
   # Generate a random admin password on first install; never expose a static default in version control
   if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
@@ -35,6 +36,17 @@ generate_secrets() {
   if [[ -z "${DATABASE_URL:-}" ]]; then
     DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
   fi
+
+  for secret_value in JWT_SECRET POSTGRES_PASSWORD ADMIN_PASSWORD WIFI_PASSPHRASE; do
+    local lowered_secret="${!secret_value}"
+    lowered_secret="${lowered_secret,,}"
+    case "${lowered_secret}" in
+      change-me|changeme|default|password|projectdanilo2026!)
+        fail "Refusing insecure placeholder value for ${secret_value}. Set a strong unique value."
+        exit 1
+        ;;
+    esac
+  done
 }
 
 validate_runtime_environment() {
@@ -60,6 +72,10 @@ DATABASE_URL=${DATABASE_URL}
 POSTGRES_DB=${POSTGRES_DB}
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+BACKEND_PORT=${BACKEND_PORT:-8000}
+FRONTEND_PORT=${FRONTEND_PORT:-80}
+OLLAMA_HOST=${OLLAMA_HOST:-ollama}
+OLLAMA_PORT=${OLLAMA_PORT:-11434}
 JWT_SECRET=${JWT_SECRET}
 SECRET_KEY=${JWT_SECRET}
 JWT_EXPIRE_MINUTES=720
@@ -113,13 +129,14 @@ OLLAMA_NUM_BATCH=${OLLAMA_NUM_BATCH:-128}
 OLLAMA_NUM_GPU=${OLLAMA_NUM_GPU:-0}
 OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
 SSID=${SSID}
+WIFI_PASSPHRASE=${WIFI_PASSPHRASE}
 ADMIN_USERNAME=${ADMIN_USERNAME}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 PORTAL_DOMAIN=${PORTAL_DOMAIN}
 DANILO_SEED_DEMO=${DANILO_SEED_DEMO}
 FRONTEND_URL=http://${PORTAL_DOMAIN}
 API_BASE_URL=/api
-CORS_ORIGINS=http://${PORTAL_DOMAIN},http://${LAN_IP},http://localhost:${VITE_DEV_PORT:-5173},http://127.0.0.1:${VITE_DEV_PORT:-5173}
+CORS_ORIGINS=http://${PORTAL_DOMAIN},http://${LAN_IP}
 EOF
   chown root:root "${APP_ROOT}/.env"
   chmod 0600 "${APP_ROOT}/.env"

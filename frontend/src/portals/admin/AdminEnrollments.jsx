@@ -5,8 +5,10 @@ import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../com
 import { Users, Plus, Minus } from "lucide-react";
 
 export default function AdminEnrollments() {
-  const { data: courses, loading: coursesLoading } = useApi("/admin/courses", { immediate: true });
+  const { data: courses, loading: coursesLoading, refresh: refreshCourses } = useApi("/admin/courses", { immediate: true });
   const { data: users } = useApi("/admin/users?role=student", { immediate: true });
+  const { data: teachers } = useApi("/admin/users?role=teacher", { immediate: true });
+  const { data: sections } = useApi("/admin/sections", { immediate: true });
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const { data: courseDetail, loading: detailLoading, refresh: refreshDetail } = useApi(
     selectedCourseId ? `/classes/${selectedCourseId}/people` : null,
@@ -16,6 +18,7 @@ export default function AdminEnrollments() {
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("error");
+  const [classForm, setClassForm] = useState({});
 
   const handleEnroll = async (e) => {
     e.preventDefault();
@@ -25,7 +28,7 @@ export default function AdminEnrollments() {
     try {
       await apiRequest(`/admin/courses/${selectedCourseId}/enroll`, {
         method: "POST",
-        body: { studentId: parseInt(enrollStudentId) },
+        body: { studentId: enrollStudentId },
       });
       setEnrollStudentId("");
       refreshDetail();
@@ -34,6 +37,46 @@ export default function AdminEnrollments() {
     } catch (err) {
       setNoticeType("error");
       setNotice(err.message || "Could not enroll student.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateClass = async (e) => {
+    e.preventDefault();
+    const section = (sections || []).find((s) => s.id === classForm.sectionId);
+    if (!classForm.title?.trim() || !classForm.subject?.trim() || !section) {
+      setNoticeType("error");
+      setNotice("Class name, subject, and section are required.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const created = await apiRequest("/admin/courses", {
+        method: "POST",
+        body: {
+          code: classForm.code || `${classForm.subject.slice(0, 4).toUpperCase()}-${Date.now().toString().slice(-5)}`,
+          title: classForm.title,
+          subject: classForm.subject,
+          educationLevel: section.educationLevel,
+          gradeLevel: section.gradeLevel,
+          strand: section.strand || undefined,
+          teacherId: classForm.teacherId || undefined,
+          schoolYear: classForm.schoolYear || section.schoolYear || "2026-2027",
+          quarter: classForm.quarter || "Q1",
+        },
+      });
+      if (classForm.enrollSection) {
+        await apiRequest(`/admin/courses/${created.id}/enroll-section`, { method: "POST", body: { sectionId: section.id } });
+      }
+      setClassForm({});
+      refreshCourses();
+      setSelectedCourseId(created.id);
+      setNoticeType("success");
+      setNotice("Class created successfully.");
+    } catch (err) {
+      setNoticeType("error");
+      setNotice(err.message || "Could not create class.");
     } finally {
       setSubmitting(false);
     }
@@ -59,6 +102,33 @@ export default function AdminEnrollments() {
   return (
     <div className="space-y-6">
       <PageHeader title="Enrollments" description="Manage student enrollments in classes." />
+
+      <Card>
+        <h3 className="dn-title mb-4">Create Class</h3>
+        <form onSubmit={handleCreateClass} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <input className="dn-input" placeholder="Class name" value={classForm.title || ""} onChange={(e) => setClassForm({ ...classForm, title: e.target.value })} required />
+          <input className="dn-input" placeholder="Subject" value={classForm.subject || ""} onChange={(e) => setClassForm({ ...classForm, subject: e.target.value })} required />
+          <select className="dn-input" value={classForm.sectionId || ""} onChange={(e) => setClassForm({ ...classForm, sectionId: e.target.value })} required>
+            <option value="">Section</option>
+            {(sections || []).map((s) => <option key={s.id} value={s.id}>{s.name} - {s.gradeLevel}</option>)}
+          </select>
+          <select className="dn-input" value={classForm.teacherId || ""} onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}>
+            <option value="">Faculty (optional)</option>
+            {(teachers || []).map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
+          </select>
+          <input className="dn-input" placeholder="School year" value={classForm.schoolYear || ""} onChange={(e) => setClassForm({ ...classForm, schoolYear: e.target.value })} />
+          <select className="dn-input" value={classForm.quarter || "Q1"} onChange={(e) => setClassForm({ ...classForm, quarter: e.target.value })}>
+            <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+          </select>
+          <label className="flex items-center gap-2 text-sm text-danilo-text-secondary">
+            <input type="checkbox" checked={!!classForm.enrollSection} onChange={(e) => setClassForm({ ...classForm, enrollSection: e.target.checked })} />
+            Enroll all students in selected section
+          </label>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Button type="submit" size="sm" disabled={submitting}><Plus className="w-4 h-4" /> Create Class</Button>
+          </div>
+        </form>
+      </Card>
 
       <Card>
         <label className="dn-label mb-2 block">Select Class</label>

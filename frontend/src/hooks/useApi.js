@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { apiRequest } from "../api";
 
 export function useApi(path, options = {}) {
-  const { immediate = true } = options;
+  const { immediate = true, deps = [] } = options;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(immediate && !!path);
   const [error, setError] = useState(null);
@@ -21,6 +21,7 @@ export function useApi(path, options = {}) {
         return result;
       } catch (err) {
         setError(err.message || "Request failed");
+        setData(null);
         throw err;
       } finally {
         setLoading(false);
@@ -35,7 +36,7 @@ export function useApi(path, options = {}) {
     if (immediate && path) {
       execute(path);
     }
-  }, [path, immediate, execute]);
+  }, [path, immediate, execute, ...deps]);
 
   return { data, loading, error, execute, refresh, setData };
 }

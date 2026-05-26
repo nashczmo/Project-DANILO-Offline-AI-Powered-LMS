@@ -440,20 +440,20 @@ EOF"
   if ollama_model_exists_in_container "${container}" "${OLLAMA_MODEL}"; then
     note "Ollama model ${OLLAMA_MODEL} is already cached; skipping pull"
   else
-    run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"
+    run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"
   fi
   if [[ -n "${DANILO_FALLBACK_OLLAMA_MODEL}" && "${DANILO_FALLBACK_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" ]]; then
     if ollama_model_exists_in_container "${container}" "${DANILO_FALLBACK_OLLAMA_MODEL}"; then
       note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} is already cached; skipping pull"
     else
-      docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}" || note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled; primary model remains available"
+      timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}" || note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled; primary model remains available"
     fi
   fi
   if [[ -n "${DANILO_OPTIONAL_OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${DANILO_FALLBACK_OLLAMA_MODEL:-}" ]]; then
     if ollama_model_exists_in_container "${container}" "${DANILO_OPTIONAL_OLLAMA_MODEL}"; then
       note "Optional model ${DANILO_OPTIONAL_OLLAMA_MODEL} is already cached; skipping pull"
     else
-      docker exec "${container}" ollama pull "${DANILO_OPTIONAL_OLLAMA_MODEL}" || note "Optional model ${DANILO_OPTIONAL_OLLAMA_MODEL} could not be pulled; primary/fallback model remains available"
+      timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_OPTIONAL_OLLAMA_MODEL}" || note "Optional model ${DANILO_OPTIONAL_OLLAMA_MODEL} could not be pulled; primary/fallback model remains available"
     fi
   fi
 }

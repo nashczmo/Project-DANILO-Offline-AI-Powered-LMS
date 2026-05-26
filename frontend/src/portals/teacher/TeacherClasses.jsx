@@ -9,6 +9,42 @@ function ClassList() {
   const { data, loading, error, refresh } = useApi("/teacher/courses", { immediate: true });
   const navigate = useNavigate();
   const courses = data || [];
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleCreateClass = async (e) => {
+    e.preventDefault();
+    if (!formData.title?.trim() || !formData.subject?.trim()) {
+      setNotice("Class name and subject are required.");
+      return;
+    }
+    setSubmitting(true);
+    setNotice("");
+    try {
+      const created = await apiRequest("/teacher/courses", {
+        method: "POST",
+        body: {
+          code: formData.code || `${formData.subject.slice(0, 4).toUpperCase()}-${Date.now().toString().slice(-5)}`,
+          title: formData.title,
+          subject: formData.subject,
+          educationLevel: formData.educationLevel || "Junior High School",
+          gradeLevel: formData.gradeLevel || "Grade 7",
+          quarter: formData.quarter || "Q1",
+          schoolYear: formData.schoolYear || "2026-2027",
+        },
+      });
+      setFormData({});
+      setShowCreateForm(false);
+      refresh();
+      navigate(`/teacher/classes/${created.id}`);
+    } catch (err) {
+      setNotice(err.message || "Could not create class.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -39,7 +75,31 @@ function ClassList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="My Classes" description="Manage your instructional sections." />
+      <PageHeader title="My Classes" description="Manage your instructional sections." action={<Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}><Plus className="w-4 h-4" /> Create Class</Button>} />
+      {notice && <div className="p-3 rounded-xl bg-danilo-error-subtle border border-danilo-error/20 text-sm text-danilo-error font-medium">{notice}</div>}
+      {showCreateForm && (
+        <Card>
+          <form onSubmit={handleCreateClass} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <input className="dn-input" placeholder="Class name" value={formData.title || ""} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
+            <input className="dn-input" placeholder="Subject" value={formData.subject || ""} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} required />
+            <input className="dn-input" placeholder="Class code (optional)" value={formData.code || ""} onChange={(e) => setFormData({ ...formData, code: e.target.value })} />
+            <select className="dn-input" value={formData.educationLevel || "Junior High School"} onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value })}>
+              <option value="Elementary">Elementary</option>
+              <option value="Junior High School">Junior High</option>
+              <option value="Senior High School">Senior High</option>
+              <option value="College">College</option>
+            </select>
+            <input className="dn-input" placeholder="Grade level" value={formData.gradeLevel || ""} onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })} />
+            <select className="dn-input" value={formData.quarter || "Q1"} onChange={(e) => setFormData({ ...formData, quarter: e.target.value })}>
+              <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+            </select>
+            <div className="sm:col-span-2 lg:col-span-3 flex gap-2">
+              <Button type="submit" size="sm" disabled={submitting}>{submitting ? "Creating..." : "Create"}</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setShowCreateForm(false)}>Cancel</Button>
+            </div>
+          </form>
+        </Card>
+      )}
       {courses.length === 0 ? (
         <EmptyState icon={BookOpen} title="No classes assigned" description="You have not been assigned to any classes yet." />
       ) : (

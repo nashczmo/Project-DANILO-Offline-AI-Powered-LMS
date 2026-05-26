@@ -50,7 +50,7 @@ def admin_create_user(payload: dict=Body(default={}), current_user: User=Depends
     if db.scalar(select(User).where(or_(func.lower(User.username) == username.lower(), func.lower(User.email) == email.lower()))):
         raise HTTPException(status_code=409, detail='Username or email already exists')
     password = clean_text(payload.get('password') or 'danilo123', max_length=255)
-    department_id = parse_int(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False, minimum=1)
+    department_id = parse_id(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False)
     if department_id and (not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True))):
         raise HTTPException(status_code=400, detail='Department not found')
     user = User(role=role, username=username, email=email, full_name=full_name, education_level=education_level, grade_level=grade_level, strand=strand, section_name=section_name_val, department_id=department_id, password_salt='', password_hash=hash_password(password), is_active=parse_bool(payload.get('isActive'), 'Active status', default=True))
@@ -76,7 +76,7 @@ def admin_update_user(user_id: str, payload: dict=Body(default={}), current_user
         if key in payload:
             setattr(user, attr, clean_text(payload.get(key), required=attr not in {'education_level', 'grade_level', 'strand', 'section_name'}, max_length=limit))
     if 'departmentId' in payload or 'department_id' in payload:
-        department_id = parse_int(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False, minimum=1)
+        department_id = parse_id(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False)
         if department_id and (not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True))):
             raise HTTPException(status_code=400, detail='Department not found')
         user.department_id = department_id
@@ -151,10 +151,14 @@ def admin_sections(current_user: User=Depends(get_current_user), db: Session=Dep
 @admin_router.post('/admin/sections')
 def admin_create_section(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     education_level, grade_level, strand = validate_grade_path(clean_text(payload.get('educationLevel') or 'Junior High School', max_length=40), clean_text(payload.get('gradeLevel') or 'Grade 7', max_length=50), clean_text(payload.get('strand'), required=False, max_length=80))
-    adviser_id = parse_int(payload.get('adviserId') or payload.get('adviser_id'), 'Adviser', required=False, minimum=1)
+    adviser_id = parse_id(payload.get('adviserId') or payload.get('adviser_id'), 'Adviser', required=False)
     if adviser_id and (not db.scalar(select(User).where(User.id == adviser_id, User.role == 'teacher'))):
         raise HTTPException(status_code=400, detail='Adviser must be a teacher account')
-    section = Section(name=clean_text(payload.get('name'), max_length=120), grade_level=grade_level, education_level=education_level, strand=strand, school_year=clean_text(payload.get('schoolYear') or '2026-2027', max_length=20), adviser_id=adviser_id, is_active=True)
+    section_name = validate_safe_text(payload.get('name'), 'Section name', max_length=120)
+    school_year = clean_text(payload.get('schoolYear') or '2026-2027', max_length=20)
+    if db.scalar(select(Section).where(func.lower(Section.name) == section_name.lower(), Section.grade_level == grade_level, Section.school_year == school_year, Section.is_active == True)):
+        raise HTTPException(status_code=409, detail='Section name already exists for this grade and school year')
+    section = Section(name=section_name, grade_level=grade_level, education_level=education_level, strand=strand, school_year=school_year, adviser_id=adviser_id, is_active=True)
     db.add(section)
     log_action(db, current_user, 'create_section', 'section', None, section.name)
     db.commit()
@@ -166,17 +170,22 @@ def admin_update_section(section_id: str, payload: dict=Body(default={}), curren
     section = db.get(Section, section_id)
     if not section:
         raise HTTPException(status_code=404, detail='Section not found')
+    old_name = section.name
     if 'name' in payload:
         section.name = clean_text(payload['name'], max_length=120)
     if 'gradeLevel' in payload or 'educationLevel' in payload or 'strand' in payload:
         section.education_level, section.grade_level, section.strand = validate_grade_path(clean_text(payload.get('educationLevel') or section.education_level, max_length=40), clean_text(payload.get('gradeLevel') or section.grade_level, max_length=50), clean_text(payload.get('strand') or section.strand, required=False, max_length=80))
     if 'adviserId' in payload:
-        adviser_id = parse_int(payload['adviserId'], 'Adviser', required=False, minimum=1)
+        adviser_id = parse_id(payload['adviserId'], 'Adviser', required=False)
         if adviser_id and (not db.scalar(select(User).where(User.id == adviser_id, User.role == 'teacher'))):
             raise HTTPException(status_code=400, detail='Adviser must be a teacher account')
         section.adviser_id = adviser_id
     if 'isActive' in payload:
         section.is_active = parse_bool(payload['isActive'], 'Active status')
+    if db.scalar(select(Section).where(func.lower(Section.name) == section.name.lower(), Section.grade_level == section.grade_level, Section.school_year == section.school_year, Section.id != section.id, Section.is_active == True)):
+        raise HTTPException(status_code=409, detail='Section name already exists for this grade and school year')
+    if old_name != section.name:
+        db.execute(text('UPDATE users SET section_name = :new_name WHERE lower(section_name) = :old_name'), {'new_name': section.name, 'old_name': old_name.lower()})
     log_action(db, current_user, 'update_section', 'section', section.id)
     db.commit()
     return {'ok': True}
@@ -199,7 +208,7 @@ def admin_assign_students_to_section(section_id: str, payload: dict=Body(default
     student_ids = payload.get('studentIds') or payload.get('student_ids') or []
     updated = 0
     for sid in student_ids:
-        student_id = parse_int(sid, 'Student', minimum=1)
+        student_id = parse_id(sid, 'Student')
         student = db.get(User, student_id)
         if student and student.role == 'student':
             student.section_name = section.name
@@ -214,14 +223,17 @@ def admin_courses(current_user: User=Depends(get_current_user), db: Session=Depe
 
 @admin_router.post('/admin/courses')
 def admin_create_course(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
-    teacher_id = parse_int(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', required=False, minimum=1)
+    teacher_id = parse_id(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', required=False)
     if teacher_id and (not db.scalar(select(User).where(User.id == teacher_id, User.role == 'teacher'))):
         raise HTTPException(status_code=400, detail='Teacher account not found')
-    department_id = parse_int(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False, minimum=1)
+    department_id = parse_id(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False)
     if department_id and (not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True))):
         raise HTTPException(status_code=400, detail='Department not found')
     education_level, grade_level, strand = validate_grade_path(clean_text(payload.get('educationLevel') or payload.get('education_level') or 'Junior High School', max_length=40), clean_text(payload.get('gradeLevel') or payload.get('grade_level') or 'Grade 7', max_length=50), clean_text(payload.get('strand'), required=False, max_length=80))
-    course = Course(code=clean_text(payload.get('code'), max_length=50), title=clean_text(payload.get('title'), max_length=255), subject=validate_deped_subject(payload.get('subject')), education_level=education_level, grade_level=grade_level, strand=strand, quarter=validate_quarter(payload.get('quarter')), school_year=clean_text(payload.get('schoolYear') or payload.get('school_year') or '2026-2027', max_length=20), description=clean_text(payload.get('description') or 'Offline-ready DANILO class.', max_length=1000), teacher_id=teacher_id, department_id=department_id, is_active=True)
+    code = validate_safe_text(payload.get('code'), 'Class code', max_length=50)
+    if db.scalar(select(Course).where(func.lower(Course.code) == code.lower())):
+        raise HTTPException(status_code=409, detail='Class code already exists')
+    course = Course(code=code, title=validate_safe_text(payload.get('title'), 'Class name', max_length=255), subject=validate_deped_subject(payload.get('subject')), education_level=education_level, grade_level=grade_level, strand=strand, quarter=validate_quarter(payload.get('quarter')), school_year=clean_text(payload.get('schoolYear') or payload.get('school_year') or '2026-2027', max_length=20), description=clean_text(payload.get('description') or 'Offline-ready DANILO class.', max_length=1000), teacher_id=teacher_id, department_id=department_id, is_active=True)
     db.add(course)
     db.flush()
     log_action(db, current_user, 'create_course', 'course', course.id)
@@ -241,12 +253,12 @@ def admin_update_course(course_id: str, payload: dict=Body(default={}), current_
     if 'quarter' in payload:
         course.quarter = validate_quarter(payload.get('quarter'))
     if 'teacherId' in payload or 'teacher_id' in payload:
-        teacher_id = parse_int(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', required=False, minimum=1)
+        teacher_id = parse_id(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', required=False)
         if teacher_id and (not db.scalar(select(User).where(User.id == teacher_id, User.role == 'teacher'))):
             raise HTTPException(status_code=400, detail='Teacher account not found')
         course.teacher_id = teacher_id
     if 'departmentId' in payload or 'department_id' in payload:
-        department_id = parse_int(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False, minimum=1)
+        department_id = parse_id(payload.get('departmentId') or payload.get('department_id'), 'Department', required=False)
         if department_id and (not db.scalar(select(Department).where(Department.id == department_id, Department.is_active == True))):
             raise HTTPException(status_code=400, detail='Department not found')
         course.department_id = department_id
@@ -290,7 +302,7 @@ def admin_permanent_delete_course(course_id: str, current_user: User=Depends(get
 
 @admin_router.post('/admin/courses/{course_id}/enroll')
 def admin_enroll_student(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
-    student_id = parse_int(payload.get('studentId') or payload.get('student_id'), 'Student', minimum=1)
+    student_id = parse_id(payload.get('studentId') or payload.get('student_id'), 'Student')
     if not db.scalar(select(User).where(User.id == student_id, User.role == 'student')):
         raise HTTPException(status_code=400, detail='Student account not found')
     enrollment = db.scalar(select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.student_id == student_id))
@@ -314,7 +326,7 @@ def admin_unenroll_student(course_id: str, student_id: str, current_user: User=D
 
 @admin_router.post('/admin/courses/{course_id}/assign-teacher')
 def admin_assign_teacher(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
-    teacher_id = parse_int(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', minimum=1)
+    teacher_id = parse_id(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty')
     if not db.scalar(select(User).where(User.id == teacher_id, User.role == 'teacher')):
         raise HTTPException(status_code=400, detail='Teacher account not found')
     course = db.get(Course, course_id)
@@ -327,8 +339,8 @@ def admin_assign_teacher(course_id: str, payload: dict=Body(default={}), current
 
 @admin_router.post('/admin/announcements')
 def admin_system_announcement(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
-    title = clean_text(payload.get('title'), max_length=255)
-    body = clean_text(payload.get('body'), max_length=2000)
+    title = validate_safe_text(payload.get('title'), 'Title', max_length=255)
+    body = validate_safe_text(payload.get('body'), 'Body', max_length=2000)
     courses = db.scalars(select(Course).where(Course.is_active == True)).all()
     for course in courses:
         db.add(StreamPost(course_id=course.id, author_id=current_user.id, title=title, body=body, post_type='announcement'))
@@ -366,7 +378,7 @@ def admin_ai_analytics_report(current_user: User=Depends(get_current_user), db: 
     total_sessions = db.query(ChatSession).count()
     total_messages = db.query(ChatMessage).count()
     active_users = db.query(StudentAIProfile.student_id).distinct().count()
-    top_users = db.execute(select(User.full_name, func.count(ChatMessage.id).label('msg_count')).join(ChatSession, ChatSession.student_id == User.id).join(ChatMessage, ChatMessage.session_id == ChatSession.id).where(ChatMessage.role == 'user').group_by(User.full_name).order_by(func.count(ChatMessage.id).desc()).limit(5)).all()
+    top_users = db.execute(select(User.full_name, func.count(ChatMessage.id).label('msg_count')).join(ChatSession, ChatSession.user_id == User.id).join(ChatMessage, ChatMessage.session_id == ChatSession.id).where(ChatMessage.role == 'user').group_by(User.full_name).order_by(func.count(ChatMessage.id).desc()).limit(5)).all()
     return {'ok': True, 'metrics': {'totalSessions': total_sessions, 'totalMessages': total_messages, 'activeUsers': active_users}, 'topUsers': [{'name': name, 'messages': count} for name, count in top_users]}
 
 @admin_router.get('/admin/enrollments')
@@ -376,8 +388,8 @@ def admin_enrollments(current_user: User=Depends(get_current_user), db: Session=
 
 @admin_router.post('/admin/enrollments')
 def admin_create_enrollment(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
-    course_id = parse_int(payload.get('courseId') or payload.get('course_id'), 'Class', minimum=1)
-    student_id = parse_int(payload.get('studentId') or payload.get('student_id'), 'Learner', minimum=1)
+    course_id = parse_id(payload.get('courseId') or payload.get('course_id'), 'Class')
+    student_id = parse_id(payload.get('studentId') or payload.get('student_id'), 'Learner')
     course = db.get(Course, course_id)
     student = db.get(User, student_id)
     if not course or not course.is_active:
@@ -412,7 +424,7 @@ def admin_create_department(payload: dict=Body(default={}), current_user: User=D
     code = clean_text(payload.get('code'), max_length=20).upper()
     if db.scalar(select(Department).where(func.lower(Department.code) == code.lower())):
         raise HTTPException(status_code=409, detail='Department code already exists')
-    head_id = parse_int(payload.get('headId') or payload.get('head_id'), 'Department head', required=False, minimum=1)
+    head_id = parse_id(payload.get('headId') or payload.get('head_id'), 'Department head', required=False)
     if head_id and (not db.scalar(select(User).where(User.id == head_id, User.role == 'teacher'))):
         raise HTTPException(status_code=400, detail='Department head must be a teacher account')
     dept = Department(name=name, code=code, description=clean_text(payload.get('description'), required=False, max_length=500), head_id=head_id, is_active=True)
@@ -431,7 +443,7 @@ def admin_update_department(dept_id: str, payload: dict=Body(default={}), curren
             val = clean_text(payload.get(key), required=attr not in {'description'}, max_length=limit)
             setattr(dept, attr, val.upper() if attr == 'code' else val)
     if 'headId' in payload:
-        head_id = parse_int(payload.get('headId'), 'Department head', required=False, minimum=1)
+        head_id = parse_id(payload.get('headId'), 'Department head', required=False)
         if head_id and (not db.scalar(select(User).where(User.id == head_id, User.role == 'teacher'))):
             raise HTTPException(status_code=400, detail='Department head must be a teacher account')
         dept.head_id = head_id
@@ -457,7 +469,7 @@ def admin_enroll_section(course_id: str, payload: dict=Body(default={}), current
     section_id = payload.get('sectionId')
     section_name = payload.get('sectionName')
     if section_id:
-        section = db.get(Section, parse_int(section_id, 'Section', minimum=1))
+        section = db.get(Section, parse_id(section_id, 'Section'))
         if not section:
             raise HTTPException(status_code=404, detail='Section not found')
         learners = db.scalars(select(User).where(func.lower(User.section_name) == section.name.lower(), User.role == 'student', User.is_active == True)).all()
@@ -538,6 +550,11 @@ def admin_recent_logs(current_user: User=Depends(get_current_user)) -> list[dict
     entries.sort(key=lambda item: item.get('time') or '', reverse=True)
     return entries[:100]
 
+@admin_router.get('/admin/activity')
+def admin_activity(current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
+    rows = db.execute(select(AuditLog, User).outerjoin(User, AuditLog.actor_id == User.id).order_by(AuditLog.created_at.desc()).limit(40)).all()
+    return [{'id': log.id, 'action': log.action, 'entityType': log.entity_type, 'entityId': log.entity_id, 'details': log.details or '', 'actorName': actor.full_name if actor else 'System', 'actorRole': actor.role if actor else '', 'createdAt': log.created_at.isoformat() if log.created_at else ''} for log, actor in rows]
+
 @admin_router.get('/admin/ai/models')
 def admin_ai_models(current_user: User=Depends(get_current_user)) -> dict:
     try:
@@ -549,4 +566,3 @@ def admin_ai_models(current_user: User=Depends(get_current_user)) -> dict:
         models = []
     presets = [{'key': 'active', 'model': OLLAMA_MODEL, 'purpose': 'Environment-selected local Ollama model for offline tutoring'}, {'key': 'fallback', 'model': DANILO_AI_FALLBACK_MODEL, 'purpose': 'Optional backup model attempted if the active model fails'}, {'key': 'gguf', 'model': DANILO_AI_PRIMARY_MODEL, 'purpose': 'Expected local GGUF asset when using a custom Ollama model'}]
     return {'runtime': DANILO_AI_RUNTIME, 'currentModel': DANILO_AI_ACTIVE_MODEL, 'models': models, 'presets': presets, 'queueSlots': _AI_MAX_CONCURRENT, 'maxLoadedModels': _env_int('OLLAMA_MAX_LOADED_MODELS', 1, minimum=1, maximum=4), 'contextTokens': OLLAMA_NUM_CTX, 'inferenceThreads': OLLAMA_NUM_THREADS, 'gpuLayers': OLLAMA_NUM_GPU, 'batchSize': OLLAMA_NUM_BATCH, 'kvCache': OLLAMA_KV_CACHE_TYPE, 'modelClass': _AI_MODEL_CLASS, 'quantization': _AI_QUANTIZATION, 'scheduler': _AI_SCHEDULER, 'hardwareProfile': _HARDWARE['profile'], 'hardware': _HARDWARE, 'keepAlive': os.getenv('OLLAMA_KEEP_ALIVE', '10m')}
-

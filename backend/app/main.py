@@ -527,6 +527,20 @@ def parse_int(value, field: str, *, required: bool=True, minimum: int | None=Non
         raise HTTPException(status_code=400, detail=f'{field} must be at least {minimum}')
     return parsed
 
+def parse_id(value, field: str, *, required: bool=True) -> str | None:
+    if value in (None, ''):
+        if required:
+            raise HTTPException(status_code=400, detail=f'{field} is required')
+        return None
+    parsed = str(value).strip()
+    if not parsed:
+        if required:
+            raise HTTPException(status_code=400, detail=f'{field} is required')
+        return None
+    if len(parsed) > 80 or (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*', parsed)):
+        raise HTTPException(status_code=400, detail=f'{field} is invalid')
+    return parsed
+
 def parse_float(value, field: str, *, required: bool=True, minimum: float | None=None, maximum: float | None=None) -> float | None:
     if value in (None, ''):
         if required:
@@ -557,7 +571,7 @@ def parse_bool(value, field: str, *, default: bool | None=None) -> bool:
             return False
     raise HTTPException(status_code=400, detail=f'{field} must be true or false')
 
-EDUCATION_LEVELS = {'Kinder': ['Kinder'], 'Elementary': [f'Grade {grade}' for grade in range(1, 7)], 'Junior High School': [f'Grade {grade}' for grade in range(7, 11)], 'Senior High School': [f'Grade {grade}' for grade in range(11, 13)]}
+EDUCATION_LEVELS = {'Kinder': ['Kinder'], 'Elementary': [f'Grade {grade}' for grade in range(1, 7)], 'Junior High School': [f'Grade {grade}' for grade in range(7, 11)], 'Senior High School': [f'Grade {grade}' for grade in range(11, 13)], 'College': [f'Year {year}' for year in range(1, 6)]}
 
 SHS_STRANDS = {'STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'Arts and Design', 'Sports'}
 
@@ -611,10 +625,14 @@ def unique_local_username(db: Session, base_username: str, user_id: str | None=N
     raise HTTPException(status_code=409, detail='Could not generate a unique username — please specify one manually')
 
 def validate_grade_path(education_level: str | None, grade_level: str | None, strand: str | None) -> tuple[str | None, str | None, str | None]:
+    if education_level == 'Junior High':
+        education_level = 'Junior High School'
+    if education_level == 'Senior High':
+        education_level = 'Senior High School'
     if not education_level and (not grade_level) and (not strand):
         return (None, None, None)
     if education_level not in EDUCATION_LEVELS:
-        raise HTTPException(status_code=400, detail='Education level must be Kinder, Elementary, Junior High School, or Senior High School')
+        raise HTTPException(status_code=400, detail='Education level must be Elementary, Junior High, Senior High, or College')
     if grade_level not in EDUCATION_LEVELS[education_level]:
         raise HTTPException(status_code=400, detail='Grade level does not match education level')
     if education_level == 'Senior High School':
@@ -624,10 +642,16 @@ def validate_grade_path(education_level: str | None, grade_level: str | None, st
         raise HTTPException(status_code=400, detail='Strand is only allowed for Senior High School')
     return (education_level, grade_level, strand)
 
+def validate_safe_text(value: str | None, field: str, *, max_length: int=255) -> str:
+    cleaned = clean_text(value, max_length=max_length)
+    if re.search(r'[<>`{}]', cleaned):
+        raise HTTPException(status_code=400, detail=f'{field} contains invalid characters')
+    return cleaned
+
 def validate_deped_subject(subject: str | None) -> str:
-    cleaned = clean_text(subject, max_length=120)
-    if cleaned not in DEPED_SUBJECTS:
-        raise HTTPException(status_code=400, detail='Subject must be a supported DepEd learning area')
+    cleaned = validate_safe_text(subject, 'Subject', max_length=120)
+    if len(cleaned) < 2:
+        raise HTTPException(status_code=400, detail='Subject is required')
     return cleaned
 
 def validate_quarter(value: str | None) -> str:
