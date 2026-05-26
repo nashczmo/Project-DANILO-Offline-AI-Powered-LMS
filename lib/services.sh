@@ -18,7 +18,7 @@ EOF
 # Handles: captive portal, SPA serving, API proxying, PWA caching
 
 upstream danilo_backend {
-  server ${BACKEND_HOST:-backend}:${BACKEND_PORT:-8000};
+  server backend:${BACKEND_PORT:-8000};
   keepalive 32;
 }
 
@@ -464,7 +464,7 @@ validate_gateway_files() {
 
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     if docker image inspect nginx:1.27-alpine >/dev/null 2>&1; then
-      if ! docker run --rm --add-host "${BACKEND_HOST:-backend}:127.0.0.1" \
+      if ! docker run --rm --add-host "backend:127.0.0.1" \
         -v "${APP_ROOT}/infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
         nginx:1.27-alpine nginx -t >/dev/null; then
         echo "Gateway nginx config failed syntax validation with nginx:1.27-alpine."
