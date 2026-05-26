@@ -18,14 +18,24 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div className="min-h-screen bg-danilo-bg flex items-center justify-center px-4">
-          <div className="dn-card p-8 w-full max-w-md text-center shadow-lg">
-            <div className="w-12 h-12 rounded-xl bg-danilo-error-subtle flex items-center justify-center mx-auto mb-4 border border-danilo-error/20">
-              <svg className="w-6 h-6 text-danilo-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+        <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl border border-[#E0E0E0] p-8 w-full max-w-md text-center"
+               style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}>
+            <div className="w-14 h-14 rounded-2xl bg-[#FCE8E6] flex items-center justify-center mx-auto mb-5">
+              <svg className="w-7 h-7 text-[#D93025]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
             </div>
-            <h1 className="text-lg font-semibold text-danilo-text">Something went wrong</h1>
-            <p className="mt-2 text-sm text-danilo-text-secondary leading-relaxed">DANILO encountered an error. Please refresh or run installer verification.</p>
-            <button className="mt-5 dn-btn-primary" onClick={() => window.location.reload()}>Reload Page</button>
+            <h1 className="text-lg font-black text-[#202124]">Something went wrong</h1>
+            <p className="mt-2 text-sm text-[#5F6368] leading-relaxed">
+              DANILO encountered an error. Please refresh or run installer verification.
+            </p>
+            <button
+              className="mt-6 dn-btn-primary px-6 py-2.5 rounded-xl text-sm font-bold"
+              onClick={() => window.location.reload()}
+            >
+              Reload Page
+            </button>
           </div>
         </div>
       );

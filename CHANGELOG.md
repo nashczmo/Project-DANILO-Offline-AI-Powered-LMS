@@ -5,6 +5,18 @@ All notable changes to Project DANILO will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-27
+
+### Added
+- Self-hosted Lato fonts (WOFF2) for guaranteed offline availability without relying on Google Fonts CDN.
+
+### Changed
+- Comprehensive UI/UX redesign inspired by Material Design 3 and Google Workspace.
+- Redesigned all 14 portal pages (Admin, Student, Teacher) with a unified, clean, and polished design language.
+- Implemented a robust global design system in Tailwind CSS (`index.css`) with consistent tokens, utility classes, and keyframe entrance animations.
+- Refactored shared UI components (Cards, Buttons, Badges, EmptyStates, PageHeaders) for a premium look and feel.
+- Removed legacy Inter font and Google Fonts CDN links.
+
 ## [1.2.0] - 2026-05-26
 
 ### Added

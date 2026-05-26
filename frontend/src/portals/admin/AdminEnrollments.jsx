@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
-import { Users, Plus, Minus } from "lucide-react";
+import { Users, Plus, Minus, BookOpen, ChevronRight } from "lucide-react";
 
 export default function AdminEnrollments() {
   const { data: courses, loading: coursesLoading, refresh: refreshCourses } = useApi("/admin/courses", { immediate: true });
@@ -67,7 +67,10 @@ export default function AdminEnrollments() {
         },
       });
       if (classForm.enrollSection) {
-        await apiRequest(`/admin/courses/${created.id}/enroll-section`, { method: "POST", body: { sectionId: section.id } });
+        await apiRequest(`/admin/courses/${created.id}/enroll-section`, {
+          method: "POST",
+          body: { sectionId: section.id },
+        });
       }
       setClassForm({});
       refreshCourses();
@@ -99,71 +102,162 @@ export default function AdminEnrollments() {
     (u) => u.role === "student" && !(courseDetail?.students || []).some((s) => s.id === u.id)
   );
 
+  const selectedCourse = (courses || []).find((c) => c.id === selectedCourseId);
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="Enrollments" description="Manage student enrollments in classes." />
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="Enrollments"
+        description="Create classes and manage student enrollments."
+      />
 
-      <Card>
-        <h3 className="dn-title mb-4">Create Class</h3>
-        <form onSubmit={handleCreateClass} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <input className="dn-input" placeholder="Class name" value={classForm.title || ""} onChange={(e) => setClassForm({ ...classForm, title: e.target.value })} required />
-          <input className="dn-input" placeholder="Subject" value={classForm.subject || ""} onChange={(e) => setClassForm({ ...classForm, subject: e.target.value })} required />
-          <select className="dn-input" value={classForm.sectionId || ""} onChange={(e) => setClassForm({ ...classForm, sectionId: e.target.value })} required>
-            <option value="">Section</option>
-            {(sections || []).map((s) => <option key={s.id} value={s.id}>{s.name} - {s.gradeLevel}</option>)}
-          </select>
-          <select className="dn-input" value={classForm.teacherId || ""} onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}>
-            <option value="">Faculty (optional)</option>
-            {(teachers || []).map((t) => <option key={t.id} value={t.id}>{t.fullName}</option>)}
-          </select>
-          <input className="dn-input" placeholder="School year" value={classForm.schoolYear || ""} onChange={(e) => setClassForm({ ...classForm, schoolYear: e.target.value })} />
-          <select className="dn-input" value={classForm.quarter || "Q1"} onChange={(e) => setClassForm({ ...classForm, quarter: e.target.value })}>
-            <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
-          </select>
-          <label className="flex items-center gap-2 text-sm text-danilo-text-secondary">
-            <input type="checkbox" checked={!!classForm.enrollSection} onChange={(e) => setClassForm({ ...classForm, enrollSection: e.target.checked })} />
-            Enroll all students in selected section
-          </label>
-          <div className="sm:col-span-2 lg:col-span-3">
-            <Button type="submit" size="sm" disabled={submitting}><Plus className="w-4 h-4" /> Create Class</Button>
-          </div>
-        </form>
-      </Card>
-
-      <Card>
-        <label className="dn-label mb-2 block">Select Class</label>
-        <select
-          className="dn-input"
-          value={selectedCourseId || ""}
-          onChange={(e) => setSelectedCourseId(e.target.value || null)}
-        >
-          <option value="">Choose a class...</option>
-          {(courses || []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.code} {c.subject} {c.gradeLevel}
-            </option>
-          ))}
-        </select>
-      </Card>
-
+      {/* Notice */}
       {notice && (
-        <div className={`p-3 rounded-xl border text-sm font-medium ${
-          noticeType === "success"
-            ? "bg-danilo-success-subtle border-danilo-success/20 text-danilo-success"
-            : "bg-danilo-error-subtle border-danilo-error/20 text-danilo-error"
-        }`}>
+        <div
+          role="alert"
+          className={`px-4 py-3 rounded-xl border text-sm font-bold animate-fade-in ${
+            noticeType === "success"
+              ? "bg-[#E6F4EA] border-[#188038]/20 text-[#188038]"
+              : "bg-[#FCE8E6] border-[#D93025]/20 text-[#D93025]"
+          }`}
+        >
           {notice}
         </div>
       )}
 
-      {selectedCourseId && detailLoading && <Skeleton className="h-48" />}
+      {/* ── Create Class Form ── */}
+      <Card>
+        <h3 className="text-base font-black text-[#202124] mb-5 flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-[#1A73E8]" />
+          Create Class
+        </h3>
+        <form onSubmit={handleCreateClass} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <input
+            className="dn-input"
+            placeholder="Class name *"
+            value={classForm.title || ""}
+            onChange={(e) => setClassForm({ ...classForm, title: e.target.value })}
+            required
+            aria-label="Class name"
+          />
+          <input
+            className="dn-input"
+            placeholder="Subject *"
+            value={classForm.subject || ""}
+            onChange={(e) => setClassForm({ ...classForm, subject: e.target.value })}
+            required
+            aria-label="Subject"
+          />
+          <select
+            className="dn-input"
+            value={classForm.sectionId || ""}
+            onChange={(e) => setClassForm({ ...classForm, sectionId: e.target.value })}
+            required
+            aria-label="Section"
+          >
+            <option value="">Section *</option>
+            {(sections || []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {s.gradeLevel}
+              </option>
+            ))}
+          </select>
+          <select
+            className="dn-input"
+            value={classForm.teacherId || ""}
+            onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}
+            aria-label="Assign teacher"
+          >
+            <option value="">Assign teacher (optional)</option>
+            {(teachers || []).map((t) => (
+              <option key={t.id} value={t.id}>{t.fullName}</option>
+            ))}
+          </select>
+          <input
+            className="dn-input"
+            placeholder="School year (e.g. 2026-2027)"
+            value={classForm.schoolYear || ""}
+            onChange={(e) => setClassForm({ ...classForm, schoolYear: e.target.value })}
+            aria-label="School year"
+          />
+          <select
+            className="dn-input"
+            value={classForm.quarter || "Q1"}
+            onChange={(e) => setClassForm({ ...classForm, quarter: e.target.value })}
+            aria-label="Quarter"
+          >
+            <option>Q1</option>
+            <option>Q2</option>
+            <option>Q3</option>
+            <option>Q4</option>
+          </select>
+          <label className="flex items-center gap-2.5 text-sm font-bold text-[#5F6368] cursor-pointer col-span-full sm:col-span-1">
+            <input
+              type="checkbox"
+              className="w-4 h-4 accent-[#1A73E8] rounded"
+              checked={!!classForm.enrollSection}
+              onChange={(e) => setClassForm({ ...classForm, enrollSection: e.target.checked })}
+            />
+            Enroll all students in selected section
+          </label>
+          <div className="col-span-full flex gap-2 pt-1">
+            <Button type="submit" disabled={submitting}>
+              <Plus className="w-4 h-4" />
+              {submitting ? "Creating…" : "Create Class"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* ── Class Selector ── */}
+      <Card>
+        <label htmlFor="course-select" className="block text-sm font-black text-[#202124] mb-2">
+          Select Class to Manage
+        </label>
+        {coursesLoading ? (
+          <Skeleton className="h-10" />
+        ) : (
+          <select
+            id="course-select"
+            className="dn-input"
+            value={selectedCourseId || ""}
+            onChange={(e) => setSelectedCourseId(e.target.value || null)}
+          >
+            <option value="">Choose a class…</option>
+            {(courses || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                [{c.code}] {c.subject} — {c.gradeLevel}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
+
+      {/* ── Enrollment Panel ── */}
+      {selectedCourseId && detailLoading && (
+        <div className="space-y-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-48" />
+        </div>
+      )}
 
       {selectedCourseId && !detailLoading && courseDetail && (
-        <div className="space-y-6">
+        <div className="space-y-4 animate-fade-in">
+          {/* Enroll student */}
           <Card>
-            <h3 className="dn-title mb-4">Enroll Student</h3>
+            <h3 className="text-base font-black text-[#202124] mb-4 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-[#1A73E8]" />
+              Enroll Student
+              {selectedCourse && (
+                <span className="text-sm font-bold text-[#9AA0A6] ml-1">
+                  — {selectedCourse.subject}
+                </span>
+              )}
+            </h3>
             {availableStudents.length === 0 ? (
-              <p className="text-sm text-danilo-text-secondary">All available students are already enrolled.</p>
+              <p className="text-sm text-[#9AA0A6] font-bold">
+                All available students are already enrolled.
+              </p>
             ) : (
               <form onSubmit={handleEnroll} className="flex items-end gap-2">
                 <select
@@ -171,36 +265,68 @@ export default function AdminEnrollments() {
                   value={enrollStudentId}
                   onChange={(e) => setEnrollStudentId(e.target.value)}
                   required
+                  aria-label="Select student"
                 >
-                  <option value="">Select student</option>
+                  <option value="">Select a student…</option>
                   {availableStudents.map((s) => (
-                    <option key={s.id} value={s.id}>{s.fullName} ({s.email || s.username})</option>
+                    <option key={s.id} value={s.id}>
+                      {s.fullName} ({s.email || s.username})
+                    </option>
                   ))}
                 </select>
-                <Button type="submit" size="sm" disabled={submitting}><Plus className="w-4 h-4" /> Enroll</Button>
+                <Button type="submit" disabled={submitting}>
+                  <Plus className="w-4 h-4" />
+                  Enroll
+                </Button>
               </form>
             )}
           </Card>
 
+          {/* Enrolled students */}
           <Card>
-            <h3 className="dn-title mb-4">Enrolled Students ({courseDetail.students?.length || 0})</h3>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-black text-[#202124] flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#1A73E8]" />
+                Enrolled Students
+              </h3>
+              <span className="text-sm font-bold text-[#9AA0A6]">
+                {courseDetail.students?.length || 0} student{courseDetail.students?.length !== 1 ? "s" : ""}
+              </span>
+            </div>
             {courseDetail.students?.length > 0 ? (
               <div className="space-y-2">
                 {courseDetail.students.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-danilo-bg-tertiary text-danilo-text-secondary flex items-center justify-center font-bold text-xs">{s.fullName?.charAt(0) || "S"}</div>
+                      <div className="w-9 h-9 rounded-full bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center font-black text-xs flex-shrink-0">
+                        {s.fullName?.charAt(0)?.toUpperCase() || "S"}
+                      </div>
                       <div>
-                        <p className="text-sm font-medium text-danilo-text">{s.fullName}</p>
-                        <p className="dn-caption">{s.email || s.username}</p>
+                        <p className="text-sm font-bold text-[#202124]">{s.fullName}</p>
+                        <p className="text-xs text-[#9AA0A6] font-bold">{s.email || s.username}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleUnenroll(s.id)}><Minus className="w-3.5 h-3.5 text-danilo-error" /> Remove</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUnenroll(s.id)}
+                      title="Remove from class"
+                    >
+                      <Minus className="w-3.5 h-3.5 text-[#D93025]" />
+                      <span className="hidden sm:inline text-[#D93025]">Remove</span>
+                    </Button>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState icon={Users} title="No students enrolled" description="Enroll students using the form above." />
+              <EmptyState
+                icon={Users}
+                title="No students enrolled"
+                description="Use the form above to enroll students into this class."
+              />
             )}
           </Card>
         </div>

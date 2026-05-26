@@ -84,9 +84,16 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-danilo-bg-secondary flex flex-col items-center justify-center">
-        <div className="w-10 h-10 border-4 border-danilo-primary/20 border-t-danilo-primary rounded-full animate-spin mb-4" />
-        <p className="text-sm font-medium text-danilo-text-muted">Loading your workspace...</p>
+      <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center gap-5">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#1A73E8] flex items-center justify-center shadow-md">
+            <span className="text-white font-black text-xl">D</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-[3px] border-[#1A73E8]/20 border-t-[#1A73E8] rounded-full animate-spin" />
+            <p className="text-sm font-bold text-[#9AA0A6]">Loading your workspace…</p>
+          </div>
+        </div>
       </div>
     );
   }

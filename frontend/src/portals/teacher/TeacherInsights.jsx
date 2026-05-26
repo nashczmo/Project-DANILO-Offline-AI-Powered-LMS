@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
-import { AlertTriangle, Users, Cpu } from "lucide-react";
+import { AlertTriangle, Users, Cpu, Sparkles, Send, BookOpen } from "lucide-react";
 
 export default function TeacherInsights() {
   const { data: courses } = useApi("/teacher/courses", { immediate: true });
@@ -39,117 +39,200 @@ export default function TeacherInsights() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="AI Insights"
         description="AI-powered analysis of student performance, struggling learners, and class-wide recommendations."
       />
 
+      {/* Class Selector */}
       <Card>
-        <label className="dn-label mb-2 block">Select Class</label>
+        <label htmlFor="insights-course-select" className="block text-sm font-black text-[#202124] mb-2">
+          Select Class
+        </label>
         <select
+          id="insights-course-select"
           className="dn-input"
           value={selectedCourseId || ""}
           onChange={(e) => setSelectedCourseId(e.target.value || null)}
         >
-          <option value="">Choose a class...</option>
+          <option value="">Choose a class to analyze…</option>
           {(courses || []).map((c) => (
             <option key={c.id} value={c.id}>
-              {c.subject} {c.gradeLevel} {c.quarter}
+              {c.subject} — {c.gradeLevel} {c.quarter}
             </option>
           ))}
         </select>
       </Card>
 
+      {/* AI Chat */}
       <Card>
-        <h3 className="dn-title mb-4">Ask DANILO About This Class</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="w-5 h-5 text-[#1A73E8]" />
+          <h3 className="text-base font-black text-[#202124]">Ask DANILO</h3>
+          <span className="text-xs text-[#9AA0A6] font-bold">
+            Intervention ideas, rubric help, or subject planning
+          </span>
+        </div>
         <form onSubmit={sendInsightChat} className="flex flex-col sm:flex-row gap-2">
-          <input className="dn-input flex-1" placeholder="Ask for intervention ideas, rubric help, or subject planning..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} />
-          <Button type="submit" disabled={chatLoading || !chatInput.trim()}>{chatLoading ? "Thinking..." : "Send"}</Button>
+          <input
+            className="dn-input flex-1"
+            placeholder="e.g. Which students need remediation in fractions?"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            aria-label="Ask AI a question"
+            disabled={chatLoading}
+          />
+          <Button type="submit" disabled={chatLoading || !chatInput.trim()}>
+            <Send className="w-4 h-4" />
+            {chatLoading ? "Thinking…" : "Send"}
+          </Button>
         </form>
-        {chatError && <div className="mt-3 p-3 rounded-xl bg-danilo-error-subtle border border-danilo-error/20 text-sm text-danilo-error">{chatError}</div>}
-        {chatAnswer && <p className="mt-4 text-sm text-danilo-text-secondary leading-relaxed whitespace-pre-line">{chatAnswer}</p>}
+        {chatError && (
+          <div
+            role="alert"
+            className="mt-3 px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025]"
+          >
+            {chatError}
+          </div>
+        )}
+        {chatAnswer && (
+          <div className="mt-4 p-4 bg-[#E8F0FE]/40 rounded-xl border border-[#1A73E8]/15">
+            <p className="text-xs font-black text-[#1A73E8] uppercase tracking-wide mb-2">DANILO's Response</p>
+            <p className="text-sm text-[#202124] leading-relaxed whitespace-pre-line">{chatAnswer}</p>
+          </div>
+        )}
       </Card>
 
       {selectedCourseId && loading && (
         <div className="space-y-4">
           <Skeleton className="h-40" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+          </div>
           <Skeleton className="h-40" />
         </div>
       )}
 
       {selectedCourseId && !loading && insights && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-in">
           {/* AI Summary */}
-          <Card className="border-blue-100 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-400/5 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
-            <div className="flex items-start gap-4 relative z-10">
-              <div className="w-10 h-10 bg-danilo-primary/10 text-danilo-primary rounded-lg flex items-center justify-center flex-shrink-0">
+          <Card className="border-[#1A73E8]/20">
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 bg-[#E8F0FE] text-[#1A73E8] rounded-xl flex items-center justify-center flex-shrink-0">
                 <Cpu className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="dn-heading-md text-danilo-text mb-2">AI Summary</h3>
-                <p className="text-sm text-danilo-text-secondary leading-relaxed whitespace-pre-line">
-                  {insights.aiSummary || "No AI summary available."}
-                </p>
-                <div className="flex items-center gap-2 mt-3">
-                  <Badge color={insights.aiStatus === "ready" ? "success" : insights.aiStatus === "offline" ? "warning" : "secondary"}>
-                    {insights.aiStatus === "ready" ? "AI Ready" : insights.aiStatus === "offline" ? "AI Offline" : "Skipped"}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-base font-black text-[#202124]">AI Summary</h3>
+                  <Badge
+                    color={
+                      insights.aiStatus === "ready"
+                        ? "success"
+                        : insights.aiStatus === "offline"
+                        ? "warning"
+                        : "secondary"
+                    }
+                  >
+                    {insights.aiStatus === "ready"
+                      ? "AI Ready"
+                      : insights.aiStatus === "offline"
+                      ? "AI Offline"
+                      : "Skipped"}
                   </Badge>
                 </div>
+                <p className="text-sm text-[#5F6368] leading-relaxed whitespace-pre-line">
+                  {insights.aiSummary || "No AI summary available for this class yet."}
+                </p>
               </div>
             </div>
           </Card>
 
-          {/* Stats */}
+          {/* Stats Grid */}
           {insights.stats && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <p className="dn-caption mb-1">Students</p>
-                <p className="text-2xl font-bold text-danilo-text">{insights.stats.studentCount}</p>
-              </Card>
-              <Card>
-                <p className="dn-caption mb-1">Class Average</p>
-                <p className="text-2xl font-bold text-danilo-text">{insights.stats.classAverage ?? "N/A"}</p>
-              </Card>
-              <Card>
-                <p className="dn-caption mb-1">Struggling</p>
-                <p className="text-2xl font-bold text-danilo-error">{insights.stats.strugglingCount}</p>
-              </Card>
-              <Card>
-                <p className="dn-caption mb-1">At Risk</p>
-                <p className="text-2xl font-bold text-danilo-warning">{insights.stats.atRiskCount}</p>
-              </Card>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                {
+                  label: "Students",
+                  value: insights.stats.studentCount,
+                  iconBg: "bg-[#E8F0FE]",
+                  iconColor: "text-[#1A73E8]",
+                  icon: Users,
+                },
+                {
+                  label: "Class Average",
+                  value: insights.stats.classAverage ?? "N/A",
+                  iconBg: "bg-[#E6F4EA]",
+                  iconColor: "text-[#188038]",
+                  icon: BookOpen,
+                },
+                {
+                  label: "Struggling",
+                  value: insights.stats.strugglingCount,
+                  iconBg: "bg-[#FCE8E6]",
+                  iconColor: "text-[#D93025]",
+                  icon: AlertTriangle,
+                },
+                {
+                  label: "At Risk",
+                  value: insights.stats.atRiskCount,
+                  iconBg: "bg-[#FEF7E0]",
+                  iconColor: "text-[#E37400]",
+                  icon: AlertTriangle,
+                },
+              ].map((s) => (
+                <Card key={s.label} className="flex flex-col gap-3 p-5">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor}`}>
+                    <s.icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-black text-[#202124]">{s.value}</p>
+                    <p className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide mt-0.5">{s.label}</p>
+                  </div>
+                </Card>
+              ))}
             </div>
           )}
 
           {/* Struggling Students */}
           <Card>
-            <h3 className="dn-title mb-4">Struggling Students</h3>
+            <div className="flex items-center gap-2 mb-5">
+              <AlertTriangle className="w-5 h-5 text-[#D93025]" />
+              <h3 className="text-base font-black text-[#202124]">Struggling Students</h3>
+            </div>
             {insights.strugglingStudents?.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {insights.strugglingStudents.map((s, idx) => (
-                  <div key={idx} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-danilo-error-subtle text-danilo-error flex items-center justify-center font-bold text-xs">
-                        <AlertTriangle className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-danilo-text">{s.studentName || "Student"}</p>
-                        <p className="dn-caption">{s.reason || "Needs attention"}</p>
-                      </div>
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 py-3 px-4 bg-[#FCE8E6]/50 rounded-xl border border-[#D93025]/10"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-[#FCE8E6] text-[#D93025] flex items-center justify-center font-black text-xs flex-shrink-0">
+                      {s.studentName?.charAt(0)?.toUpperCase() || "?"}
                     </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#202124]">{s.studentName || "Student"}</p>
+                      <p className="text-xs text-[#9AA0A6] font-bold">{s.reason || "Needs attention"}</p>
+                    </div>
+                    <Badge color="error" className="ml-auto flex-shrink-0">At Risk</Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState icon={Users} title="No struggling students" description="Great news! All students are performing well." />
+              <EmptyState
+                icon={Users}
+                title="No struggling students"
+                description="Great news! All students are performing well."
+              />
             )}
           </Card>
 
           {/* Weak Topics */}
           <Card>
-            <h3 className="dn-title mb-4">Class Weak Topics</h3>
+            <div className="flex items-center gap-2 mb-5">
+              <BookOpen className="w-5 h-5 text-[#E37400]" />
+              <h3 className="text-base font-black text-[#202124]">Class Weak Topics</h3>
+            </div>
             {insights.classWeakTopics?.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {insights.classWeakTopics.map((topic, idx) => (
@@ -157,7 +240,7 @@ export default function TeacherInsights() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-danilo-text-secondary">No weak topics identified.</p>
+              <p className="text-sm text-[#9AA0A6] font-bold">No weak topics identified yet.</p>
             )}
           </Card>
         </div>

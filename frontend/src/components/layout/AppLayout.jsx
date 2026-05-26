@@ -45,6 +45,13 @@ const NAV_CONFIG = {
   ],
 };
 
+// Role-specific sidebar accent colors (Google-inspired)
+const ROLE_COLORS = {
+  student: { dot: "bg-[#1A73E8]", badge: "text-[#1A73E8] bg-[#E8F0FE]" },
+  teacher: { dot: "bg-[#188038]", badge: "text-[#188038] bg-[#E6F4EA]" },
+  admin:   { dot: "bg-[#E37400]", badge: "text-[#E37400] bg-[#FEF7E0]" },
+};
+
 export default function AppLayout({ children, role }) {
   const user = useAppStore((s) => s.user);
   const logout = useAppStore((s) => s.logout);
@@ -56,7 +63,21 @@ export default function AppLayout({ children, role }) {
   const userMenuRef = useRef(null);
 
   const navItems = NAV_CONFIG[role] || [];
-  const portalLabel = { student: "Student Portal", teacher: "Faculty Portal", admin: "Admin Portal" }[role] || "Portal";
+  const portalLabel = {
+    student: "Student Portal",
+    teacher: "Faculty Portal",
+    admin: "Admin Portal",
+  }[role] || "Portal";
+
+  const roleColors = ROLE_COLORS[role] || ROLE_COLORS.student;
+
+  // User initials for avatar
+  const initials = (user?.fullName || user?.name || "U")
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   useEffect(() => {
     const handler = (e) => {
@@ -78,97 +99,146 @@ export default function AppLayout({ children, role }) {
   };
 
   return (
-    <div className="flex h-screen bg-danilo-bg-secondary overflow-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-danilo-border flex-shrink-0">
-        <div className="h-16 flex items-center px-6 border-b border-danilo-border">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-danilo-primary flex items-center justify-center">
-              <span className="text-white font-bold text-sm">D</span>
+    <div className="flex h-screen bg-[#F8F9FA] overflow-hidden">
+
+      {/* ── Desktop Sidebar ────────────────────────────────── */}
+      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-[#E0E0E0] flex-shrink-0">
+        {/* Logo / Brand */}
+        <div className="h-16 flex items-center px-5 border-b border-[#E0E0E0]">
+          <div className="flex items-center gap-3">
+            {/* Google-style product icon */}
+            <div className="w-9 h-9 rounded-xl bg-[#1A73E8] flex items-center justify-center shadow-sm flex-shrink-0">
+              <span className="text-white font-black text-base leading-none">D</span>
             </div>
             <div>
-              <h2 className="text-sm font-bold text-danilo-text tracking-tight leading-none">DANILO</h2>
-              <p className="text-[10px] text-danilo-text-muted leading-none mt-0.5">{portalLabel}</p>
+              <h2 className="text-sm font-black text-[#202124] tracking-tight leading-none">DANILO</h2>
+              <p className="text-[10px] font-bold text-[#9AA0A6] leading-none mt-0.5 uppercase tracking-wide">
+                {portalLabel}
+              </p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {navItems.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                `dn-nav-item ${isActive ? "active" : ""} ${link.highlight ? "relative" : ""}`
+                `dn-nav-item ${isActive ? "active" : ""}`
               }
             >
-              <link.icon className="w-[18px] h-[18px]" />
-              <span>{link.label}</span>
+              <link.icon className="w-[18px] h-[18px] flex-shrink-0" />
+              <span className="flex-1">{link.label}</span>
               {link.highlight && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-danilo-secondary" />
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${roleColors.dot}`} />
               )}
             </NavLink>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-danilo-border">
-          <div className="flex items-center gap-2 text-xs text-danilo-text-muted">
-            {isOffline ? <WifiOff className="w-3.5 h-3.5 text-danilo-warning" /> : <Wifi className="w-3.5 h-3.5 text-danilo-success" />}
+        {/* Offline Status Footer */}
+        <div className="px-4 py-4 border-t border-[#E0E0E0]">
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-full text-xs font-bold ${
+              isOffline
+                ? "bg-[#FEF7E0] text-[#E37400]"
+                : "bg-[#E6F4EA] text-[#188038]"
+            }`}
+          >
+            {isOffline
+              ? <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />
+              : <Wifi className="w-3.5 h-3.5 flex-shrink-0" />}
             <span>{isOffline ? "Offline Mode" : "Connected"}</span>
           </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* ── Main Content ───────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar */}
-        <header className="h-16 bg-white border-b border-danilo-border flex items-center justify-between px-4 sm:px-6 flex-shrink-0">
+
+        {/* ── Top Header Bar ─────────────────────────────── */}
+        <header className="h-16 bg-white border-b border-[#E0E0E0] flex items-center justify-between px-4 sm:px-6 flex-shrink-0 z-10">
+
+          {/* Mobile: Hamburger + Logo */}
           <div className="flex items-center gap-3 md:hidden">
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="p-2 -ml-2 text-danilo-text-secondary hover:text-danilo-text rounded-lg hover:bg-danilo-bg-tertiary transition-colors"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              className="p-2 -ml-2 text-[#5F6368] hover:text-[#202124] rounded-full hover:bg-[#F1F3F4] transition-colors"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-md bg-danilo-primary flex items-center justify-center">
-                <span className="text-white font-bold text-xs">D</span>
+              <div className="w-7 h-7 rounded-lg bg-[#1A73E8] flex items-center justify-center">
+                <span className="text-white font-black text-xs">D</span>
               </div>
-              <span className="text-sm font-bold text-danilo-text">DANILO</span>
+              <span className="text-sm font-black text-[#202124]">DANILO</span>
             </div>
           </div>
 
-          <div className="hidden md:block">
-            <h1 className="text-sm font-medium text-danilo-text-secondary">
-              Welcome back, <span className="text-danilo-text font-semibold">{user?.fullName || user?.name || "User"}</span>
-            </h1>
+          {/* Desktop: Page context */}
+          <div className="hidden md:flex items-center gap-2">
+            <p className="text-sm text-[#5F6368]">
+              Welcome back,{" "}
+              <span className="font-bold text-[#202124]">
+                {user?.fullName || user?.name || "User"}
+              </span>
+            </p>
           </div>
 
+          {/* Right: User Menu */}
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-danilo-bg-tertiary transition-colors"
+              aria-expanded={userMenuOpen}
+              aria-label="User menu"
+              className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full hover:bg-[#F1F3F4] transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-danilo-primary/10 flex items-center justify-center text-danilo-primary font-bold text-sm">
-                {(user?.fullName || user?.name || "U").charAt(0).toUpperCase()}
+              {/* Avatar */}
+              <div className="w-8 h-8 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-black text-xs flex-shrink-0">
+                {initials}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-sm font-medium text-danilo-text leading-none">{user?.fullName || user?.name || "User"}</p>
-                <p className="text-xs text-danilo-text-muted capitalize leading-none mt-1">{user?.displayRole || user?.role || "User"}</p>
+                <p className="text-sm font-bold text-[#202124] leading-none">
+                  {user?.fullName || user?.name || "User"}
+                </p>
+                <p className="text-[11px] text-[#9AA0A6] capitalize leading-none mt-0.5 font-bold">
+                  {user?.displayRole || user?.role || "User"}
+                </p>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-danilo-text-muted hidden sm:block" />
+              <ChevronDown
+                className={`w-4 h-4 text-[#9AA0A6] hidden sm:block transition-transform duration-200 ${
+                  userMenuOpen ? "rotate-180" : ""
+                }`}
+              />
             </button>
 
+            {/* Dropdown */}
             {userMenuOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-white border border-danilo-border rounded-xl shadow-lg overflow-hidden z-50">
-                <div className="p-3 border-b border-danilo-border">
-                  <p className="text-sm font-medium text-danilo-text truncate">{user?.fullName || user?.name || "User"}</p>
-                  <p className="text-xs text-danilo-text-muted truncate">{user?.email || user?.username || ""}</p>
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-[#E0E0E0] rounded-2xl shadow-elevation-2 overflow-hidden z-50 animate-scale-in">
+                {/* User info */}
+                <div className="p-4 border-b border-[#E0E0E0]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+                      {initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#202124] truncate">
+                        {user?.fullName || user?.name || "User"}
+                      </p>
+                      <p className="text-xs text-[#9AA0A6] truncate font-bold">
+                        {user?.email || user?.username || ""}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-1.5">
+                {/* Actions */}
+                <div className="p-2">
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danilo-error hover:bg-danilo-error-subtle rounded-lg transition-colors"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-[#D93025] hover:bg-[#FCE8E6] rounded-xl transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign out
@@ -179,10 +249,10 @@ export default function AppLayout({ children, role }) {
           </div>
         </header>
 
-        {/* Mobile Nav Drawer */}
+        {/* ── Mobile Nav Drawer ──────────────────────────── */}
         {mobileOpen && (
-          <div className="md:hidden bg-white border-b border-danilo-border">
-            <nav className="p-3 space-y-1">
+          <div className="md:hidden bg-white border-b border-[#E0E0E0] animate-slide-down shadow-md z-10">
+            <nav className="px-3 py-3 space-y-0.5">
               {navItems.map((link) => (
                 <NavLink
                   key={link.to}
@@ -192,22 +262,33 @@ export default function AppLayout({ children, role }) {
                     `dn-nav-item ${isActive ? "active" : ""}`
                   }
                 >
-                  <link.icon className="w-[18px] h-[18px]" />
-                  {link.label}
+                  <link.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="flex-1">{link.label}</span>
                   {link.highlight && (
-                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-danilo-secondary" />
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${roleColors.dot}`} />
                   )}
                 </NavLink>
               ))}
             </nav>
-            <div className="px-4 py-3 border-t border-danilo-border flex items-center gap-2 text-xs text-danilo-text-muted">
-              {isOffline ? <WifiOff className="w-3.5 h-3.5 text-danilo-warning" /> : <Wifi className="w-3.5 h-3.5 text-danilo-success" />}
-              <span>{isOffline ? "Offline Mode" : "Connected to LAN"}</span>
+            {/* Offline status in drawer */}
+            <div className="px-4 py-3 border-t border-[#E0E0E0]">
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
+                  isOffline
+                    ? "bg-[#FEF7E0] text-[#E37400]"
+                    : "bg-[#E6F4EA] text-[#188038]"
+                }`}
+              >
+                {isOffline
+                  ? <WifiOff className="w-3.5 h-3.5" />
+                  : <Wifi className="w-3.5 h-3.5" />}
+                <span>{isOffline ? "Offline Mode" : "Connected to LAN"}</span>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Page Content */}
+        {/* ── Page Content ──────────────────────────────── */}
         <main className="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto w-full flex flex-col min-h-0">
             {children}

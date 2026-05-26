@@ -1,21 +1,60 @@
-@font-face { font-family: "Nunito"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Nunito-Regular.woff2") format("woff2"); }
-@font-face { font-family: "Nunito"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Nunito-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Nunito"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Nunito-SemiBold.woff2") format("woff2"); }
-@font-face { font-family: "Nunito"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Nunito-Bold.woff2") format("woff2"); }
-@font-face { font-family: "Nunito"; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Nunito-ExtraBold.woff2") format("woff2"); }
+/* ============================================================
+   DANILO LMS — Global Design System
+   Inspired by Google Material Design 3 / Google Workspace
+   Font: Lato (Self-hosted for offline use)
+   ============================================================ */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 300;
+  src: url('/fonts/lato-300.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/lato-400.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 700;
+  src: url('/fonts/lato-700.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 900;
+  src: url('/fonts/lato-900.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* ── Base Reset & Root Variables ──────────────────────────── */
 :root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  --sidebar-w: 260px;
+  --sidebar-w: 256px;
   --header-h: 64px;
   color-scheme: light;
+
+  /* MD3 Design tokens */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Focus ring */
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px #1A73E8;
 }
 
 html { scroll-behavior: smooth; }
@@ -23,73 +62,98 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   min-height: 100dvh;
-  background: #F8FAFC;
-  color: #0F172A;
-  font-family: "Nunito", system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
+  background: #F8F9FA;
+  color: #202124;
+  font-family: "Lato", sans-serif;
+  font-size: 14px;
   line-height: 1.5;
+  letter-spacing: 0.01em;
 }
 
 #root { min-height: 100dvh; display: flex; flex-direction: column; }
 
-input, select, textarea { font-family: inherit; }
+input, select, textarea, button {
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+}
 
-::selection { background: #2563EB; color: #fff; }
+/* Selection */
+::selection { background: #1A73E8; color: #fff; }
 
+/* Focus visible — keyboard accessible */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+
+/* Scrollbar — thin, elegant */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.5); }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.20); }
 
+/* ── Component Layer ──────────────────────────────────────── */
 @layer components {
+
+  /* ── Cards ── */
   .dn-card {
     @apply rounded-2xl border border-danilo-border bg-white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
     transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
   }
   .dn-card-hover {
     cursor: pointer;
   }
   .dn-card-hover:hover {
-    @apply border-danilo-border/60;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border-color: #C5D4F5;
+    box-shadow: 0 4px 12px rgba(26,115,232,0.10), 0 2px 4px rgba(0,0,0,0.06);
     transform: translateY(-1px);
   }
+  .dn-card-hover:active {
+    transform: scale(0.99) translateY(0);
+  }
 
+  /* ── Typography Scale ── */
   .dn-title {
-    @apply text-lg font-semibold text-danilo-text tracking-tight leading-snug;
+    @apply text-base font-bold text-danilo-text tracking-tight leading-snug;
   }
   .dn-subtitle {
     @apply text-sm text-danilo-text-secondary leading-relaxed;
   }
   .dn-overline {
-    @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-danilo-text-muted;
+    @apply text-[10px] font-bold uppercase tracking-[0.12em] text-danilo-text-muted;
   }
   .dn-label {
-    @apply text-sm font-medium text-danilo-text-secondary;
+    @apply text-sm font-bold text-danilo-text-secondary;
   }
   .dn-caption {
-    @apply text-xs text-danilo-text-muted;
+    @apply text-xs text-danilo-text-muted leading-relaxed;
   }
   .dn-heading-xl {
-    @apply text-3xl font-bold text-danilo-text tracking-tight leading-tight;
+    @apply text-3xl font-black text-danilo-text tracking-tight leading-tight;
   }
   .dn-heading-lg {
-    @apply text-2xl font-bold text-danilo-text tracking-tight leading-tight;
+    @apply text-2xl font-black text-danilo-text tracking-tight leading-tight;
   }
   .dn-heading-md {
-    @apply text-xl font-semibold text-danilo-text tracking-tight;
+    @apply text-lg font-bold text-danilo-text tracking-tight;
   }
 
+  /* ── Form Inputs ── */
   .dn-input {
-    @apply w-full bg-white border border-danilo-border rounded-xl px-4 py-2.5 text-sm text-danilo-text outline-none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    @apply w-full bg-white border border-danilo-border rounded-lg px-3 py-2.5 text-sm text-danilo-text outline-none;
+    font-weight: 400;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .dn-input:focus {
     @apply border-danilo-primary;
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    box-shadow: 0 0 0 3px rgba(26,115,232,0.12);
   }
   .dn-input::placeholder { @apply text-danilo-text-placeholder; }
   .dn-input:disabled { @apply opacity-50 cursor-not-allowed bg-danilo-bg-tertiary; }
-  .dn-input:hover:not(:disabled):not(:focus) { @apply border-danilo-text-placeholder/50; }
+  .dn-input:hover:not(:disabled):not(:focus) { border-color: #9AA0A6; }
 
   .dn-textarea {
     @apply dn-input resize-none;
@@ -97,27 +161,36 @@ input, select, textarea { font-family: inherit; }
     min-height: 80px;
   }
 
+  /* ── Buttons ── */
   .dn-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-medium text-sm transition-all duration-200;
-    @apply px-4 py-2.5;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-bold text-sm transition-all duration-150;
+    @apply px-4 py-2 leading-none;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    user-select: none;
   }
-  .dn-btn:disabled { @apply opacity-50 cursor-not-allowed; }
+  .dn-btn:focus-visible {
+    box-shadow: var(--focus-ring);
+    outline: none;
+  }
+  .dn-btn:disabled { @apply opacity-50 cursor-not-allowed pointer-events-none; }
 
   .dn-btn-primary {
-    @apply dn-btn bg-danilo-primary text-white shadow-sm;
+    @apply dn-btn bg-danilo-primary text-white;
+    box-shadow: 0 1px 3px rgba(26,115,232,0.3);
   }
   .dn-btn-primary:hover:not(:disabled) {
     @apply bg-danilo-primary-hover;
-    box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+    box-shadow: 0 3px 8px rgba(26,115,232,0.35);
     transform: translateY(-1px);
   }
   .dn-btn-primary:active:not(:disabled) { transform: scale(0.98) translateY(0); }
 
   .dn-btn-secondary {
-    @apply dn-btn bg-white text-danilo-text border border-danilo-border;
+    @apply dn-btn bg-white text-danilo-primary border border-danilo-primary/25;
   }
   .dn-btn-secondary:hover:not(:disabled) {
-    @apply bg-danilo-bg-secondary border-danilo-text-placeholder/40;
+    @apply bg-danilo-blue-light border-danilo-primary/40;
     transform: translateY(-1px);
   }
   .dn-btn-secondary:active:not(:disabled) { transform: scale(0.98) translateY(0); }
@@ -128,33 +201,44 @@ input, select, textarea { font-family: inherit; }
   .dn-btn-ghost:hover:not(:disabled) {
     @apply bg-danilo-bg-tertiary text-danilo-text;
   }
+  .dn-btn-ghost:active:not(:disabled) { @apply bg-danilo-surface-active; }
 
   .dn-btn-danger {
     @apply dn-btn bg-danilo-error text-white;
+    box-shadow: 0 1px 3px rgba(217,48,37,0.3);
   }
   .dn-btn-danger:hover:not(:disabled) {
-    @apply bg-red-700;
-    box-shadow: 0 4px 12px rgba(220,38,38,0.2);
+    @apply bg-danilo-error-hover;
+    box-shadow: 0 3px 8px rgba(217,48,37,0.3);
   }
 
-  .dn-btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
-  .dn-btn-lg { @apply px-6 py-3 text-base rounded-2xl; }
+  .dn-btn-sm { @apply px-3 py-1.5 text-xs rounded-md gap-1.5; }
+  .dn-btn-lg { @apply px-6 py-3 text-base rounded-xl; }
 
+  /* ── Skeleton Loading ── */
   .dn-shimmer {
-    @apply rounded-xl;
-    background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+    @apply rounded-lg;
+    background: linear-gradient(90deg, #F1F3F4 25%, #E8EAED 50%, #F1F3F4 75%);
     background-size: 200% 100%;
-    animation: shimmer 1.5s ease-in-out infinite;
+    animation: shimmer 1.6s ease-in-out infinite;
   }
 
+  /* ── Navigation Items ── */
   .dn-nav-item {
-    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200;
-    @apply text-danilo-text-muted hover:text-danilo-text hover:bg-danilo-bg-tertiary;
+    @apply flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-bold transition-all duration-150;
+    @apply text-danilo-text-secondary hover:text-danilo-text hover:bg-danilo-bg-tertiary;
+    letter-spacing: 0.01em;
   }
   .dn-nav-item.active {
-    @apply bg-danilo-primary-subtle text-danilo-primary;
+    @apply bg-danilo-blue-light text-danilo-primary;
+    font-weight: 900;
+  }
+  .dn-nav-item:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 
+  /* ── Progress Bar ── */
   .dn-progress {
     @apply h-2 rounded-full bg-danilo-bg-tertiary overflow-hidden;
   }
@@ -162,28 +246,64 @@ input, select, textarea { font-family: inherit; }
     @apply h-full rounded-full bg-danilo-primary transition-all duration-500;
   }
 
+  /* ── Tabs ── */
   .dn-tabs {
-    @apply flex items-center gap-1 p-1 bg-danilo-bg-tertiary rounded-xl;
+    @apply flex items-center border-b border-danilo-border;
   }
   .dn-tab {
-    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200;
-    @apply text-danilo-text-muted hover:text-danilo-text;
+    @apply px-4 py-3 text-sm font-bold transition-all duration-150 border-b-2 border-transparent -mb-px;
+    @apply text-danilo-text-muted hover:text-danilo-text hover:border-danilo-text-muted/40;
   }
   .dn-tab.active {
-    @apply bg-white text-danilo-text shadow-sm;
+    @apply text-danilo-primary border-danilo-primary;
   }
 
+  /* ── Chips ── */
   .dn-chip {
-    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold;
     @apply bg-danilo-bg-tertiary text-danilo-text-secondary border border-danilo-border;
   }
 
+  /* ── AI Bubble ── */
   .dn-ai-bubble {
     @apply rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed;
-    @apply bg-danilo-primary-muted border border-danilo-primary/10;
+    @apply bg-danilo-blue-light border border-danilo-primary/10;
+    color: #202124;
+  }
+
+  /* ── Table Styles ── */
+  .dn-table {
+    @apply w-full text-sm;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .dn-table thead tr {
+    @apply bg-danilo-bg-tertiary;
+  }
+  .dn-table th {
+    @apply py-3 px-4 text-left text-xs font-black uppercase tracking-wide text-danilo-text-muted;
+    @apply border-b border-danilo-border;
+  }
+  .dn-table th:first-child { border-radius: 8px 0 0 0; }
+  .dn-table th:last-child { border-radius: 0 8px 0 0; }
+  .dn-table td {
+    @apply py-3 px-4 text-danilo-text border-b border-danilo-border/60;
+    transition: background-color 0.1s ease;
+  }
+  .dn-table tbody tr:hover td {
+    @apply bg-danilo-bg-secondary;
+  }
+  .dn-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* ── Section Divider ── */
+  .dn-divider {
+    @apply border-t border-danilo-border my-4;
   }
 }
 
+/* ── Utility Layer ────────────────────────────────────────── */
 @layer utilities {
   .dn-line-clamp-2 {
     display: -webkit-box;
@@ -204,9 +324,35 @@ input, select, textarea { font-family: inherit; }
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
+  /* Ripple-style interaction surface */
+  .dn-interactive {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
 }
 
+/* ── Keyframe Animations ──────────────────────────────────── */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.22s ease both;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease both;
 }

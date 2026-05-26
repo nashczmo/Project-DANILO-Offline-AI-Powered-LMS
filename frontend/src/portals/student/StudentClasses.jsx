@@ -4,8 +4,25 @@ import { useAppStore } from "../../store/useAppStore";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest, apiUrl } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
-import { BookOpen, Users, Clock, ArrowLeft, FileText, ClipboardList, HelpCircle, MessageSquare, Download } from "lucide-react";
+import {
+  BookOpen, Users, Clock, ArrowLeft, FileText, ClipboardList,
+  HelpCircle, MessageSquare, Download, ChevronRight,
+} from "lucide-react";
 
+/* ── Subject color palette — cycling for variety ────────── */
+const SUBJECT_COLORS = [
+  { bg: "bg-[#E8F0FE]", text: "text-[#1A73E8]" },
+  { bg: "bg-[#E6F4EA]", text: "text-[#188038]" },
+  { bg: "bg-[#FEF7E0]", text: "text-[#E37400]" },
+  { bg: "bg-[#F3E8FD]", text: "text-[#7B1FA2]" },
+  { bg: "bg-[#FCE8E6]", text: "text-[#D93025]" },
+];
+
+function colorForIdx(idx) {
+  return SUBJECT_COLORS[idx % SUBJECT_COLORS.length];
+}
+
+/* ── Class List ───────────────────────────────────────────── */
 function ClassList() {
   const dashboard = useAppStore((s) => s.dashboard);
   const navigate = useNavigate();
@@ -13,55 +30,67 @@ function ClassList() {
   const courses = dashboard?.courses || [];
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="My Classes" description="Browse your enrolled subjects and course materials." />
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="My Classes"
+        description="Browse your enrolled subjects and course materials."
+      />
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-52" />)}
         </div>
       ) : courses.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {courses.map((cls) => (
-            <Card
-              key={cls.id}
-              className="flex flex-col cursor-pointer"
-              hover
-              onClick={() => navigate(`/student/classes/${cls.id}`)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
-                  <BookOpen className="w-5 h-5" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {courses.map((cls, idx) => {
+            const colors = colorForIdx(idx);
+            return (
+              <Card
+                key={cls.id}
+                className="flex flex-col cursor-pointer group"
+                hover
+                onClick={() => navigate(`/student/classes/${cls.id}`)}
+              >
+                {/* Color bar accent */}
+                <div className={`w-full h-1.5 rounded-full mb-4 ${colors.bg}`} />
+                <div className="flex items-start justify-between mb-3">
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${colors.bg} ${colors.text}`}
+                  >
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <Badge color="primary">{cls.quarter}</Badge>
                 </div>
-                <Badge color="primary">{cls.quarter}</Badge>
-              </div>
-              <h3 className="dn-heading-md mb-1">{cls.subject}</h3>
-              <p className="text-sm text-danilo-text-secondary mb-4">{cls.title}</p>
-              <div className="space-y-2 mt-auto">
-                <div className="flex items-center gap-2 text-sm text-danilo-text-secondary">
-                  <Users className="w-4 h-4" />
-                  <span>{cls.teacherName || "TBA"}</span>
+                <h3 className="text-base font-black text-[#202124] leading-tight">{cls.subject}</h3>
+                <p className="text-sm text-[#5F6368] font-bold mt-0.5 dn-line-clamp-2">{cls.title}</p>
+                <div className="mt-auto pt-4 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs text-[#9AA0A6] font-bold">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{cls.teacherName || "TBA"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-[#9AA0A6] font-bold">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{cls.gradeLevel}{cls.strand ? ` · ${cls.strand}` : ""}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-danilo-text-secondary">
-                  <Clock className="w-4 h-4" />
-                  <span>{cls.gradeLevel} {cls.strand ? `(${cls.strand})` : ""}</span>
+                <div className="flex items-center gap-1 text-xs font-black text-[#1A73E8] mt-4 pt-4 border-t border-[#E0E0E0] group-hover:gap-2 transition-all">
+                  Open class <ChevronRight className="w-3.5 h-3.5" />
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <EmptyState
           icon={BookOpen}
           title="No classes yet"
-          description="You are not currently enrolled in any academic courses. Please consult your academic adviser."
+          description="You are not currently enrolled in any courses. Please consult your academic adviser."
         />
       )}
     </div>
   );
 }
 
+/* ── Class Detail ─────────────────────────────────────────── */
 function ClassDetail() {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -77,8 +106,6 @@ function ClassDetail() {
   const [quizError, setQuizError] = useState("");
   const [pdfError, setPdfError] = useState("");
   const [submittingQuiz, setSubmittingQuiz] = useState(false);
-
-  const loading = courseLoading || classworkLoading || peopleLoading || streamLoading;
 
   if (!courseId) return <ClassList />;
 
@@ -124,35 +151,45 @@ function ClassDetail() {
     }
   };
 
+  const TABS = ["stream", "classwork", "people"];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 animate-fade-in">
+      {/* Back link */}
       <button
         onClick={() => navigate("/student/classes")}
-        className="inline-flex items-center gap-1.5 text-sm text-danilo-text-secondary hover:text-danilo-text transition-colors mb-2"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#5F6368] hover:text-[#1A73E8] transition-colors"
+        aria-label="Back to classes"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Classes
+        <ArrowLeft className="w-4 h-4" />
+        Back to Classes
       </button>
 
+      {/* Course Header */}
       {courseLoading ? (
-        <Skeleton className="h-24" />
+        <Skeleton className="h-28" />
       ) : (
         <Card>
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="dn-heading-lg">{course?.subject}</h1>
-              <p className="dn-subtitle mt-1">{course?.title}</p>
-              <div className="flex flex-wrap items-center gap-3 mt-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-black text-[#202124] leading-tight">{course?.subject}</h1>
+              <p className="text-sm text-[#5F6368] font-bold mt-0.5">{course?.title}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 <Badge color="primary">{course?.quarter}</Badge>
-                <span className="text-sm text-danilo-text-secondary">{course?.gradeLevel}</span>
-                <span className="text-sm text-danilo-text-secondary">{course?.teacherName || "TBA"}</span>
+                <span className="text-sm text-[#9AA0A6] font-bold">{course?.gradeLevel}</span>
+                <span className="text-sm text-[#9AA0A6] font-bold">{course?.teacherName || "TBA"}</span>
               </div>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0">
+              <BookOpen className="w-6 h-6" />
             </div>
           </div>
         </Card>
       )}
 
+      {/* Tabs */}
       <div className="dn-tabs">
-        {["stream", "classwork", "people"].map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -163,29 +200,34 @@ function ClassDetail() {
         ))}
       </div>
 
+      {/* PDF error */}
       {pdfError && (
-        <div className="p-3 rounded-xl bg-danilo-error-subtle border border-danilo-error/20 text-sm text-danilo-error font-medium">
+        <div
+          role="alert"
+          className="px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025]"
+        >
           {pdfError}
         </div>
       )}
 
+      {/* ── Stream Tab ── */}
       {activeTab === "stream" && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {streamLoading ? (
             <Skeleton className="h-32" />
           ) : stream?.length > 0 ? (
             stream.map((item) => (
               <Card key={item.id}>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-danilo-primary-subtle text-danilo-primary flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="w-4 h-4" />
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <MessageSquare className="w-5 h-5" />
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-danilo-text text-sm">{item.title}</h4>
-                    <p className="text-sm text-danilo-text-secondary mt-1">{item.body}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="dn-caption">{item.authorName}</span>
-                      <span className="dn-caption">{item.postType}</span>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-black text-[#202124]">{item.title}</h4>
+                    <p className="text-sm text-[#5F6368] mt-1.5 leading-relaxed">{item.body}</p>
+                    <div className="flex items-center gap-3 mt-3 flex-wrap">
+                      <span className="text-xs text-[#9AA0A6] font-bold">{item.authorName}</span>
+                      <Badge color="secondary">{item.postType}</Badge>
                     </div>
                   </div>
                 </div>
@@ -197,31 +239,37 @@ function ClassDetail() {
         </div>
       )}
 
+      {/* ── Classwork Tab ── */}
       {activeTab === "classwork" && (
-        <div className="space-y-6">
+        <div className="space-y-5">
+          {/* Modules */}
           <Card>
-            <h3 className="dn-title mb-4">Modules</h3>
+            <div className="flex items-center gap-2 mb-5">
+              <FileText className="w-5 h-5 text-[#1A73E8]" />
+              <h3 className="text-base font-black text-[#202124]">Modules</h3>
+            </div>
             {classworkLoading ? (
               <Skeleton className="h-24" />
             ) : classwork?.modules?.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {classwork.modules.map((mod) => (
-                  <div key={mod.id} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <div
+                    key={mod.id}
+                    className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0">
                         <FileText className="w-4 h-4" />
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-danilo-text text-sm">{mod.title}</h4>
-                        <p className="dn-caption">Week {mod.week} {mod.quarter}</p>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-[#202124] truncate">{mod.title}</h4>
+                        <p className="text-xs text-[#9AA0A6] font-bold">Week {mod.week} · {mod.quarter}</p>
                       </div>
                     </div>
-                    <div className="mt-3">
-                      <Button variant="secondary" size="sm" onClick={() => openModulePdf(mod)}>
-                        <Download className="w-3.5 h-3.5" />
-                        Open PDF
-                      </Button>
-                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => openModulePdf(mod)}>
+                      <Download className="w-3.5 h-3.5" />
+                      Open PDF
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -230,21 +278,28 @@ function ClassDetail() {
             )}
           </Card>
 
+          {/* Assignments */}
           <Card>
-            <h3 className="dn-title mb-4">Assignments</h3>
+            <div className="flex items-center gap-2 mb-5">
+              <ClipboardList className="w-5 h-5 text-[#E37400]" />
+              <h3 className="text-base font-black text-[#202124]">Assignments</h3>
+            </div>
             {classworkLoading ? (
               <Skeleton className="h-24" />
             ) : classwork?.assignments?.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {classwork.assignments.map((a) => (
-                  <div key={a.id} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-danilo-warning-subtle text-danilo-warning flex items-center justify-center">
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-[#FEF7E0] text-[#E37400] flex items-center justify-center flex-shrink-0">
                         <ClipboardList className="w-4 h-4" />
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-danilo-text text-sm">{a.title}</h4>
-                        <p className="dn-caption">{a.points} points</p>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-[#202124] truncate">{a.title}</h4>
+                        <p className="text-xs text-[#9AA0A6] font-bold">{a.points} pts</p>
                       </div>
                     </div>
                     <Badge color={a.submission ? "success" : "warning"}>
@@ -258,56 +313,80 @@ function ClassDetail() {
             )}
           </Card>
 
+          {/* Quizzes */}
           <Card>
-            <h3 className="dn-title mb-4">Quizzes</h3>
+            <div className="flex items-center gap-2 mb-5">
+              <HelpCircle className="w-5 h-5 text-[#7B1FA2]" />
+              <h3 className="text-base font-black text-[#202124]">Quizzes</h3>
+            </div>
             {classworkLoading ? (
               <Skeleton className="h-24" />
             ) : classwork?.quizzes?.length > 0 ? (
               <div className="space-y-3">
                 {classwork.quizzes.map((q) => (
-                  <div key={q.id} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                    <div className="flex justify-between items-center gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-danilo-purple-subtle text-danilo-purple flex items-center justify-center">
+                  <div key={q.id} className="bg-[#F8F9FA] rounded-xl border border-[#E0E0E0] overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#F3E8FD] text-[#7B1FA2] flex items-center justify-center flex-shrink-0">
                           <HelpCircle className="w-4 h-4" />
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-danilo-text text-sm">{q.title}</h4>
-                          <p className="dn-caption">{q.questions?.length || 0} questions</p>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-[#202124] truncate">{q.title}</h4>
+                          <p className="text-xs text-[#9AA0A6] font-bold">{q.questions?.length || 0} questions</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Badge color={q.attempt ? "success" : "secondary"}>
-                          {q.attempt ? `Scored ${q.attempt.score}%` : "Not taken"}
+                          {q.attempt ? `${q.attempt.score}%` : "Not taken"}
                         </Badge>
                         {!q.attempt && (
-                          <Button size="sm" variant="secondary" onClick={() => { setActiveQuiz(activeQuiz === q.id ? null : q.id); setQuizResult(null); setQuizError(""); }}>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setActiveQuiz(activeQuiz === q.id ? null : q.id);
+                              setQuizResult(null);
+                              setQuizError("");
+                            }}
+                          >
                             Take Quiz
                           </Button>
                         )}
                       </div>
                     </div>
+
+                    {/* Quiz Questions Panel */}
                     {activeQuiz === q.id && !q.attempt && (
-                      <div className="mt-4 pt-4 border-t border-danilo-border space-y-4">
-                        <p className="text-sm text-danilo-text-secondary">{q.instructions}</p>
+                      <div className="border-t border-[#E0E0E0] p-4 space-y-5 bg-white">
+                        {q.instructions && (
+                          <p className="text-sm text-[#5F6368] leading-relaxed">{q.instructions}</p>
+                        )}
                         {q.questions?.map((question, index) => {
                           const choices = parseChoices(question.choicesJson);
                           return (
-                            <div key={question.id} className="space-y-2">
-                              <p className="text-sm font-medium text-danilo-text">{index + 1}. {question.questionText}</p>
+                            <div key={question.id} className="space-y-3">
+                              <p className="text-sm font-bold text-[#202124]">
+                                {index + 1}. {question.questionText}
+                              </p>
                               {choices.length > 0 ? (
                                 <div className="space-y-2">
                                   {choices.map((choice) => (
-                                    <label key={choice} className="flex items-center gap-2 text-sm text-danilo-text-secondary">
+                                    <label
+                                      key={choice}
+                                      className="flex items-center gap-2.5 text-sm text-[#5F6368] cursor-pointer font-bold hover:text-[#202124] transition-colors"
+                                    >
                                       <input
                                         type="radio"
                                         name={`quiz-${q.id}-${question.id}`}
                                         value={choice}
                                         checked={(answers[q.id]?.[question.id] || "") === choice}
-                                        onChange={(e) => setAnswers((prev) => ({
-                                          ...prev,
-                                          [q.id]: { ...(prev[q.id] || {}), [question.id]: e.target.value },
-                                        }))}
+                                        onChange={(e) =>
+                                          setAnswers((prev) => ({
+                                            ...prev,
+                                            [q.id]: { ...(prev[q.id] || {}), [question.id]: e.target.value },
+                                          }))
+                                        }
+                                        className="accent-[#1A73E8]"
                                       />
                                       {choice}
                                     </label>
@@ -316,26 +395,31 @@ function ClassDetail() {
                               ) : (
                                 <input
                                   className="dn-input"
-                                  placeholder="Your answer"
+                                  placeholder="Your answer…"
                                   value={answers[q.id]?.[question.id] || ""}
-                                  onChange={(e) => setAnswers((prev) => ({
-                                    ...prev,
-                                    [q.id]: { ...(prev[q.id] || {}), [question.id]: e.target.value },
-                                  }))}
+                                  onChange={(e) =>
+                                    setAnswers((prev) => ({
+                                      ...prev,
+                                      [q.id]: { ...(prev[q.id] || {}), [question.id]: e.target.value },
+                                    }))
+                                  }
                                 />
                               )}
                             </div>
                           );
                         })}
-                        {quizError && <p className="text-sm text-danilo-error">{quizError}</p>}
-                        {quizResult && (
-                          <div className="p-3 bg-danilo-success-subtle border border-danilo-success/10 rounded-xl text-sm text-danilo-success font-medium">
-                            Submitted. Score: {quizResult.score}% ({quizResult.earnedPoints}/{quizResult.totalPoints})
-                          </div>
+                        {quizError && (
+                          <p className="text-sm font-bold text-[#D93025]" role="alert">{quizError}</p>
                         )}
-                        <Button size="sm" onClick={() => submitQuiz(q)} disabled={submittingQuiz}>
-                          {submittingQuiz ? "Submitting..." : "Submit Quiz"}
-                        </Button>
+                        {quizResult ? (
+                          <div className="px-4 py-3 bg-[#E6F4EA] border border-[#188038]/20 rounded-xl text-sm font-bold text-[#188038]">
+                            ✓ Submitted! Score: {quizResult.score}% ({quizResult.earnedPoints}/{quizResult.totalPoints} pts)
+                          </div>
+                        ) : (
+                          <Button size="sm" onClick={() => submitQuiz(q)} disabled={submittingQuiz}>
+                            {submittingQuiz ? "Submitting…" : "Submit Quiz"}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -348,39 +432,48 @@ function ClassDetail() {
         </div>
       )}
 
+      {/* ── People Tab ── */}
       {activeTab === "people" && (
         <Card>
-          <h3 className="dn-title mb-4">Class Roster</h3>
+          <div className="flex items-center gap-2 mb-5">
+            <Users className="w-5 h-5 text-[#1A73E8]" />
+            <h3 className="text-base font-black text-[#202124]">Class Roster</h3>
+          </div>
           {peopleLoading ? (
             <Skeleton className="h-24" />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* Teacher */}
               {people?.teacher && (
-                <div className="p-4 bg-danilo-primary-subtle rounded-xl border border-danilo-primary/10">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-danilo-primary mb-2">Teacher</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-danilo-primary text-white flex items-center justify-center font-bold text-sm">
-                      {people.teacher.fullName?.charAt(0) || "T"}
+                <div>
+                  <p className="text-xs font-black text-[#1A73E8] uppercase tracking-wide mb-3">Teacher</p>
+                  <div className="flex items-center gap-3 p-4 bg-[#E8F0FE]/40 rounded-xl border border-[#1A73E8]/15">
+                    <div className="w-10 h-10 rounded-full bg-[#1A73E8] text-white flex items-center justify-center font-black text-sm flex-shrink-0">
+                      {people.teacher.fullName?.charAt(0)?.toUpperCase() || "T"}
                     </div>
                     <div>
-                      <p className="font-semibold text-danilo-text text-sm">{people.teacher.fullName}</p>
-                      <p className="dn-caption">{people.teacher.email}</p>
+                      <p className="text-sm font-bold text-[#202124]">{people.teacher.fullName}</p>
+                      <p className="text-xs text-[#9AA0A6] font-bold">{people.teacher.email}</p>
                     </div>
                   </div>
                 </div>
               )}
+              {/* Students */}
               {people?.students?.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-danilo-text-muted mb-2">
+                  <p className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide mb-3">
                     Students ({people.students.length})
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {people.students.map((s) => (
-                      <div key={s.id} className="flex items-center gap-3 p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                        <div className="w-8 h-8 rounded-full bg-danilo-bg-tertiary text-danilo-text-secondary flex items-center justify-center font-bold text-xs">
-                          {s.fullName?.charAt(0) || "S"}
+                      <div
+                        key={s.id}
+                        className="flex items-center gap-3 py-2.5 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center font-black text-xs flex-shrink-0">
+                          {s.fullName?.charAt(0)?.toUpperCase() || "S"}
                         </div>
-                        <p className="text-sm text-danilo-text font-medium">{s.fullName}</p>
+                        <p className="text-sm text-[#202124] font-bold truncate">{s.fullName}</p>
                       </div>
                     ))}
                   </div>

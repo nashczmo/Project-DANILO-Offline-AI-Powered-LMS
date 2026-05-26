@@ -27,7 +27,7 @@ function MarkdownPreview({ content }) {
         if (!part) return null;
         if (part.startsWith("```") && part.endsWith("```")) {
           return (
-            <pre key={index} className="bg-slate-900 text-gray-200 p-4 rounded-xl overflow-x-auto text-xs font-mono my-3 shadow-inner">
+            <pre key={index} className="bg-[#202124] text-[#E8EAED] p-4 rounded-xl overflow-x-auto text-xs font-mono my-3">
               {part.slice(3, -3).replace(/^[a-z]+\n/, "")}
             </pre>
           );
@@ -321,37 +321,37 @@ export default function StudentTutor() {
         {/* Sessions Sidebar Overlay */}
         {showSessions && (
           <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-sm flex">
-            <div ref={sidebarRef} className="w-full max-w-sm border-r border-danilo-border bg-white flex flex-col">
-              <div className="p-4 border-b border-danilo-border flex items-center justify-between">
-                <h3 className="font-semibold text-danilo-text">Conversations</h3>
-                <button onClick={() => setShowSessions(false)} className="p-1.5 rounded-lg hover:bg-danilo-bg-tertiary">
-                  <ChevronLeft className="w-4 h-4" />
+            <div ref={sidebarRef} className="w-full max-w-sm border-r border-[#E0E0E0] bg-white flex flex-col">
+              <div className="p-4 border-b border-[#E0E0E0] flex items-center justify-between">
+                <h3 className="text-base font-black text-[#202124]">Conversations</h3>
+                <button onClick={() => setShowSessions(false)} className="p-1.5 rounded-lg hover:bg-[#F1F3F4]">
+                  <ChevronLeft className="w-4 h-4 text-[#5F6368]" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {sessions.length === 0 && (
-                  <p className="text-sm text-danilo-text-secondary text-center py-8">No conversations yet.</p>
+                  <p className="text-sm text-[#9AA0A6] font-bold text-center py-8">No conversations yet.</p>
                 )}
                 {sessions.map((s) => (
                   <div
                     key={s.id}
                     className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${
                       currentSessionId === s.id
-                        ? "bg-danilo-primary-subtle border-danilo-primary/20"
-                        : "bg-white border-danilo-border hover:bg-danilo-bg-secondary"
+                        ? "bg-[#E8F0FE] border-[#1A73E8]/20"
+                        : "bg-white border-[#E0E0E0] hover:bg-[#F8F9FA]"
                     }`}
                     onClick={() => loadSession(s.id)}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-danilo-text truncate">{s.title}</p>
-                      <p className="text-xs text-danilo-text-muted">{s.messageCount} messages</p>
+                      <p className="text-sm font-bold text-[#202124] truncate">{s.title}</p>
+                      <p className="text-xs text-[#9AA0A6] font-bold">{s.messageCount} messages</p>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteSession(s.id);
                       }}
-                      className="p-1.5 rounded-lg hover:bg-danilo-error-subtle hover:text-danilo-error text-danilo-text-muted transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[#FCE8E6] hover:text-[#D93025] text-[#9AA0A6] transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -369,7 +369,7 @@ export default function StudentTutor() {
             <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  msg.role === "user" ? "bg-danilo-primary text-white" : "bg-danilo-primary/10 text-danilo-primary"
+                  msg.role === "user" ? "bg-[#1A73E8] text-white" : "bg-[#E8F0FE] text-[#1A73E8]"
                 }`}
               >
                 {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
@@ -377,8 +377,8 @@ export default function StudentTutor() {
               <div
                 className={`max-w-[85%] sm:max-w-[75%] group ${
                   msg.role === "user"
-                    ? "bg-danilo-primary text-white rounded-2xl rounded-tr-sm px-5 py-3.5 text-[15px] shadow-sm leading-relaxed"
-                    : "bg-white border border-danilo-border rounded-2xl rounded-tl-sm px-5 py-3.5 text-[15px] shadow-sm leading-relaxed"
+                    ? "bg-[#1A73E8] text-white rounded-2xl rounded-tr-sm px-5 py-3.5 text-[15px] shadow-sm leading-relaxed"
+                    : "bg-white border border-[#E0E0E0] rounded-2xl rounded-tl-sm px-5 py-3.5 text-[15px] shadow-sm leading-relaxed text-[#202124]"
                 }`}
               >
                 <MarkdownPreview content={msg.content} />
@@ -386,7 +386,7 @@ export default function StudentTutor() {
                   <div className="flex justify-end gap-1.5 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleCopy(msg.id, msg.content)}
-                      className="p-1.5 text-gray-400 hover:text-danilo-primary hover:bg-danilo-primary/10 rounded-md transition-colors"
+                      className="p-1.5 text-[#9AA0A6] hover:text-[#1A73E8] hover:bg-[#E8F0FE] rounded-md transition-colors"
                       title="Copy"
                     >
                       {copiedId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -398,13 +398,13 @@ export default function StudentTutor() {
           ))}
           {isTyping && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-danilo-primary/10 text-danilo-primary flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-white border border-danilo-border rounded-2xl rounded-tl-sm flex items-center gap-1.5 h-10 px-4 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-danilo-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-danilo-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-danilo-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="bg-white border border-[#E0E0E0] rounded-2xl rounded-tl-sm flex items-center gap-1.5 h-10 px-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]/50 animate-bounce" style={{ animationDelay: "300ms" }} />
               </div>
             </div>
           )}
@@ -412,17 +412,17 @@ export default function StudentTutor() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-danilo-border bg-white">
+        <div className="p-4 border-t border-[#E0E0E0] bg-white">
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
               {files.map((f) => (
                 <div
                   key={f.id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-full text-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E8F0FE] border border-[#1A73E8]/20 text-[#1A73E8] rounded-full text-xs font-bold"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span className="max-w-[120px] truncate">{f.filename}</span>
-                  <button onClick={() => handleRemoveFile(f.id)} className="hover:text-blue-900 ml-1">
+                  <button onClick={() => handleRemoveFile(f.id)} className="hover:text-[#1557B0] ml-1">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -431,7 +431,7 @@ export default function StudentTutor() {
           )}
 
           {uploadError && (
-            <div className="mb-3 p-3 rounded-xl bg-danilo-error-subtle border border-danilo-error/20 text-sm text-danilo-error font-medium">
+            <div className="mb-3 px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025]">
               {uploadError}
             </div>
           )}
@@ -444,9 +444,9 @@ export default function StudentTutor() {
                   const text = input.trim() || "Explain this topic";
                   handleSend(text, action.mode);
                 }}
-                className="dn-chip hover:bg-danilo-primary-subtle hover:text-danilo-primary hover:border-danilo-primary/20 transition-all cursor-pointer"
+                className="dn-chip hover:bg-[#E8F0FE] hover:text-[#1A73E8] hover:border-[#1A73E8]/20 transition-all cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-danilo-primary" />
+                <Sparkles className="w-3.5 h-3.5 text-[#1A73E8]" />
                 {action.label}
               </button>
             ))}

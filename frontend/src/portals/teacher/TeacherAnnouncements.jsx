@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
-import { Bell, Plus, MessageSquare } from "lucide-react";
+import { Bell, Plus, MessageSquare, X } from "lucide-react";
 
 export default function TeacherAnnouncements() {
   const { data, loading, error, refresh } = useApi("/teacher/announcements", { immediate: true });
@@ -37,7 +37,11 @@ export default function TeacherAnnouncements() {
     try {
       await apiRequest("/teacher/announcements", {
         method: "POST",
-        body: { courseId: formData.courseId, title: formData.title, body: formData.body },
+        body: {
+          courseId: formData.courseId,
+          title: formData.title,
+          body: formData.body,
+        },
       });
       setShowForm(false);
       setFormData({});
@@ -54,10 +58,11 @@ export default function TeacherAnnouncements() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <PageHeader title="Announcements" description="Post and manage class announcements." />
-        <Skeleton className="h-40" />
-        <Skeleton className="h-40" />
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        </div>
       </div>
     );
   }
@@ -67,9 +72,9 @@ export default function TeacherAnnouncements() {
       <div className="space-y-6">
         <PageHeader title="Announcements" description="Post and manage class announcements." />
         <Card>
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <h3 className="text-lg font-semibold text-danilo-text mb-2">Unable to load announcements</h3>
-            <p className="text-sm text-danilo-text-secondary max-w-sm mb-6">{error}</p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <h3 className="text-base font-bold text-[#202124] mb-2">Unable to load announcements</h3>
+            <p className="text-sm text-[#5F6368] max-w-sm mb-6">{error}</p>
             <Button onClick={refresh} variant="secondary">Try Again</Button>
           </div>
         </Card>
@@ -78,63 +83,114 @@ export default function TeacherAnnouncements() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Announcements"
         description="Post and manage class announcements."
-        action={<Button size="sm" onClick={() => setShowForm(!showForm)}><Plus className="w-4 h-4" /> New</Button>}
+        action={
+          <Button onClick={() => setShowForm(!showForm)}>
+            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showForm ? "Cancel" : "New Announcement"}
+          </Button>
+        }
       />
 
+      {/* Notice */}
       {notice && (
-        <div className={`p-3 rounded-xl border text-sm font-medium ${
-          noticeType === "success"
-            ? "bg-danilo-success-subtle border-danilo-success/20 text-danilo-success"
-            : "bg-danilo-error-subtle border-danilo-error/20 text-danilo-error"
-        }`}>
+        <div
+          role="alert"
+          className={`px-4 py-3 rounded-xl border text-sm font-bold animate-fade-in ${
+            noticeType === "success"
+              ? "bg-[#E6F4EA] border-[#188038]/20 text-[#188038]"
+              : "bg-[#FCE8E6] border-[#D93025]/20 text-[#D93025]"
+          }`}
+        >
           {notice}
         </div>
       )}
 
+      {/* New Announcement Form */}
       {showForm && (
-        <Card>
+        <Card className="border-[#1A73E8]/20 animate-slide-down">
+          <h3 className="text-base font-black text-[#202124] mb-5 flex items-center gap-2">
+            <Bell className="w-4 h-4 text-[#1A73E8]" />
+            New Announcement
+          </h3>
           <form onSubmit={handleSubmit} className="space-y-3">
             <select
               className="dn-input"
               value={formData.courseId || ""}
               onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
               required
+              aria-label="Select class"
             >
-              <option value="">Select class</option>
+              <option value="">Select class *</option>
               {(courses || []).map((c) => (
-                <option key={c.id} value={c.id}>{c.subject} {c.gradeLevel}</option>
+                <option key={c.id} value={c.id}>
+                  {c.subject} — {c.gradeLevel}
+                </option>
               ))}
             </select>
-            <input className="dn-input" placeholder="Title" value={formData.title || ""} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
-            <textarea className="dn-textarea" placeholder="Body" value={formData.body || ""} onChange={(e) => setFormData({ ...formData, body: e.target.value })} required />
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" disabled={submitting}>{submitting ? "Posting..." : "Post Announcement"}</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+            <input
+              className="dn-input"
+              placeholder="Announcement title *"
+              value={formData.title || ""}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              required
+              aria-label="Title"
+            />
+            <textarea
+              className="dn-textarea"
+              placeholder="Write your announcement here…"
+              value={formData.body || ""}
+              onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+              required
+              rows={4}
+              aria-label="Announcement body"
+            />
+            <div className="flex gap-2 pt-1">
+              <Button type="submit" disabled={submitting}>
+                <Bell className="w-4 h-4" />
+                {submitting ? "Posting…" : "Post Announcement"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => { setShowForm(false); setFormData({}); }}
+              >
+                Cancel
+              </Button>
             </div>
           </form>
         </Card>
       )}
 
+      {/* Announcement List */}
       {announcements.length === 0 ? (
-        <EmptyState icon={Bell} title="No announcements" description="Announcements you post will appear here." />
+        <EmptyState
+          icon={Bell}
+          title="No announcements yet"
+          description="Announcements you post will appear here for students to see."
+        />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {announcements.map((item) => (
             <Card key={item.id}>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-danilo-primary-subtle text-danilo-primary flex items-center justify-center flex-shrink-0">
-                  <MessageSquare className="w-4 h-4" />
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <MessageSquare className="w-5 h-5" />
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-danilo-text text-sm">{item.title}</h4>
-                  <p className="text-sm text-danilo-text-secondary mt-1">{item.body}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge color="secondary">{item.courseTitle || item.courseCode}</Badge>
-                    <span className="dn-caption">{item.authorName}</span>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-black text-[#202124]">{item.title}</h4>
+                  <p className="text-sm text-[#5F6368] mt-2 leading-relaxed">{item.body}</p>
+                  <div className="flex items-center gap-3 mt-3 flex-wrap">
+                    <Badge color="primary">{item.courseTitle || item.courseCode}</Badge>
+                    <span className="text-xs text-[#9AA0A6] font-bold">{item.authorName}</span>
+                    {item.createdAt && (
+                      <span className="text-xs text-[#9AA0A6] font-bold">
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

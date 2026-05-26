@@ -2,12 +2,14 @@ import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../../store/useAppStore";
 import { useApi } from "../../hooks/useApi";
 import { Card, PageHeader, Skeleton, EmptyState, Badge } from "../../components/ui";
-import { ClipboardList, FileText, TrendingUp, Sparkles, AlertCircle, ArrowRight } from "lucide-react";
+import { ClipboardList, FileText, TrendingUp, Sparkles, Bell, ArrowRight, BookOpen } from "lucide-react";
 
 export default function StudentDashboard() {
   const dashboard = useAppStore((s) => s.dashboard);
   const user = useAppStore((s) => s.user);
-  const { data: assignmentsData, loading: assignmentsLoading } = useApi("/student/assignments", { immediate: true });
+  const { data: assignmentsData, loading: assignmentsLoading } = useApi("/student/assignments", {
+    immediate: true,
+  });
   const navigate = useNavigate();
 
   const loading = !dashboard || assignmentsLoading;
@@ -22,102 +24,133 @@ export default function StudentDashboard() {
   const announcements = stream.filter((s) => s.postType === "announcement").slice(0, 3);
   const suggestions = aiProfile?.recommendations?.length
     ? aiProfile.recommendations.slice(0, 3)
-    : ["Ask DANILO to explain today lesson in simpler words.", "Review one weak topic for 10 minutes.", "Use Quiz Me mode before your next class."];
+    : [
+        "Ask your AI Tutor to explain today's lesson in simpler words.",
+        "Review one weak topic for 10 minutes before class.",
+        "Use Quiz Me mode before your next exam.",
+      ];
+
+  // Quick stat cards
+  const stats = loading
+    ? null
+    : [
+        {
+          label: "Active Classes",
+          value: courses.length,
+          icon: BookOpen,
+          iconBg: "bg-[#E8F0FE]",
+          iconColor: "text-[#1A73E8]",
+          trend: "On track this week",
+          trendColor: "text-[#188038]",
+          onClick: () => navigate("/student/classes"),
+        },
+        {
+          label: "Pending Assignments",
+          value: pendingAssignments.length,
+          icon: ClipboardList,
+          iconBg: "bg-[#FEF7E0]",
+          iconColor: "text-[#E37400]",
+          trend: pendingAssignments.length > 0 ? "Due soon" : "All caught up ✓",
+          trendColor: pendingAssignments.length > 0 ? "text-[#E37400]" : "text-[#188038]",
+          onClick: () => navigate("/student/assignments"),
+        },
+        {
+          label: "Graded Items",
+          value: recentGrades.length,
+          icon: TrendingUp,
+          iconBg: "bg-[#E6F4EA]",
+          iconColor: "text-[#188038]",
+          trend: "Recent grades",
+          trendColor: "text-[#9AA0A6]",
+          onClick: () => navigate("/student/grades"),
+        },
+      ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="My Overview"
         description={`Welcome back, ${user?.fullName || "Student"}. Here is everything you need for today.`}
       />
 
+      {/* ── Quick Stats ── */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="flex flex-col justify-between" hover>
-            <div>
-              <div className="w-10 h-10 bg-danilo-success-subtle text-danilo-success rounded-lg flex items-center justify-center mb-3">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <h3 className="dn-heading-md">{courses.length}</h3>
-              <p className="dn-subtitle mt-1">Active Classes</p>
-            </div>
-            <div className="mt-3 pt-3 border-t border-danilo-border">
-              <span className="dn-caption font-medium text-danilo-success">On track this week</span>
-            </div>
-          </Card>
-
-          <Card className="flex flex-col justify-between" hover>
-            <div>
-              <div className="w-10 h-10 bg-danilo-warning-subtle text-danilo-warning rounded-lg flex items-center justify-center mb-3">
-                <ClipboardList className="w-5 h-5" />
-              </div>
-              <h3 className="dn-heading-md">{pendingAssignments.length}</h3>
-              <p className="dn-subtitle mt-1">Pending Tasks</p>
-            </div>
-            <div className="mt-3 pt-3 border-t border-danilo-border">
-              <span className="dn-caption font-medium text-danilo-warning">
-                {pendingAssignments.length > 0 ? "Due soon" : "All caught up"}
-              </span>
-            </div>
-          </Card>
-
-          <Card className="relative overflow-hidden border-blue-100" hover>
-            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-400/5 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
-            <div className="flex items-start gap-4 relative z-10">
-              <div className="w-10 h-10 bg-danilo-primary/10 text-danilo-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-5 h-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {stats.map((s) => (
+            <Card
+              key={s.label}
+              hover
+              onClick={s.onClick}
+              className="flex flex-col gap-4 p-5 cursor-pointer"
+            >
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor}`}>
+                <s.icon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="dn-heading-md text-danilo-text mb-1">AI Learning Insights</h3>
-                <p className="text-sm text-danilo-text-secondary leading-relaxed">
-                  {aiProfile?.recommendations?.length
-                    ? aiProfile.recommendations[0]
-                    : "Interact with the AI Tutor to receive personalized learning recommendations."}
-                </p>
-                <button
-                  onClick={() => navigate("/student/tutor")}
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-danilo-primary hover:text-danilo-primary-hover transition-colors"
-                >
-                  Ask AI Tutor <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <p className="text-3xl font-black text-[#202124] leading-none">{s.value}</p>
+                <p className="text-sm font-black text-[#202124] mt-2">{s.label}</p>
+                <p className={`text-xs font-bold mt-0.5 ${s.trendColor}`}>{s.trend}</p>
               </div>
-            </div>
-          </Card>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* ── AI Insights Banner ── */}
+      {!loading && (
+        <div className="dn-card p-5 flex flex-col sm:flex-row sm:items-center gap-4 border-[#1A73E8]/20 bg-[#E8F0FE]/30">
+          <div className="w-11 h-11 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black text-[#202124]">AI Learning Insights</p>
+            <p className="text-sm text-[#5F6368] leading-relaxed mt-0.5 dn-line-clamp-2">
+              {aiProfile?.recommendations?.length
+                ? aiProfile.recommendations[0]
+                : "Interact with the AI Tutor to receive personalized learning recommendations."}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/student/tutor")}
+            className="dn-btn-primary flex-shrink-0 text-sm"
+          >
+            Ask AI Tutor <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Pending Assignments ── */}
         <Card>
-          <div className="flex items-center gap-2 mb-4">
-            <ClipboardList className="w-5 h-5 text-danilo-primary" />
-            <h2 className="dn-title">Pending Assignments</h2>
+          <div className="flex items-center gap-2 mb-5">
+            <ClipboardList className="w-5 h-5 text-[#1A73E8]" />
+            <h2 className="text-base font-black text-[#202124]">Pending Assignments</h2>
           </div>
           {loading ? (
             <div className="space-y-3">
-              <Skeleton className="h-16" />
-              <Skeleton className="h-16" />
+              <Skeleton className="h-[60px]" />
+              <Skeleton className="h-[60px]" />
+              <Skeleton className="h-[60px]" />
             </div>
           ) : pendingAssignments.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {pendingAssignments.map((task) => (
                 <div
                   key={task.id}
                   onClick={() => navigate("/student/assignments")}
-                  className="p-4 bg-danilo-bg-secondary hover:bg-white rounded-xl border border-danilo-border transition-colors flex justify-between items-center group cursor-pointer"
+                  className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] hover:bg-white rounded-xl border border-[#E0E0E0] hover:border-[#C5D4F5] transition-colors cursor-pointer group"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-lg bg-danilo-warning-subtle text-danilo-warning flex items-center justify-center">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#FEF7E0] text-[#E37400] flex items-center justify-center flex-shrink-0">
                       <ClipboardList className="w-4 h-4" />
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-danilo-text text-sm">{task.title}</h4>
-                      <p className="dn-caption">{task.courseTitle}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#202124] truncate">{task.title}</p>
+                      <p className="text-xs text-[#9AA0A6] font-bold">{task.courseTitle}</p>
                     </div>
                   </div>
                   <Badge color="warning">Pending</Badge>
@@ -127,41 +160,46 @@ export default function StudentDashboard() {
           ) : (
             <EmptyState
               icon={ClipboardList}
-              title="No pending assignments"
-              description="All assignments have been completed. Great work!"
+              title="All done!"
+              description="No pending assignments. Great work!"
             />
           )}
         </Card>
 
+        {/* ── Recent Grades ── */}
         <Card>
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="w-5 h-5 text-danilo-primary" />
-            <h2 className="dn-title">Recent Grades</h2>
+          <div className="flex items-center gap-2 mb-5">
+            <FileText className="w-5 h-5 text-[#1A73E8]" />
+            <h2 className="text-base font-black text-[#202124]">Recent Grades</h2>
           </div>
           {loading ? (
             <div className="space-y-3">
-              <Skeleton className="h-16" />
-              <Skeleton className="h-16" />
+              <Skeleton className="h-[60px]" />
+              <Skeleton className="h-[60px]" />
+              <Skeleton className="h-[60px]" />
             </div>
           ) : recentGrades.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentGrades.map((work) => (
                 <div
                   key={work.id || Math.random()}
-                  className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border flex justify-between items-center"
+                  className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-9 h-9 rounded-lg bg-danilo-bg-tertiary flex items-center justify-center text-danilo-text-secondary">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#F1F3F4] text-[#5F6368] flex items-center justify-center flex-shrink-0">
                       <FileText className="w-4 h-4" />
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-danilo-text text-sm">{work.component || "Assessment"}</h4>
-                      <p className="dn-caption">{work.courseCode}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#202124] truncate">
+                        {work.component || "Assessment"}
+                      </p>
+                      <p className="text-xs text-[#9AA0A6] font-bold">{work.courseCode}</p>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-lg font-bold text-danilo-primary">
-                      {work.score} <span className="text-sm text-danilo-text-muted font-normal">/ {work.maxScore}</span>
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <span className="text-base font-black text-[#1A73E8]">
+                      {work.score}
+                      <span className="text-sm text-[#9AA0A6] font-bold"> / {work.maxScore}</span>
                     </span>
                     <Badge color="success">Graded</Badge>
                   </div>
@@ -172,49 +210,68 @@ export default function StudentDashboard() {
             <EmptyState
               icon={FileText}
               title="No grades yet"
-              description="Grades will appear here once your teachers record them."
+              description="Your grades will appear here once your teachers record them."
             />
           )}
         </Card>
       </div>
 
+      {/* ── AI Study Suggestions ── */}
       <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-danilo-primary" />
-          <h2 className="dn-title">AI Study Suggestions</h2>
+        <div className="flex items-center gap-2 mb-5">
+          <Sparkles className="w-5 h-5 text-[#1A73E8]" />
+          <h2 className="text-base font-black text-[#202124]">AI Study Suggestions</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {suggestions.map((item, idx) => (
-            <div key={idx} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-              <p className="text-sm text-danilo-text-secondary leading-relaxed">{item}</p>
+            <div
+              key={idx}
+              className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0] flex gap-3"
+            >
+              <span className="w-5 h-5 rounded-full bg-[#1A73E8] text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">
+                {idx + 1}
+              </span>
+              <p className="text-sm text-[#5F6368] leading-relaxed font-bold">{item}</p>
             </div>
           ))}
         </div>
       </Card>
 
+      {/* ── Announcements ── */}
       <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <AlertCircle className="w-5 h-5 text-danilo-primary" />
-          <h2 className="dn-title">Announcements</h2>
+        <div className="flex items-center gap-2 mb-5">
+          <Bell className="w-5 h-5 text-[#1A73E8]" />
+          <h2 className="text-base font-black text-[#202124]">Announcements</h2>
         </div>
         {announcements.length > 0 ? (
           <div className="space-y-3">
             {announcements.map((item) => (
-              <div key={item.id} className="p-4 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                <div className="flex items-center gap-2">
+              <div
+                key={item.id}
+                className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+              >
+                <div className="flex items-start gap-2 mb-2">
                   <Badge color="primary">Pinned</Badge>
-                  <h4 className="font-semibold text-danilo-text text-sm">{item.title}</h4>
+                  <h4 className="text-sm font-bold text-[#202124] leading-snug">{item.title}</h4>
                 </div>
-                <p className="text-sm text-danilo-text-secondary mt-1">{item.body}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="dn-caption">{item.courseTitle || "School"}</span>
-                  <span className="dn-caption">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}</span>
+                <p className="text-sm text-[#5F6368] leading-relaxed">{item.body}</p>
+                <div className="flex items-center gap-3 mt-3">
+                  <span className="text-xs text-[#9AA0A6] font-bold">
+                    {item.courseTitle || "School"}
+                  </span>
+                  <span className="text-xs text-[#9AA0A6] font-bold">
+                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <EmptyState icon={AlertCircle} title="No announcements" description="Latest class and school announcements will appear here." />
+          <EmptyState
+            icon={Bell}
+            title="No announcements"
+            description="Class and school announcements will appear here."
+          />
         )}
       </Card>
     </div>

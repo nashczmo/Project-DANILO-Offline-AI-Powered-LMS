@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
-import { Settings, Cpu, Wifi, BookOpen, Plus, Trash2, Server } from "lucide-react";
+import { Settings, Cpu, Wifi, BookOpen, Plus, Trash2, Server, Activity, Pencil, X } from "lucide-react";
 
 export default function AdminSystem() {
   const { data: systemStatus, loading, error, refresh } = useApi("/admin/system", { immediate: true });
@@ -33,16 +33,19 @@ export default function AdminSystem() {
     setSubmitting(true);
     setNotice("");
     try {
-      await apiRequest(editingSectionId ? `/admin/sections/${editingSectionId}` : "/admin/sections", {
-        method: editingSectionId ? "PUT" : "POST",
-        body: {
-          name: formData.name,
-          gradeLevel: formData.gradeLevel,
-          educationLevel: formData.educationLevel || "Junior High School",
-          strand: formData.strand || undefined,
-          schoolYear: formData.schoolYear || "2026-2027",
-        },
-      });
+      await apiRequest(
+        editingSectionId ? `/admin/sections/${editingSectionId}` : "/admin/sections",
+        {
+          method: editingSectionId ? "PUT" : "POST",
+          body: {
+            name: formData.name,
+            gradeLevel: formData.gradeLevel,
+            educationLevel: formData.educationLevel || "Junior High School",
+            strand: formData.strand || undefined,
+            schoolYear: formData.schoolYear || "2026-2027",
+          },
+        }
+      );
       setShowSectionForm(false);
       setEditingSectionId(null);
       setFormData({});
@@ -51,7 +54,7 @@ export default function AdminSystem() {
       setNotice(editingSectionId ? "Section updated successfully." : "Section created successfully.");
     } catch (err) {
       setNoticeType("error");
-      setNotice(err.message || "Could not create section.");
+      setNotice(err.message || "Could not save section.");
     } finally {
       setSubmitting(false);
     }
@@ -84,9 +87,12 @@ export default function AdminSystem() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <PageHeader title="System Management" description="Manage platform settings and sections." />
-        <Skeleton className="h-48" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
         <Skeleton className="h-48" />
       </div>
     );
@@ -97,9 +103,9 @@ export default function AdminSystem() {
       <div className="space-y-6">
         <PageHeader title="System Management" description="Manage platform settings and sections." />
         <Card>
-          <div className="flex flex-col items-center justify-center p-12 text-center">
-            <h3 className="text-lg font-semibold text-danilo-text mb-2">Unable to load system data</h3>
-            <p className="text-sm text-danilo-text-secondary max-w-sm mb-6">{error}</p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <h3 className="text-base font-bold text-[#202124] mb-2">Unable to load system data</h3>
+            <p className="text-sm text-[#5F6368] max-w-sm mb-6">{error}</p>
             <Button onClick={refresh} variant="secondary">Try Again</Button>
           </div>
         </Card>
@@ -108,108 +114,213 @@ export default function AdminSystem() {
   }
 
   const healthRows = [
-    { label: "Backend", value: systemStatus ? "healthy" : "reconnecting", color: systemStatus ? "success" : "warning" },
-    { label: "Database", value: systemStatus?.database === "connected" ? "healthy" : "unhealthy", color: systemStatus?.database === "connected" ? "success" : "error" },
-    { label: "Gateway / Frontend", value: "healthy", color: "success" },
-    { label: "Ollama", value: systemStatus?.ollama === "online" ? "healthy" : systemStatus?.ollama === "degraded" ? "reconnecting" : "unhealthy", color: systemStatus?.ollama === "online" ? "success" : systemStatus?.ollama === "degraded" ? "warning" : "error" },
+    {
+      label: "Backend",
+      value: systemStatus ? "Healthy" : "Reconnecting",
+      color: systemStatus ? "success" : "warning",
+      icon: Server,
+    },
+    {
+      label: "Database",
+      value: systemStatus?.database === "connected" ? "Healthy" : "Unhealthy",
+      color: systemStatus?.database === "connected" ? "success" : "error",
+      icon: Settings,
+    },
+    {
+      label: "Gateway / Frontend",
+      value: "Healthy",
+      color: "success",
+      icon: Wifi,
+    },
+    {
+      label: "Ollama AI",
+      value:
+        systemStatus?.ollama === "online"
+          ? "Online"
+          : systemStatus?.ollama === "degraded"
+          ? "Degraded"
+          : "Offline",
+      color:
+        systemStatus?.ollama === "online"
+          ? "success"
+          : systemStatus?.ollama === "degraded"
+          ? "warning"
+          : "error",
+      icon: Cpu,
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="System Management" description="Manage platform settings and sections." />
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="System Management"
+        description="Monitor platform health, manage sections, and view live activity."
+      />
 
+      {/* Notice */}
       {notice && (
-        <div className={`p-3 rounded-xl border text-sm font-medium ${
-          noticeType === "success"
-            ? "bg-danilo-success-subtle border-danilo-success/20 text-danilo-success"
-            : "bg-danilo-error-subtle border-danilo-error/20 text-danilo-error"
-        }`}>
+        <div
+          role="alert"
+          className={`px-4 py-3 rounded-xl border text-sm font-bold animate-fade-in ${
+            noticeType === "success"
+              ? "bg-[#E6F4EA] border-[#188038]/20 text-[#188038]"
+              : "bg-[#FCE8E6] border-[#D93025]/20 text-[#D93025]"
+          }`}
+        >
           {notice}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── System Status ── */}
         <Card>
-          <h3 className="dn-title mb-4">System Status</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-              <div className="flex items-center gap-3">
-                <Server className="w-4 h-4 text-danilo-text-secondary" />
-                <span className="text-sm text-danilo-text">Portal URL</span>
+          <div className="flex items-center gap-2 mb-5">
+            <Settings className="w-5 h-5 text-[#1A73E8]" />
+            <h3 className="text-base font-black text-[#202124]">System Status</h3>
+          </div>
+          <div className="space-y-2">
+            {/* Info rows */}
+            {[
+              { label: "Portal URL", icon: Server, value: systemStatus?.portalUrl || "N/A", badge: null },
+              { label: "WiFi SSID",  icon: Wifi,   value: systemStatus?.wifiSsid || "N/A",  badge: null },
+              { label: "AI Model",   icon: Cpu,    value: systemStatus?.activeModel || "N/A", badge: null },
+              { label: "Mode",       icon: Settings, value: systemStatus?.mode || "N/A",    badge: "primary" },
+              { label: "AI Runtime", icon: Cpu,    value: systemStatus?.aiRuntime || "N/A", badge: systemStatus?.ollama === "online" ? "success" : "warning" },
+            ].map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+              >
+                <div className="flex items-center gap-3">
+                  <row.icon className="w-4 h-4 text-[#9AA0A6]" />
+                  <span className="text-sm font-bold text-[#202124]">{row.label}</span>
+                </div>
+                {row.badge ? (
+                  <Badge color={row.badge}>{row.value}</Badge>
+                ) : (
+                  <span className="text-sm font-mono font-bold text-[#5F6368] text-right max-w-[140px] truncate">
+                    {row.value}
+                  </span>
+                )}
               </div>
-              <span className="text-sm font-medium text-danilo-text font-mono">{systemStatus?.portalUrl || "N/A"}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-              <div className="flex items-center gap-3">
-                <Wifi className="w-4 h-4 text-danilo-text-secondary" />
-                <span className="text-sm text-danilo-text">WiFi SSID</span>
-              </div>
-              <span className="text-sm font-medium text-danilo-text font-mono">{systemStatus?.wifiSsid || "N/A"}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-              <div className="flex items-center gap-3">
-                <Cpu className="w-4 h-4 text-danilo-text-secondary" />
-                <span className="text-sm text-danilo-text">AI Runtime</span>
-              </div>
-              <Badge color={systemStatus?.ollama === "online" ? "success" : "warning"}>{systemStatus?.aiRuntime || "N/A"}</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-              <div className="flex items-center gap-3">
-                <Cpu className="w-4 h-4 text-danilo-text-secondary" />
-                <span className="text-sm text-danilo-text">AI Model</span>
-              </div>
-              <span className="text-sm font-medium text-danilo-text font-mono">{systemStatus?.activeModel || "N/A"}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-              <div className="flex items-center gap-3">
-                <Settings className="w-4 h-4 text-danilo-text-secondary" />
-                <span className="text-sm text-danilo-text">Mode</span>
-              </div>
-              <Badge color="primary">{systemStatus?.mode || "N/A"}</Badge>
-            </div>
+            ))}
+            {/* Health rows */}
             {healthRows.map((item) => (
-              <div key={item.label} className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                <span className="text-sm text-danilo-text">{item.label}</span>
+              <div
+                key={item.label}
+                className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className="w-4 h-4 text-[#9AA0A6]" />
+                  <span className="text-sm font-bold text-[#202124]">{item.label}</span>
+                </div>
                 <Badge color={item.color}>{item.value}</Badge>
               </div>
             ))}
           </div>
         </Card>
 
+        {/* ── Sections ── */}
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="dn-title">Sections</h3>
-            <Button size="sm" onClick={() => { setEditingSectionId(null); setFormData({}); setShowSectionForm(!showSectionForm); }}><Plus className="w-4 h-4" /> Section</Button>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-[#1A73E8]" />
+              <h3 className="text-base font-black text-[#202124]">Sections</h3>
+            </div>
+            <Button
+              size="sm"
+              variant={showSectionForm ? "secondary" : "primary"}
+              onClick={() => {
+                setEditingSectionId(null);
+                setFormData({});
+                setShowSectionForm(!showSectionForm);
+              }}
+            >
+              {showSectionForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              {showSectionForm ? "Cancel" : "Add Section"}
+            </Button>
           </div>
 
           {showSectionForm && (
-            <form onSubmit={handleSaveSection} className="space-y-3 mb-4">
-              <input className="dn-input" placeholder="Section Name" value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-              <input className="dn-input" placeholder="Grade Level (e.g. Grade 7)" value={formData.gradeLevel || ""} onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })} required />
-              <input className="dn-input" placeholder="Education Level" value={formData.educationLevel || ""} onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value })} />
-              <input className="dn-input" placeholder="Strand (optional)" value={formData.strand || ""} onChange={(e) => setFormData({ ...formData, strand: e.target.value })} />
-              <input className="dn-input" placeholder="School Year" value={formData.schoolYear || ""} onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })} />
+            <form onSubmit={handleSaveSection} className="space-y-3 mb-5 p-4 bg-[#E8F0FE]/40 rounded-xl border border-[#1A73E8]/15 animate-slide-down">
+              <h4 className="text-sm font-black text-[#202124]">
+                {editingSectionId ? "Edit Section" : "New Section"}
+              </h4>
+              <input
+                className="dn-input"
+                placeholder="Section name *"
+                value={formData.name || ""}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+              <input
+                className="dn-input"
+                placeholder="Grade level (e.g. Grade 7) *"
+                value={formData.gradeLevel || ""}
+                onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })}
+                required
+              />
+              <input
+                className="dn-input"
+                placeholder="Education level"
+                value={formData.educationLevel || ""}
+                onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value })}
+              />
+              <input
+                className="dn-input"
+                placeholder="Strand (optional)"
+                value={formData.strand || ""}
+                onChange={(e) => setFormData({ ...formData, strand: e.target.value })}
+              />
+              <input
+                className="dn-input"
+                placeholder="School year (e.g. 2026-2027)"
+                value={formData.schoolYear || ""}
+                onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
+              />
               <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={submitting}>{submitting ? "Saving..." : editingSectionId ? "Save" : "Create"}</Button>
-                <Button type="button" variant="secondary" size="sm" onClick={() => { setShowSectionForm(false); setEditingSectionId(null); }}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={submitting}>
+                  {submitting ? "Saving…" : editingSectionId ? "Save Changes" : "Create Section"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setShowSectionForm(false); setEditingSectionId(null); }}
+                >
+                  Cancel
+                </Button>
               </div>
             </form>
           )}
 
           {(sections || []).length === 0 ? (
-            <EmptyState icon={BookOpen} title="No sections" description="Sections will appear here once created." />
+            <EmptyState
+              icon={BookOpen}
+              title="No sections yet"
+              description="Sections will appear here once created."
+            />
           ) : (
             <div className="space-y-2">
               {(sections || []).map((sec) => (
-                <div key={sec.id} className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                  <div>
-                    <p className="text-sm font-medium text-danilo-text">{sec.name}</p>
-                    <p className="dn-caption">{sec.gradeLevel} {sec.educationLevel} {sec.schoolYear}</p>
+                <div
+                  key={sec.id}
+                  className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#202124]">{sec.name}</p>
+                    <p className="text-xs text-[#9AA0A6] font-bold mt-0.5">
+                      {[sec.gradeLevel, sec.educationLevel, sec.schoolYear].filter(Boolean).join(" · ")}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Badge color="primary">{sec.studentCount} students</Badge>
-                    <Button variant="ghost" size="sm" onClick={() => handleEditSection(sec)}>Edit</Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteSection(sec.id)}><Trash2 className="w-3.5 h-3.5 text-danilo-error" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditSection(sec)} title="Edit">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteSection(sec.id)} title="Deactivate">
+                      <Trash2 className="w-3.5 h-3.5 text-[#D93025]" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -218,21 +329,45 @@ export default function AdminSystem() {
         </Card>
       </div>
 
+      {/* ── Live Activity ── */}
       <Card>
-        <h3 className="dn-title mb-4">Live Activity</h3>
+        <div className="flex items-center gap-2 mb-5">
+          <Activity className="w-5 h-5 text-[#1A73E8]" />
+          <h3 className="text-base font-black text-[#202124]">Live Activity</h3>
+          <span className="text-xs font-bold text-[#9AA0A6] ml-auto">Auto-refreshes every 15s</span>
+        </div>
         {(activity || []).length === 0 ? (
-          <EmptyState icon={Server} title="No activity yet" description="Logins and classroom changes will appear here." />
+          <EmptyState
+            icon={Server}
+            title="No activity yet"
+            description="Logins and classroom changes will appear here."
+          />
         ) : (
-          <div className="space-y-2">
-            {(activity || []).slice(0, 12).map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 bg-danilo-bg-secondary rounded-xl border border-danilo-border">
-                <div>
-                  <p className="text-sm font-medium text-danilo-text">{item.action?.replaceAll("_", " ")}</p>
-                  <p className="dn-caption">{item.actorName} {item.details}</p>
-                </div>
-                <span className="dn-caption">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</span>
-              </div>
-            ))}
+          <div className="overflow-x-auto -mx-6 px-6">
+            <table className="dn-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th className="hidden sm:table-cell">Details</th>
+                  <th className="text-right">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(activity || []).slice(0, 15).map((item) => (
+                  <tr key={item.id}>
+                    <td className="font-bold text-[#202124] capitalize">
+                      {item.action?.replaceAll("_", " ")}
+                    </td>
+                    <td className="text-[#5F6368]">{item.actorName}</td>
+                    <td className="hidden sm:table-cell text-[#9AA0A6]">{item.details}</td>
+                    <td className="text-right text-[#9AA0A6] text-xs font-bold whitespace-nowrap">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
