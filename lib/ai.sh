@@ -520,6 +520,7 @@ wait_for_container_healthy() {
         unhealthy_consecutive=$(( unhealthy_consecutive + 1 ))
         warn "${label} reported ${health_status} for service: ${service} (consecutive: ${unhealthy_consecutive})"
         docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=40 "${service}" || true
+        docker inspect --format '{{if .State.Health}}{{range .State.Health.Log}}{{println .End "exit=" .ExitCode}}{{println .Output}}{{end}}{{end}}' "${container_id}" 2>/dev/null || true
         
         # Self-healing: if container is exited or unhealthy for 10 attempts (~30 seconds), try to restart it
         if (( unhealthy_consecutive >= 10 )) || [[ "${health_status}" == "exited" ]]; then

@@ -253,7 +253,7 @@ services:
       - /var/run
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "test -f /opt/danilo/app/frontend/dist/index.html && pgrep nginx >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && nginx -t -q"]
       interval: 30s
       timeout: 20s
       retries: 30
