@@ -114,6 +114,9 @@ validate_wifi_capability() {
 }
 
 validate_wifi_passphrase() {
+  if [[ -z "${WIFI_PASSPHRASE:-}" ]]; then
+    WIFI_PASSPHRASE="$(openssl rand -base64 18 | tr -d '/+=\r\n' | head -c 20)"
+  fi
   if (( ${#WIFI_PASSPHRASE} < 8 || ${#WIFI_PASSPHRASE} > 63 )); then
     echo "Wi-Fi passphrase must be 8-63 characters. Current length: ${#WIFI_PASSPHRASE}"
     echo "Set DANILO_WIFI_PASSPHRASE to override, or let the installer generate one."
