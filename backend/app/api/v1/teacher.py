@@ -6,6 +6,8 @@ from app.models import *
 from app.schemas import *
 from app.main import *
 import math
+import io
+import os
 
 teacher_router = APIRouter(prefix='/api', tags=['teacher'], dependencies=[Depends(RoleChecker(['teacher']))])
 
