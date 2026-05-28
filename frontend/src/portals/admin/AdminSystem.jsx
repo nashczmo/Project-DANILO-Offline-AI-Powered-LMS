@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
-import { Settings, Cpu, Wifi, BookOpen, Plus, Trash2, Server, Activity, Pencil, X } from "lucide-react";
+import { Settings, Cpu, Wifi, BookOpen, Plus, Trash2, Server, Activity, Pencil, X, MemoryStick, HardDrive, Thermometer, Clock } from "lucide-react";
 
 export default function AdminSystem() {
   const { data: systemStatus, loading, error, refresh } = useApi("/admin/system", { immediate: true });
@@ -215,6 +215,41 @@ export default function AdminSystem() {
                   <span className="text-sm font-bold text-[#202124]">{item.label}</span>
                 </div>
                 <Badge color={item.color}>{item.value}</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* ── Server Analytics ── */}
+        <Card>
+          <div className="flex items-center gap-2 mb-5">
+            <Activity className="w-5 h-5 text-[#1A73E8]" />
+            <h3 className="text-base font-black text-[#202124]">Server Analytics</h3>
+          </div>
+          <div className="space-y-2">
+            {[
+              { label: "CPU Usage", icon: Cpu, value: systemStatus?.hardware?.cpuPercent != null ? `${systemStatus.hardware.cpuPercent}%` : "N/A", badge: null },
+              { label: "Memory", icon: MemoryStick, value: systemStatus?.hardware?.ramUsedMb != null ? `${systemStatus.hardware.ramUsedMb} MB / ${systemStatus.hardware.ramTotalMb} MB (${systemStatus.hardware.ramPercent}%)` : "N/A", badge: null },
+              { label: "Storage", icon: HardDrive, value: systemStatus?.hardware?.diskUsedGb != null ? `${systemStatus.hardware.diskUsedGb} GB / ${systemStatus.hardware.diskTotalGb} GB (${systemStatus.hardware.diskPercent}%)` : "N/A", badge: null },
+              { label: "GPU", icon: Server, value: systemStatus?.hardware?.gpuName && systemStatus.hardware.gpuName !== "none" ? `${systemStatus.hardware.gpuName} (${systemStatus.hardware.gpuVramMb}MB)` : "No dedicated GPU", badge: null },
+              { label: "Temperature", icon: Thermometer, value: systemStatus?.hardware?.temperatureCelsius != null ? `${systemStatus.hardware.temperatureCelsius}°C` : "N/A", badge: null },
+              { label: "Uptime", icon: Clock, value: systemStatus?.uptime || "N/A", badge: null },
+            ].map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
+              >
+                <div className="flex items-center gap-3">
+                  <row.icon className="w-4 h-4 text-[#9AA0A6]" />
+                  <span className="text-sm font-bold text-[#202124]">{row.label}</span>
+                </div>
+                {row.badge ? (
+                  <Badge color={row.badge}>{row.value}</Badge>
+                ) : (
+                  <span className="text-sm font-mono font-bold text-[#5F6368] text-right max-w-[200px] truncate" title={row.value}>
+                    {row.value}
+                  </span>
+                )}
               </div>
             ))}
           </div>
