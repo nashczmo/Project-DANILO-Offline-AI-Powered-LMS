@@ -779,7 +779,7 @@ async def generated_lesson_from_text(course: Course, filename: str, text: str, m
     default_title = clean_text(title_seed.title() or f'{course.subject} Lesson', max_length=255)
     prompt = f"""You are an expert curriculum developer. Convert this raw material into a structured textbook-style lesson.\nCourse: {course.grade_level} {course.subject}\nMode: {RESPONSE_MODE_OPTIONS.get(mode, RESPONSE_MODE_OPTIONS['normal']).get('instruction')}\nMaterial Context:\n{trim_text(text, max(1000, OLLAMA_CONTEXT_CHARS - 1500))}\n\nPlease output EXACTLY and ONLY a JSON object (do not wrap it in markdown code blocks) with the following fields:\n"title": A short catchy lesson title\n"summary": A brief 2-sentence summary\n"essential_question": One overarching essential question\n"objectives": An array of 3 learning objectives\n"content": The main lesson text formatted in Markdown, which MUST include the following sections:\n  - An easier-to-understand Explanation\n  - A short Reviewer summary\n  - A 3-question Quiz\n  - A Practice activity\nEnsure the tone matches the requested Mode.\n"""
     try:
-        response_text, _ = await ask_ollama(prompt, mode)
+        response_text, _ = await ask_ollama(SYSTEM_PROMPT, prompt, mode)
         cleaned_json = response_text.strip()
         if cleaned_json.startswith('```json'):
             cleaned_json = cleaned_json[7:]
@@ -916,6 +916,12 @@ Be professional, supportive, and pedagogical. Use the provided <curriculum_conte
 SYSTEM_PROMPT_ADMIN = '''You are DANILO, a DevOps and Systems Administration AI for the Project DANILO LMS platform.
 Your goal is to assist school administrators with system configuration, network troubleshooting, and server maintenance.
 Be concise, technical, and precise.'''
+
+SAFETY_KEYWORDS = {'suicide', 'kill', 'murder', 'bomb', 'weapon', 'drugs', 'porn', 'sex', 'hack', 'exploit', 'violence', 'gore', 'terrorist', 'abuse'}
+
+SAFETY_REDIRECT = "I'm here to help you with your schoolwork! Let's focus on your lessons. What subject would you like help with?"
+
+ROLLING_MEMORY_LIMIT = 6
 
 DEFAULT_RESPONSE_MODE_OPTIONS = {
     'short': {'num_predict': int(os.getenv('DANILO_TOKENS_SHORT', '150')), 'instruction': 'Keep your response brief and direct.'},
@@ -1374,7 +1380,7 @@ def _runtime_pressure() -> tuple[bool, str | None]:
         return (False, None)
     return (False, None)
 
-async def _post_nonstream_inference(client: httpx.AsyncClient, prompt: str, mode: str, memory: list[dict] | None, model_name: str, gpu_layers: int) -> tuple[str, dict]:
+async def _post_nonstream_inference(client: httpx.AsyncClient, system_prompt: str, prompt: str, mode: str, memory: list[dict] | None, model_name: str, gpu_layers: int) -> tuple[str, dict]:
     payload = ollama_chat_payload(system_prompt, prompt, mode, stream=False, memory=memory, model=model_name, gpu_layers=gpu_layers)
     response = await client.post(f'{OLLAMA_URL}/api/chat', json=payload)
     response.raise_for_status()
