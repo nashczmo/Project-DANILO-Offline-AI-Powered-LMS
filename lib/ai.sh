@@ -316,9 +316,9 @@ configure_ollama_model() {
 
   # WhichLLM Dynamic hardware-aware AI model selection
   if command_missing whichllm; then
-    if command -v pip3 >/dev/null 2>&1 && internet_reachable_now; then
+    if command_exists pip3 && internet_reachable_now; then
       note "Internet and pip3 detected. Installing whichllm for dynamic hardware AI benchmarking..."
-      run_step_command "Installing whichllm via pip" pip3 install --break-system-packages whichllm >/dev/null 2>&1 || true
+      pip3 install --break-system-packages whichllm >/dev/null 2>&1 || true
     fi
   fi
 

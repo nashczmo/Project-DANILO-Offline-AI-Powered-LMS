@@ -170,7 +170,7 @@ build_frontend_static() {
 clear_frontend_build_cache() {
   note "Removing old frontend dist, Vite cache, and previously served gateway assets"
   rm -rf "${APP_ROOT}/frontend/dist"
-  rm -rf "${APP_ROOT}/frontend/node_modules/.vite"
+  rm -rf "${APP_ROOT}/frontend/node_modules"
   rm -rf "${APP_ROOT}/frontend/.vite"
   rm -rf "${APP_ROOT}/gateway/dist"
   ok "Old frontend build artifacts and local cache were removed"
