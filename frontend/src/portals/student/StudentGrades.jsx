@@ -118,21 +118,21 @@ export default function StudentGrades() {
               {/* Weighted Score footer */}
               <div className="flex items-center justify-between pt-4 border-t border-[#E0E0E0]">
                 <div>
-                  <p className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide">Weighted Score</p>
+                  <p className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide">Final Grade</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-2xl font-black ${
-                      g.weightedScore >= 85
+                      g.finalGrade >= 85
                         ? "text-[#188038]"
-                        : g.weightedScore >= 70
+                        : g.finalGrade >= 70
                         ? "text-[#1A73E8]"
-                        : g.weightedScore >= 60
+                        : g.finalGrade >= 60
                         ? "text-[#E37400]"
                         : "text-[#D93025]"
                     }`}
                   >
-                    {g.weightedScore?.toFixed(1) ?? "N/A"}
+                    {g.finalGrade?.toFixed(1) ?? "N/A"}
                   </span>
                 </div>
               </div>

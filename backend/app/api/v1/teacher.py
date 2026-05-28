@@ -227,6 +227,71 @@ async def teacher_generate_quiz(course_id: str, payload: dict=Body(default={}), 
         ai_logger.error('Failed to parse quiz JSON: %s. Response was: %s', str(e), result)
         raise HTTPException(status_code=500, detail='AI failed to generate a valid quiz format. Please try again.')
 
+@teacher_router.post('/teacher/courses/{course_id}/quizzes/generate-from-file')
+async def teacher_generate_quiz_from_file(course_id: str, file: UploadFile=File(...), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+    course = ensure_teacher_course(db, current_user, course_id)
+    content = await file.read()
+    filename = file.filename.lower()
+    text = ''
+    try:
+        if filename.endswith('.pdf'):
+            import pypdf
+            pdf = pypdf.PdfReader(io.BytesIO(content))
+            text = '\\n'.join((page.extract_text() for page in pdf.pages if page.extract_text()))
+        elif filename.endswith('.docx'):
+            import docx
+            doc = docx.Document(io.BytesIO(content))
+            text = '\\n'.join((para.text for para in doc.paragraphs))
+        elif filename.endswith('.txt') or filename.endswith('.md') or filename.endswith('.csv'):
+            text = content.decode('utf-8')
+        else:
+            raise HTTPException(status_code=400, detail='Unsupported file format. Please upload PDF, DOCX, or TXT.')
+    except Exception as e:
+        ai_logger.error('Document parsing failed: %s', str(e))
+        raise HTTPException(status_code=400, detail='Failed to parse document.')
+    
+    text = text.strip()[:20000]
+    if not text:
+        raise HTTPException(status_code=400, detail='No readable text found.')
+
+    prompt = f'''You are an expert DepEd teacher. Generate a comprehensive 10-item quiz based on the following document.
+Include a mix of question types: multiple-choice, checkbox, identification, and short-answer.
+Output the quiz in strict JSON format.
+
+Document Text: {text}
+Subject: {course.subject}
+Grade Level: {course.grade_level}
+
+JSON Schema:
+{{
+  "title": "Generated Quiz from Document",
+  "questions": [
+    {{
+      "type": "multiple-choice", // or "checkbox", "identification", "short-answer"
+      "question": "Question text here?",
+      "choices": ["Option 1", "Option 2"], // required for multiple-choice/checkbox
+      "answerKey": "Correct answer text", // string for multiple-choice/identification/short-answer, array for checkbox
+      "points": 1
+    }}
+  ]
+}}
+
+Return ONLY valid JSON. Do not include markdown formatting or explanations.
+'''
+    result, metrics = await ask_ollama(prompt, mode='tutor', memory=None)
+    try:
+        import re
+        json_str = result
+        if '```json' in json_str:
+            json_str = json_str.split('```json')[1].split('```')[0]
+        elif '```' in json_str:
+            json_str = json_str.split('```')[1].split('```')[0]
+        data = json.loads(json_str.strip())
+        return {'ok': True, 'quiz': data, 'metrics': metrics}
+    except Exception as e:
+        ai_logger.error('Failed to parse quiz JSON: %s. Response was: %s', str(e), result)
+        raise HTTPException(status_code=500, detail='AI failed to generate a valid quiz format. Please try again.')
+
 @teacher_router.post('/teacher/courses/{course_id}/quizzes')
 def teacher_create_quiz(course_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     course = ensure_teacher_course(db, current_user, course_id)

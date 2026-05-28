@@ -255,18 +255,28 @@ export default function StudentTutor() {
           while ((newIndex = buffer.indexOf("\n")) !== -1) {
             const line = buffer.slice(0, newIndex);
             buffer = buffer.slice(newIndex + 1);
+            if (line.startsWith("event: error")) {
+              // The next line should be data: {"detail": "..."}
+              continue;
+            }
             if (line.startsWith("data: ")) {
               const dataStr = line.substring(6);
               if (dataStr.trim() === "[DONE]") continue;
               try {
                 const parsed = JSON.parse(dataStr);
+                if (parsed.detail) {
+                   throw new Error(parsed.detail);
+                }
                 if (parsed.done) {
                   if (parsed.sessionId) setCurrentSessionId(parsed.sessionId);
                 } else if (parsed.content) {
                   appendedText += parsed.content;
                 }
-              } catch {
-                appendedText += dataStr;
+              } catch (e) {
+                if (e.message !== "Unexpected end of JSON input" && !e.message.includes("is not valid JSON")) {
+                   throw e;
+                }
+                if (!dataStr.startsWith("{")) appendedText += dataStr;
               }
             }
           }
@@ -287,12 +297,15 @@ export default function StudentTutor() {
     } catch (error) {
       console.error(error);
       setIsTyping(false);
+      const errorMessage = error.message && error.message !== "Failed to fetch" && error.message !== "Failed to connect to AI" 
+        ? error.message 
+        : "DANILO Tutor is offline or still getting ready. Please check the local AI runtime and try again.";
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 2,
           role: "assistant",
-          content: "Sorry, I'm having trouble connecting to the AI Tutor right now. Please try again shortly.",
+          content: errorMessage,
         },
       ]);
     }

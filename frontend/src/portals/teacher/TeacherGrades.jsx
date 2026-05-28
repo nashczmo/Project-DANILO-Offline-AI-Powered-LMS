@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
-import { Card, PageHeader, Skeleton, EmptyState, Button } from "../../components/ui";
-import { FileText, GraduationCap, Plus } from "lucide-react";
+import { Card, PageHeader, Skeleton, EmptyState, Button, Badge } from "../../components/ui";
+import { FileText, GraduationCap, Plus, Save } from "lucide-react";
 
 export default function TeacherGrades() {
   const { data: courses, loading: coursesLoading } = useApi("/teacher/courses", { immediate: true });
@@ -15,51 +15,129 @@ export default function TeacherGrades() {
     selectedCourseId ? `/teacher/courses/${selectedCourseId}/gradebook` : null,
     { immediate: !!selectedCourseId }
   );
-  const [formData, setFormData] = useState({});
+  
+  const [selectedComponent, setSelectedComponent] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [newAssignment, setNewAssignment] = useState({ quarter: "Q1", component: "", maxScore: 100, weight: 1 });
+  
+  const [studentGrades, setStudentGrades] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("error");
 
   const activeCourses = courses || [];
 
-  const handleAddGrade = async (e) => {
+  const uniqueAssignments = useMemo(() => {
+    if (!gradebook?.entries) return [];
+    const map = new Map();
+    gradebook.entries.forEach(e => {
+      const key = `${e.quarter}-${e.component}`;
+      if (!map.has(key)) {
+        map.set(key, { quarter: e.quarter, component: e.component, maxScore: e.maxScore, weight: e.weight });
+      }
+    });
+    return Array.from(map.values());
+  }, [gradebook]);
+
+  const handleSelectComponent = (val) => {
+    if (val === "NEW") {
+      setIsCreating(true);
+      setSelectedComponent("");
+      setStudentGrades({});
+    } else {
+      setIsCreating(false);
+      setSelectedComponent(val);
+      
+      // Pre-fill existing grades
+      const current = uniqueAssignments.find(a => `${a.quarter}-${a.component}` === val);
+      if (current && gradebook) {
+        const gradesMap = {};
+        gradebook.students.forEach(s => {
+          const entry = gradebook.entries.find(e => e.studentId === s.id && e.quarter === current.quarter && e.component === current.component);
+          gradesMap[s.id] = {
+            score: entry ? entry.score : "",
+            remarks: entry ? entry.remarks : "",
+            gradeId: entry ? entry.id : null,
+          };
+        });
+        setStudentGrades(gradesMap);
+      }
+    }
+  };
+
+  const handleSaveGrades = async (e) => {
     e.preventDefault();
-    if (!selectedCourseId || !formData.studentId || !formData.component) return;
     setSubmitting(true);
     setNotice("");
+    
+    let targetAssignment = isCreating ? newAssignment : uniqueAssignments.find(a => `${a.quarter}-${a.component}` === selectedComponent);
+    if (!targetAssignment || !targetAssignment.component.trim()) {
+      setNoticeType("error");
+      setNotice("Please define the assignment details.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      await apiRequest(`/teacher/courses/${selectedCourseId}/grades`, {
-        method: "POST",
-        body: {
-          studentId: formData.studentId,
-          quarter: formData.quarter || "Q1",
-          component: formData.component,
-          score: parseFloat(formData.score) || 0,
-          maxScore: parseFloat(formData.maxScore) || 100,
-          weight: parseFloat(formData.weight) || 1,
-          remarks: formData.remarks || "",
-        },
+      const promises = gradebook.students.map(async (student) => {
+        const gradeData = studentGrades[student.id];
+        if (!gradeData || gradeData.score === "" || gradeData.score === null) return null; // skip empty
+        
+        const payload = {
+          studentId: student.id,
+          quarter: targetAssignment.quarter,
+          component: targetAssignment.component,
+          score: parseFloat(gradeData.score) || 0,
+          maxScore: parseFloat(targetAssignment.maxScore) || 100,
+          weight: parseFloat(targetAssignment.weight) || 1,
+          remarks: gradeData.remarks || "",
+        };
+
+        if (gradeData.gradeId) {
+          return apiRequest(`/teacher/grades/${gradeData.gradeId}`, { method: "PUT", body: payload });
+        } else {
+          return apiRequest(`/teacher/courses/${selectedCourseId}/grades`, { method: "POST", body: payload });
+        }
       });
-      setFormData({});
-      refreshGradebook();
+      
+      await Promise.all(promises.filter(p => p !== null));
+      
       setNoticeType("success");
-      setNotice("Grade recorded successfully.");
+      setNotice("Grades successfully recorded!");
+      await refreshGradebook();
+      setIsCreating(false);
+      setSelectedComponent(`${targetAssignment.quarter}-${targetAssignment.component}`);
+      
+      // Update local state to map new gradeIds
+      const newGradebook = await apiRequest(`/teacher/courses/${selectedCourseId}/gradebook`);
+      const gradesMap = {};
+      newGradebook.students.forEach(s => {
+        const entry = newGradebook.entries.find(e => e.studentId === s.id && e.quarter === targetAssignment.quarter && e.component === targetAssignment.component);
+        gradesMap[s.id] = {
+          score: entry ? entry.score : "",
+          remarks: entry ? entry.remarks : "",
+          gradeId: entry ? entry.id : null,
+        };
+      });
+      setStudentGrades(gradesMap);
+      
     } catch (err) {
       setNoticeType("error");
-      setNotice(err.message || "Could not record grade.");
+      setNotice(err.message || "Could not save grades.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const currentMaxScore = isCreating ? newAssignment.maxScore : (uniqueAssignments.find(a => `${a.quarter}-${a.component}` === selectedComponent)?.maxScore || 100);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Grades"
-        description="Manage and record student grades for your classes."
+        description="Manage and record student grades for your classes per assignment."
       />
 
-      {/* Notice */}
       {notice && (
         <div
           role="alert"
@@ -73,7 +151,6 @@ export default function TeacherGrades() {
         </div>
       )}
 
-      {/* Class Selector */}
       <Card>
         <label htmlFor="grade-course-select" className="block text-sm font-black text-[#202124] mb-2">
           Select Class
@@ -85,7 +162,12 @@ export default function TeacherGrades() {
             id="grade-course-select"
             className="dn-input"
             value={selectedCourseId || ""}
-            onChange={(e) => setSelectedCourseId(e.target.value || null)}
+            onChange={(e) => {
+              setSelectedCourseId(e.target.value || null);
+              setSelectedComponent("");
+              setIsCreating(false);
+              setNotice("");
+            }}
           >
             <option value="">Choose a class…</option>
             {activeCourses.map((c) => (
@@ -100,134 +182,106 @@ export default function TeacherGrades() {
       {selectedCourseId && gradebookLoading && (
         <div className="space-y-4">
           <Skeleton className="h-48" />
-          <Skeleton className="h-48" />
         </div>
       )}
 
       {selectedCourseId && !gradebookLoading && gradebook && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Record New Grade */}
-          <Card>
-            <h3 className="text-base font-black text-[#202124] mb-5 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-[#1A73E8]" />
-              Record New Grade
-            </h3>
-            <form onSubmit={handleAddGrade} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Card className="animate-fade-in">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <label className="block text-sm font-black text-[#202124] mb-2">Assignment / Component</label>
               <select
                 className="dn-input"
-                value={formData.studentId || ""}
-                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                required
-                aria-label="Select student"
+                value={isCreating ? "NEW" : selectedComponent}
+                onChange={(e) => handleSelectComponent(e.target.value)}
               >
-                <option value="">Select student *</option>
-                {gradebook.students?.map((s) => (
-                  <option key={s.id} value={s.id}>{s.fullName}</option>
+                <option value="" disabled>Select an assignment...</option>
+                {uniqueAssignments.map(a => (
+                  <option key={`${a.quarter}-${a.component}`} value={`${a.quarter}-${a.component}`}>
+                    [{a.quarter}] {a.component} (Max: {a.maxScore}, Wt: {a.weight})
+                  </option>
                 ))}
+                <option value="NEW">+ Create New Assignment</option>
               </select>
-              <input
-                className="dn-input"
-                placeholder="Component (e.g. Written Work) *"
-                value={formData.component || ""}
-                onChange={(e) => setFormData({ ...formData, component: e.target.value })}
-                required
-                aria-label="Grade component"
-              />
-              <select
-                className="dn-input"
-                value={formData.quarter || "Q1"}
-                onChange={(e) => setFormData({ ...formData, quarter: e.target.value })}
-                aria-label="Quarter"
-              >
-                <option>Q1</option>
-                <option>Q2</option>
-                <option>Q3</option>
-                <option>Q4</option>
-              </select>
-              <input
-                className="dn-input"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Score *"
-                value={formData.score || ""}
-                onChange={(e) => setFormData({ ...formData, score: e.target.value })}
-                required
-                aria-label="Score"
-              />
-              <input
-                className="dn-input"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Max Score *"
-                value={formData.maxScore || ""}
-                onChange={(e) => setFormData({ ...formData, maxScore: e.target.value })}
-                required
-                aria-label="Max score"
-              />
-              <input
-                className="dn-input"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                placeholder="Weight (0-1) *"
-                value={formData.weight || ""}
-                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                required
-                aria-label="Weight"
-              />
-              <div className="sm:col-span-2 lg:col-span-3 flex gap-2 pt-1">
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? "Saving…" : "Record Grade"}
-                </Button>
-              </div>
-            </form>
-          </Card>
-
-          {/* Grade Entries Table */}
-          <Card>
-            <div className="flex items-center gap-2 mb-5">
-              <GraduationCap className="w-5 h-5 text-[#1A73E8]" />
-              <h3 className="text-base font-black text-[#202124]">Grade Entries</h3>
-              {gradebook.entries?.length > 0 && (
-                <span className="text-sm text-[#9AA0A6] font-bold ml-auto">
-                  {gradebook.entries.length} entries
-                </span>
-              )}
             </div>
-            {gradebook.entries?.length > 0 ? (
+          </div>
+
+          {isCreating && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6 p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]">
+              <div>
+                <label className="block text-xs font-bold text-[#5F6368] mb-1">Quarter</label>
+                <select className="dn-input" value={newAssignment.quarter} onChange={e => setNewAssignment({...newAssignment, quarter: e.target.value})}>
+                  <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5F6368] mb-1">Component Name (e.g. Written Work 1)</label>
+                <input className="dn-input" value={newAssignment.component} onChange={e => setNewAssignment({...newAssignment, component: e.target.value})} placeholder="Required" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5F6368] mb-1">Max Score</label>
+                <input type="number" className="dn-input" value={newAssignment.maxScore} onChange={e => setNewAssignment({...newAssignment, maxScore: e.target.value})} min="1" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5F6368] mb-1">Weight (e.g. 0.3 for 30%)</label>
+                <input type="number" step="0.01" className="dn-input" value={newAssignment.weight} onChange={e => setNewAssignment({...newAssignment, weight: e.target.value})} />
+              </div>
+            </div>
+          )}
+
+          {(selectedComponent || isCreating) && (
+            <form onSubmit={handleSaveGrades}>
+              <div className="flex items-center gap-2 mb-4">
+                <GraduationCap className="w-5 h-5 text-[#1A73E8]" />
+                <h3 className="text-base font-black text-[#202124]">Student Submissions</h3>
+                <span className="text-sm text-[#9AA0A6] font-bold ml-auto">
+                  {gradebook.students?.length || 0} students
+                </span>
+              </div>
+              
               <div className="overflow-x-auto -mx-6 px-6">
                 <table className="dn-table">
                   <thead>
                     <tr>
                       <th>Student</th>
-                      <th className="hidden sm:table-cell">Quarter</th>
-                      <th>Component</th>
-                      <th className="text-right">Score</th>
-                      <th className="text-right hidden sm:table-cell">Max</th>
-                      <th className="text-right hidden md:table-cell">Weight</th>
+                      <th className="w-32">Score</th>
+                      <th>Remarks / Feedback</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {gradebook.entries.map((entry) => {
-                      const pct = entry.maxScore ? (entry.score / entry.maxScore) * 100 : null;
+                    {gradebook.students?.map((student) => {
+                      const st = studentGrades[student.id] || { score: "", remarks: "" };
+                      const pct = st.score !== "" && st.score !== null ? (st.score / currentMaxScore) * 100 : null;
                       return (
-                        <tr key={entry.id}>
-                          <td className="font-bold text-[#202124]">{entry.studentName}</td>
-                          <td className="hidden sm:table-cell text-[#5F6368]">{entry.quarter}</td>
-                          <td className="text-[#5F6368]">{entry.component}</td>
-                          <td className={`text-right font-black ${
-                            pct >= 85 ? "text-[#188038]" : pct >= 70 ? "text-[#1A73E8]" : pct >= 60 ? "text-[#E37400]" : "text-[#D93025]"
-                          }`}>
-                            {entry.score}
+                        <tr key={student.id}>
+                          <td className="font-bold text-[#202124]">
+                            {student.fullName}
+                            {pct !== null && (
+                               <Badge className="ml-2" color={pct >= 85 ? "success" : pct >= 70 ? "primary" : pct >= 60 ? "warning" : "error"}>
+                                 {Math.round(pct)}%
+                               </Badge>
+                            )}
                           </td>
-                          <td className="text-right hidden sm:table-cell text-[#9AA0A6] font-bold">
-                            {entry.maxScore}
+                          <td>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max={currentMaxScore}
+                              className="dn-input py-1.5"
+                              value={st.score}
+                              onChange={(e) => setStudentGrades(prev => ({ ...prev, [student.id]: { ...prev[student.id], score: e.target.value } }))}
+                              placeholder="0"
+                            />
                           </td>
-                          <td className="text-right hidden md:table-cell text-[#9AA0A6] font-bold">
-                            {entry.weight}
+                          <td>
+                            <input
+                              type="text"
+                              className="dn-input py-1.5"
+                              value={st.remarks}
+                              onChange={(e) => setStudentGrades(prev => ({ ...prev, [student.id]: { ...prev[student.id], remarks: e.target.value } }))}
+                              placeholder="Optional feedback..."
+                            />
                           </td>
                         </tr>
                       );
@@ -235,15 +289,15 @@ export default function TeacherGrades() {
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <EmptyState
-                icon={FileText}
-                title="No grade entries yet"
-                description="Record grades using the form above."
-              />
-            )}
-          </Card>
-        </div>
+              <div className="mt-6 flex justify-end">
+                <Button type="submit" disabled={submitting}>
+                  <Save className="w-4 h-4" />
+                  {submitting ? "Saving Grades..." : "Save All Grades"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
       )}
     </div>
   );

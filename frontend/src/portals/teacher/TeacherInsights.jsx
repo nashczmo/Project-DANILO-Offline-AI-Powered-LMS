@@ -235,8 +235,10 @@ export default function TeacherInsights() {
             </div>
             {insights.classWeakTopics?.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {insights.classWeakTopics.map((topic, idx) => (
-                  <Badge key={idx} color="warning">{topic}</Badge>
+                {insights.classWeakTopics.map((topicObj, idx) => (
+                  <Badge key={idx} color="warning">
+                    {typeof topicObj === 'string' ? topicObj : topicObj.topic || "Unknown Topic"}
+                  </Badge>
                 ))}
               </div>
             ) : (
