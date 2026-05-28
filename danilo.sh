@@ -201,7 +201,6 @@ run_rebuild_frontend_mode() {
   step 1 4 "Pre-flight checks"
   require_command docker
   require_command curl
-  require_command npm
 
   step 2 4 "Frontend generation"
   mkdir -p "${APP_ROOT}"
@@ -224,7 +223,6 @@ run_rebuild_frontend_mode() {
 
   step 4 4 "Verification"
   verify_command "Frontend reachable" curl -fsS -H "Host: ${PORTAL_DOMAIN}" "http://127.0.0.1/"
-  verify_frontend_dist
   verify_frontend_html "Frontend static bundle reachable" "http://127.0.0.1/"
   verify_frontend_served_build_marker
   if [[ "${VERIFY_FAILED}" -ne 0 ]]; then

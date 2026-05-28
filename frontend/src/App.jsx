@@ -18,7 +18,6 @@ import TeacherClasses from "./portals/teacher/TeacherClasses";
 import TeacherGrades from "./portals/teacher/TeacherGrades";
 import TeacherAnnouncements from "./portals/teacher/TeacherAnnouncements";
 import TeacherInsights from "./portals/teacher/TeacherInsights";
-import TeacherAIQuizzes from "./portals/teacher/TeacherAIQuizzes";
 
 import AdminOverview from "./portals/admin/AdminDashboard";
 import AdminDirectory from "./portals/admin/AdminDirectory";
@@ -141,7 +140,6 @@ export default function App() {
                   <Route path="grades" element={<TeacherGrades />} />
                   <Route path="announcements" element={<TeacherAnnouncements />} />
                   <Route path="insights" element={<TeacherInsights />} />
-                  <Route path="quizzes" element={<TeacherAIQuizzes />} />
                   <Route path="*" element={<Navigate to="overview" replace />} />
                 </Routes>
               </AppLayout>

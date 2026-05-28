@@ -33,7 +33,14 @@ def class_classwork(course_id: str, current_user: User=Depends(get_current_user)
     assignments = []
     for item in assignment_rows:
         submission = submissions_by_assignment.get(item.id)
-        assignments.append({'id': item.id, 'courseId': course.id, 'title': item.title, 'instructions': item.instructions, 'points': item.points, 'dueAt': item.due_at.isoformat() if item.due_at else None, 'createdAt': item.created_at.isoformat() if item.created_at else '', 'submission': {'status': submission.status, 'responseText': submission.response_text or '', 'score': submission.score, 'feedback': submission.feedback or ''} if submission else None})
+        questions = db.scalars(select(AssignmentQuestion).where(AssignmentQuestion.assignment_id == item.id).order_by(AssignmentQuestion.id.asc())).all()
+        questions_data = [{'id': q.id, 'sectionName': q.section_name or '', 'questionText': q.question_text, 'type': q.question_type, 'choicesJson': q.choices_json or '', 'answerKey': q.answer_key or '', 'points': q.points} for q in questions]
+        assignments.append({
+            'id': item.id, 'courseId': course.id, 'title': item.title, 'instructions': item.instructions, 'points': item.points, 
+            'dueAt': item.due_at.isoformat() if item.due_at else None, 'createdAt': item.created_at.isoformat() if item.created_at else '', 
+            'assignmentType': item.assignment_type, 'attachmentsJson': item.attachments_json, 'questions': questions_data,
+            'submission': {'status': submission.status, 'responseText': submission.response_text or '', 'answersJson': submission.answers_json, 'attachmentsJson': submission.attachments_json, 'score': submission.score, 'feedback': submission.feedback or ''} if submission else None
+        })
     quiz_rows = db.scalars(select(Quiz).where(Quiz.course_id == course.id, Quiz.is_published == True).order_by(Quiz.created_at.desc())).all()
     attempts_by_quiz = {}
     if current_user.role == 'student':
@@ -58,7 +65,7 @@ def class_grades(course_id: str, current_user: User=Depends(get_current_user), d
     course = get_user_class(db, current_user, course_id)
     if current_user.role == 'student':
         grades = db.scalars(select(GradeEntry).where(GradeEntry.course_id == course.id, GradeEntry.student_id == current_user.id).order_by(GradeEntry.created_at.asc())).all()
-        return {'course': serialize_course(course), 'entries': [{'id': grade.id, 'quarter': grade.quarter, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or ''} for grade in grades], 'grades': summarize_grade_entries(course, grades)}
+        return {'course': serialize_course(course), 'entries': [{'id': grade.id, 'term': grade.term, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or ''} for grade in grades], 'grades': summarize_grade_entries(course, grades)}
     grades = db.execute(select(GradeEntry, User).join(User, GradeEntry.student_id == User.id).where(GradeEntry.course_id == course.id).order_by(User.full_name.asc(), GradeEntry.created_at.asc())).all()
     by_student: dict[int, list[GradeEntry]] = {}
     names: dict[int, str] = {}
@@ -70,5 +77,5 @@ def class_grades(course_id: str, current_user: User=Depends(get_current_user), d
         for item in summarize_grade_entries(course, rows, names.get(student_id)):
             item['studentId'] = student_id
             summaries.append(item)
-    return {'course': serialize_course(course), 'entries': [{'id': grade.id, 'studentId': student.id, 'studentName': student.full_name, 'quarter': grade.quarter, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or ''} for grade, student in grades], 'grades': summaries}
+    return {'course': serialize_course(course), 'entries': [{'id': grade.id, 'studentId': student.id, 'studentName': student.full_name, 'term': grade.term, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or ''} for grade, student in grades], 'grades': summaries}
 

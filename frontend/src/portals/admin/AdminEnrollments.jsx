@@ -63,7 +63,7 @@ export default function AdminEnrollments() {
           strand: section.strand || undefined,
           teacherId: classForm.teacherId || undefined,
           schoolYear: classForm.schoolYear || section.schoolYear || "2026-2027",
-          quarter: classForm.quarter || "Q1",
+          term: classForm.term || "Term 1",
         },
       });
       if (classForm.enrollSection) {
@@ -182,14 +182,13 @@ export default function AdminEnrollments() {
           />
           <select
             className="dn-input"
-            value={classForm.quarter || "Q1"}
-            onChange={(e) => setClassForm({ ...classForm, quarter: e.target.value })}
-            aria-label="Quarter"
+            value={classForm.term || "Term 1"}
+            onChange={(e) => setClassForm({ ...classForm, term: e.target.value })}
+            aria-label="Term"
           >
-            <option>Q1</option>
-            <option>Q2</option>
-            <option>Q3</option>
-            <option>Q4</option>
+            <option value="Term 1">Term 1</option>
+            <option value="Term 2">Term 2</option>
+            <option value="Term 3">Term 3</option>
           </select>
           <label className="flex items-center gap-2.5 text-sm font-bold text-[#5F6368] cursor-pointer col-span-full sm:col-span-1">
             <input

@@ -1,9 +1,32 @@
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton } from "../../components/ui";
-import { BarChart3, Users, Activity, MessageSquare, TrendingUp } from "lucide-react";
+import { apiUrl } from "../../api";
+import { useAppStore } from "../../store/useAppStore";
+import { Card, PageHeader, Skeleton, Button } from "../../components/ui";
+import { BarChart3, Users, Activity, MessageSquare, TrendingUp, Download } from "lucide-react";
 
 export default function AdminReports() {
   const { data, loading, error, refresh } = useApi("/admin/overview", { immediate: true });
+  const token = useAppStore((s) => s.token);
+
+  const handleDownload = async (endpoint, filename) => {
+    try {
+      const res = await fetch(apiUrl(endpoint), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to download");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Error downloading report.");
+    }
+  };
 
   if (loading) {
     return (
@@ -74,6 +97,16 @@ export default function AdminReports() {
       <PageHeader
         title="Reports"
         description="Platform analytics, usage metrics, and operational highlights."
+        action={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => handleDownload('/admin/reports/roster', 'danilo-roster.csv')}>
+              <Download className="w-4 h-4" /> Roster
+            </Button>
+            <Button variant="secondary" onClick={() => handleDownload('/admin/reports/grades', 'danilo-grades.csv')}>
+              <Download className="w-4 h-4" /> Grades
+            </Button>
+          </div>
+        }
       />
 
       {/* Metric Cards */}

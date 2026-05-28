@@ -4,6 +4,13 @@ import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
 import { Settings, Cpu, Wifi, BookOpen, Plus, Trash2, Server, Activity, Pencil, X, MemoryStick, HardDrive, Thermometer, Clock } from "lucide-react";
 
+const GRADE_OPTIONS = {
+  "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
+  "Senior High School": ["Grade 11", "Grade 12"],
+};
+
+const STRAND_OPTIONS = ["STEM", "ABM", "HUMSS", "GAS", "TVL", "Sports", "Arts & Design"];
+
 export default function AdminSystem() {
   const { data: systemStatus, loading, error, refresh } = useApi("/admin/system", { immediate: true });
   const { data: activity, refresh: refreshActivity } = useApi("/admin/activity", { immediate: true });
@@ -25,11 +32,34 @@ export default function AdminSystem() {
 
   const handleSaveSection = async (e) => {
     e.preventDefault();
-    if (!formData.name?.trim() || !formData.gradeLevel?.trim()) {
+    if (!formData.gradeLevel?.trim()) {
       setNoticeType("error");
-      setNotice("Section name and grade level are required.");
+      setNotice("Grade level is required.");
       return;
     }
+    
+    let sectionName = formData.name;
+    if (!editingSectionId) {
+      const prefix = formData.educationLevel === "Senior High School" 
+        ? `${formData.strand} ${formData.gradeLevel.replace('Grade ', '')}` 
+        : formData.gradeLevel;
+        
+      const existingSame = (sections || []).filter(s => s.name.startsWith(prefix));
+      let highestCharCode = 64; 
+      existingSame.forEach(s => {
+        const suffix = s.name.slice(prefix.length).trim();
+        if (suffix.length === 1 && suffix.charCodeAt(0) > highestCharCode) {
+          highestCharCode = suffix.charCodeAt(0);
+        }
+      });
+      const nextLetter = String.fromCharCode(highestCharCode + 1);
+      sectionName = `${prefix}${nextLetter}`;
+    } else if (!sectionName?.trim()) {
+      setNoticeType("error");
+      setNotice("Section name is required.");
+      return;
+    }
+    
     setSubmitting(true);
     setNotice("");
     try {
@@ -38,7 +68,7 @@ export default function AdminSystem() {
         {
           method: editingSectionId ? "PUT" : "POST",
           body: {
-            name: formData.name,
+            name: sectionName,
             gradeLevel: formData.gradeLevel,
             educationLevel: formData.educationLevel || "Junior High School",
             strand: formData.strand || undefined,
@@ -267,7 +297,7 @@ export default function AdminSystem() {
               variant={showSectionForm ? "secondary" : "primary"}
               onClick={() => {
                 setEditingSectionId(null);
-                setFormData({});
+                setFormData({ educationLevel: "Junior High School" });
                 setShowSectionForm(!showSectionForm);
               }}
             >
@@ -281,32 +311,48 @@ export default function AdminSystem() {
               <h4 className="text-sm font-black text-[#202124]">
                 {editingSectionId ? "Edit Section" : "New Section"}
               </h4>
-              <input
+              {editingSectionId && (
+                <input
+                  className="dn-input"
+                  placeholder="Section name *"
+                  value={formData.name || ""}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              )}
+              <select
                 className="dn-input"
-                placeholder="Section name *"
-                value={formData.name || ""}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.educationLevel || "Junior High School"}
+                onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value, gradeLevel: "", strand: "" })}
                 required
-              />
-              <input
+              >
+                <option value="Junior High School">Junior High</option>
+                <option value="Senior High School">Senior High</option>
+              </select>
+              <select
                 className="dn-input"
-                placeholder="Grade level (e.g. Grade 7) *"
                 value={formData.gradeLevel || ""}
                 onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })}
                 required
-              />
-              <input
-                className="dn-input"
-                placeholder="Education level"
-                value={formData.educationLevel || ""}
-                onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value })}
-              />
-              <input
-                className="dn-input"
-                placeholder="Strand (optional)"
-                value={formData.strand || ""}
-                onChange={(e) => setFormData({ ...formData, strand: e.target.value })}
-              />
+              >
+                <option value="">Grade Level *</option>
+                {(GRADE_OPTIONS[formData.educationLevel || "Junior High School"] || []).map((grade) => (
+                  <option key={grade} value={grade}>{grade}</option>
+                ))}
+              </select>
+              {formData.educationLevel === "Senior High School" && (
+                <select
+                  className="dn-input"
+                  value={formData.strand || ""}
+                  onChange={(e) => setFormData({ ...formData, strand: e.target.value })}
+                  required
+                >
+                  <option value="">Strand *</option>
+                  {STRAND_OPTIONS.map((strand) => (
+                    <option key={strand} value={strand}>{strand}</option>
+                  ))}
+                </select>
+              )}
               <input
                 className="dn-input"
                 placeholder="School year (e.g. 2026-2027)"

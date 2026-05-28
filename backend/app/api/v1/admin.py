@@ -233,7 +233,7 @@ def admin_create_course(payload: dict=Body(default={}), current_user: User=Depen
     code = validate_safe_text(payload.get('code'), 'Class code', max_length=50)
     if db.scalar(select(Course).where(func.lower(Course.code) == code.lower())):
         raise HTTPException(status_code=409, detail='Class code already exists')
-    course = Course(code=code, title=validate_safe_text(payload.get('title'), 'Class name', max_length=255), subject=validate_deped_subject(payload.get('subject')), education_level=education_level, grade_level=grade_level, strand=strand, quarter=validate_quarter(payload.get('quarter')), school_year=clean_text(payload.get('schoolYear') or payload.get('school_year') or '2026-2027', max_length=20), description=clean_text(payload.get('description') or 'Offline-ready DANILO class.', max_length=1000), teacher_id=teacher_id, department_id=department_id, is_active=True)
+    course = Course(code=code, title=validate_safe_text(payload.get('title'), 'Class name', max_length=255), subject=validate_deped_subject(payload.get('subject')), education_level=education_level, grade_level=grade_level, strand=strand, term=validate_term(payload.get('term')), school_year=clean_text(payload.get('schoolYear') or payload.get('school_year') or '2026-2027', max_length=20), description=clean_text(payload.get('description') or 'Offline-ready DANILO class.', max_length=1000), teacher_id=teacher_id, department_id=department_id, is_active=True)
     db.add(course)
     db.flush()
     log_action(db, current_user, 'create_course', 'course', course.id)
@@ -250,8 +250,8 @@ def admin_update_course(course_id: str, payload: dict=Body(default={}), current_
             setattr(course, attr, clean_text(payload.get(key), required=attr != 'strand', max_length=limit))
     if 'subject' in payload:
         course.subject = validate_deped_subject(payload.get('subject'))
-    if 'quarter' in payload:
-        course.quarter = validate_quarter(payload.get('quarter'))
+    if 'term' in payload:
+        course.term = validate_term(payload.get('term'))
     if 'teacherId' in payload or 'teacher_id' in payload:
         teacher_id = parse_id(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', required=False)
         if teacher_id and (not db.scalar(select(User).where(User.id == teacher_id, User.role == 'teacher'))):
@@ -367,10 +367,10 @@ def admin_roster_report(current_user: User=Depends(get_current_user), db: Sessio
 def admin_grades_report(current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> Response:
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['course_code', 'student_username', 'student_name', 'quarter', 'component', 'score', 'max_score', 'weight', 'remarks'])
+    writer.writerow(['course_code', 'student_username', 'student_name', 'term', 'component', 'score', 'max_score', 'weight', 'remarks'])
     data = db.execute(select(GradeEntry, Course, User).join(Course, GradeEntry.course_id == Course.id).join(User, GradeEntry.student_id == User.id).order_by(Course.code, User.full_name)).all()
     for grade, course, student in data:
-        writer.writerow([course.code, student.username, student.full_name, grade.quarter, grade.component, grade.score, grade.max_score, grade.weight, grade.remarks or ''])
+        writer.writerow([course.code, student.username, student.full_name, grade.term, grade.component, grade.score, grade.max_score, grade.weight, grade.remarks or ''])
     return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename=danilo-grades.csv'})
 
 @admin_router.get('/admin/reports/ai-analytics')

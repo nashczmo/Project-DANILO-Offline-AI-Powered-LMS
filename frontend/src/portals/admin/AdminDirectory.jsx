@@ -5,11 +5,11 @@ import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../com
 import { Users, Plus, UserCheck, UserX, RefreshCw, ChevronDown, X } from "lucide-react";
 
 const GRADE_OPTIONS = {
-  Elementary: ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6"],
   "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
   "Senior High School": ["Grade 11", "Grade 12"],
-  College: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"],
 };
+
+const STRAND_OPTIONS = ["STEM", "ABM", "HUMSS", "GAS", "TVL", "Sports", "Arts & Design"];
 
 const ROLE_BADGE = {
   admin:   { color: "error",   label: "Admin" },
@@ -236,10 +236,8 @@ export default function AdminDirectory() {
               aria-label="Education level"
             >
               <option value="">Education Level *</option>
-              <option value="Elementary">Elementary</option>
               <option value="Junior High School">Junior High</option>
               <option value="Senior High School">Senior High</option>
-              <option value="College">College</option>
             </select>
             <select
               className="dn-input"
@@ -253,13 +251,20 @@ export default function AdminDirectory() {
                 <option key={grade} value={grade}>{grade}</option>
               ))}
             </select>
-            <input
-              className="dn-input"
-              placeholder="Strand (optional)"
-              value={formData.strand || ""}
-              onChange={(e) => setFormData({ ...formData, strand: e.target.value })}
-              aria-label="Strand"
-            />
+            {formData.educationLevel === "Senior High School" && (
+              <select
+                className="dn-input"
+                value={formData.strand || ""}
+                onChange={(e) => setFormData({ ...formData, strand: e.target.value })}
+                required
+                aria-label="Strand"
+              >
+                <option value="">Strand *</option>
+                {STRAND_OPTIONS.map((strand) => (
+                  <option key={strand} value={strand}>{strand}</option>
+                ))}
+              </select>
+            )}
             <select
               className="dn-input"
               value={formData.sectionName || ""}

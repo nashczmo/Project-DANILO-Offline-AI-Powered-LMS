@@ -60,14 +60,14 @@ export default function StudentGrades() {
       ) : (
         <div className="space-y-4">
           {grades.map((g) => (
-            <Card key={`${g.courseId}-${g.quarter}`}>
+            <Card key={`${g.courseId}-${g.term}`}>
               {/* Course header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div>
                   <h3 className="text-base font-black text-[#202124]">{g.courseTitle}</h3>
                   <p className="text-sm text-[#5F6368] font-bold mt-0.5">{g.subject}</p>
                 </div>
-                <Badge color="primary">{g.quarter}</Badge>
+                <Badge color="primary">{g.term}</Badge>
               </div>
 
               {/* Grade components */}

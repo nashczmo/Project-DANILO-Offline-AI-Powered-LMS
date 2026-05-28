@@ -59,7 +59,7 @@ export default function TeacherInsights() {
           <option value="">Choose a class to analyze…</option>
           {(courses || []).map((c) => (
             <option key={c.id} value={c.id}>
-              {c.subject} — {c.gradeLevel} {c.quarter}
+              {c.subject} - {c.gradeLevel} {c.term}
             </option>
           ))}
         </select>

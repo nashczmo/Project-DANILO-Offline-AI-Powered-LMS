@@ -4,11 +4,17 @@ write_gateway_files() {
   mkdir -p "${APP_ROOT}/gateway" "${APP_ROOT}/infra/nginx"
 
   cat > "${APP_ROOT}/gateway/Dockerfile" <<'EOF'
-FROM nginx:1.27-alpine
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY frontend/package.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
+FROM nginx:1.27-alpine
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
-RUN mkdir -p /opt/danilo/app/frontend/dist && \
-    chown -R nginx:nginx /opt/danilo/app/frontend/dist
+COPY --from=builder /app/dist /opt/danilo/app/frontend/dist
+RUN chown -R nginx:nginx /opt/danilo/app/frontend/dist
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
@@ -245,8 +251,6 @@ services:
       PORTAL_DOMAIN: ${PORTAL_DOMAIN}
     ports:
       - "${FRONTEND_PORT:-80}:80"
-    volumes:
-      - ./frontend/dist:/opt/danilo/app/frontend/dist:ro
     read_only: true
     tmpfs:
       - /var/cache/nginx

@@ -119,7 +119,10 @@ def _env_float(name: str, default: float, *, minimum: float=0.0, maximum: float 
     return value
 
 def _detected_hardware() -> dict:
-    cpu_count = os.cpu_count() or 2
+    try:
+        cpu_count = len(os.sched_getaffinity(0))
+    except AttributeError:
+        cpu_count = os.cpu_count() or 2
     ram_mb = 0
     ram_available_mb = None
     if _psutil:
@@ -350,97 +353,20 @@ security = HTTPBearer()
 
 
 
-def migrate_users_table() -> None:
-    Base.metadata.create_all(bind=engine)
-    inspector = inspect(engine)
-    if 'users' not in inspector.get_table_names():
-        Base.metadata.create_all(bind=engine)
-        return
-    columns = {column['name'] for column in inspector.get_columns('users')}
-    with engine.begin() as connection:
-        if 'password_hash' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)'))
-        if 'password_salt' not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN password_salt VARCHAR(255) DEFAULT ''"))
-        if 'role' not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'student' NOT NULL"))
-        if 'email' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN email VARCHAR(255)'))
-        if 'full_name' not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN full_name VARCHAR(255) DEFAULT 'Project DANILO User' NOT NULL"))
-        if 'education_level' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN education_level VARCHAR(40)'))
-        if 'grade_level' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN grade_level VARCHAR(50)'))
-        if 'strand' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN strand VARCHAR(80)'))
-        if 'section_name' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN section_name VARCHAR(120)'))
-        if 'is_active' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT true NOT NULL'))
-        if 'created_at' not in columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN created_at TIMESTAMPTZ DEFAULT now() NOT NULL'))
-    inspector = inspect(engine)
-    course_columns = {column['name'] for column in inspector.get_columns('courses')} if 'courses' in inspector.get_table_names() else set()
-    module_columns = {column['name'] for column in inspector.get_columns('modules')} if 'modules' in inspector.get_table_names() else set()
-    user_columns = {column['name'] for column in inspector.get_columns('users')} if 'users' in inspector.get_table_names() else set()
-    with engine.begin() as connection:
-        if 'courses' in inspector.get_table_names() and 'teacher_id' in course_columns:
-            connection.execute(text('ALTER TABLE courses ALTER COLUMN teacher_id DROP NOT NULL'))
-        if 'courses' in inspector.get_table_names() and 'is_active' not in course_columns:
-            connection.execute(text('ALTER TABLE courses ADD COLUMN is_active BOOLEAN DEFAULT true NOT NULL'))
-        if 'courses' in inspector.get_table_names() and 'education_level' not in course_columns:
-            connection.execute(text("ALTER TABLE courses ADD COLUMN education_level VARCHAR(40) DEFAULT 'Junior High School' NOT NULL"))
-        if 'courses' in inspector.get_table_names() and 'strand' not in course_columns:
-            connection.execute(text('ALTER TABLE courses ADD COLUMN strand VARCHAR(80)'))
-        if 'courses' in inspector.get_table_names() and 'department_id' not in course_columns:
-            connection.execute(text('ALTER TABLE courses ADD COLUMN department_id VARCHAR(36) REFERENCES departments(id)'))
-        if 'modules' in inspector.get_table_names() and 'file_url' not in module_columns:
-            connection.execute(text('ALTER TABLE modules ADD COLUMN file_url VARCHAR(500)'))
-        if 'modules' in inspector.get_table_names() and 'content' not in module_columns:
-            connection.execute(text('ALTER TABLE modules ADD COLUMN content TEXT'))
-        if 'modules' in inspector.get_table_names() and 'learning_competency' not in module_columns:
-            connection.execute(text('ALTER TABLE modules ADD COLUMN learning_competency TEXT'))
-        if 'modules' in inspector.get_table_names() and 'lesson_objectives' not in module_columns:
-            connection.execute(text('ALTER TABLE modules ADD COLUMN lesson_objectives TEXT'))
-        if 'modules' in inspector.get_table_names() and 'assessment_type' not in module_columns:
-            connection.execute(text('ALTER TABLE modules ADD COLUMN assessment_type VARCHAR(120)'))
-        if 'users' in inspector.get_table_names() and 'department_id' not in user_columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN department_id VARCHAR(36) REFERENCES departments(id)'))
-        if 'users' in inspector.get_table_names() and 'force_password_change' not in user_columns:
-            connection.execute(text('ALTER TABLE users ADD COLUMN force_password_change BOOLEAN DEFAULT false NOT NULL'))
-    inspector = inspect(engine)
-    submission_columns = {column['name'] for column in inspector.get_columns('submissions')} if 'submissions' in inspector.get_table_names() else set()
-    with engine.begin() as connection:
-        if 'submissions' in inspector.get_table_names() and 'score' not in submission_columns:
-            connection.execute(text('ALTER TABLE submissions ADD COLUMN score FLOAT'))
-        if 'submissions' in inspector.get_table_names() and 'feedback' not in submission_columns:
-            connection.execute(text('ALTER TABLE submissions ADD COLUMN feedback TEXT'))
-    inspector = inspect(engine)
-    profile_columns = {column['name'] for column in inspector.get_columns('student_ai_profiles')} if 'student_ai_profiles' in inspector.get_table_names() else set()
-    with engine.begin() as connection:
-        if 'student_ai_profiles' not in inspector.get_table_names():
-            Base.metadata.create_all(bind=engine)
-        else:
-            for column_name, ddl in {'strengths_json': "ALTER TABLE student_ai_profiles ADD COLUMN strengths_json TEXT DEFAULT '[]' NOT NULL", 'weak_concepts_json': "ALTER TABLE student_ai_profiles ADD COLUMN weak_concepts_json TEXT DEFAULT '[]' NOT NULL", 'learning_trends_json': "ALTER TABLE student_ai_profiles ADD COLUMN learning_trends_json TEXT DEFAULT '[]' NOT NULL", 'recommendations_json': "ALTER TABLE student_ai_profiles ADD COLUMN recommendations_json TEXT DEFAULT '[]' NOT NULL", 'quiz_summary_json': "ALTER TABLE student_ai_profiles ADD COLUMN quiz_summary_json TEXT DEFAULT '{}' NOT NULL", 'assignment_summary_json': "ALTER TABLE student_ai_profiles ADD COLUMN assignment_summary_json TEXT DEFAULT '{}' NOT NULL", 'ai_interaction_count': 'ALTER TABLE student_ai_profiles ADD COLUMN ai_interaction_count INTEGER DEFAULT 0 NOT NULL', 'last_interaction_at': 'ALTER TABLE student_ai_profiles ADD COLUMN last_interaction_at TIMESTAMPTZ', 'updated_at': 'ALTER TABLE student_ai_profiles ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now() NOT NULL'}.items():
-                if column_name not in profile_columns:
-                    connection.execute(text(ddl))
-    
-    # Audit log entity_id UUID VARCHAR migration
-    inspector = inspect(engine)
-    if 'audit_logs' in inspector.get_table_names():
-        audit_cols = inspector.get_columns('audit_logs')
-        for col in audit_cols:
-            if col['name'] == 'entity_id' and not str(col['type']).startswith('VARCHAR'):
-                with engine.begin() as connection:
-                    connection.execute(text('ALTER TABLE audit_logs ALTER COLUMN entity_id TYPE VARCHAR(36)'))
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global _AI_SEMAPHORE
     _AI_SEMAPHORE = asyncio.Semaphore(_AI_MAX_CONCURRENT)
     wait_for_database()
-    migrate_users_table()
+
+    Base.metadata.create_all(bind=engine)
+    from alembic.config import Config
+    from alembic import command
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+
     db = SessionLocal()
     try:
         seed_defaults(db, admin_username=ADMIN_USERNAME, admin_password=ADMIN_PASSWORD, portal_domain=PORTAL_DOMAIN)
@@ -454,6 +380,10 @@ app = FastAPI(title='Project DANILO API', version='1.1.0-beta', description='Off
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+upload_dir = os.path.join(os.getcwd(), 'data', 'uploads')
+os.makedirs(upload_dir, exist_ok=True)
+from fastapi.staticfiles import StaticFiles
+app.mount("/api/uploads", StaticFiles(directory=upload_dir), name="uploads")
 
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 
@@ -571,13 +501,13 @@ def parse_bool(value, field: str, *, default: bool | None=None) -> bool:
             return False
     raise HTTPException(status_code=400, detail=f'{field} must be true or false')
 
-EDUCATION_LEVELS = {'Kinder': ['Kinder'], 'Elementary': [f'Grade {grade}' for grade in range(1, 7)], 'Junior High School': [f'Grade {grade}' for grade in range(7, 11)], 'Senior High School': [f'Grade {grade}' for grade in range(11, 13)], 'College': [f'Year {year}' for year in range(1, 6)]}
+EDUCATION_LEVELS = {'Junior High School': [f'Grade {grade}' for grade in range(7, 11)], 'Senior High School': [f'Grade {grade}' for grade in range(11, 13)]}
 
 SHS_STRANDS = {'STEM', 'ABM', 'HUMSS', 'GAS', 'TVL', 'Arts and Design', 'Sports'}
 
 DEPED_SUBJECTS = {'Filipino', 'English', 'Mathematics', 'Science', 'Araling Panlipunan', 'MAPEH', 'TLE', 'ESP', 'Mother Tongue', 'Oral Communication', 'Reading and Writing', 'General Mathematics', 'Statistics and Probability', 'Earth and Life Science', 'Physical Science', 'Biology', 'Chemistry', 'Physics', 'Practical Research', 'Media and Information Literacy', 'Empowerment Technologies', 'Personal Development', 'Contemporary Arts', 'Understanding Culture, Society, and Politics', 'Philosophy'}
 
-ASSESSMENT_TYPES = {'Written Work', 'Performance Task', 'Quarterly Assessment', 'Quiz', 'Assignment', 'Project', 'Recitation', 'Portfolio'}
+ASSESSMENT_TYPES = {'Written Work', 'Performance Task', 'Term Assessment', 'Quiz', 'Assignment', 'Project', 'Recitation', 'Portfolio'}
 
 MATERIAL_EXTENSIONS = {'.pdf', '.ppt', '.pptx', '.docx', '.txt'}
 
@@ -632,7 +562,7 @@ def validate_grade_path(education_level: str | None, grade_level: str | None, st
     if not education_level and (not grade_level) and (not strand):
         return (None, None, None)
     if education_level not in EDUCATION_LEVELS:
-        raise HTTPException(status_code=400, detail='Education level must be Elementary, Junior High, Senior High, or College')
+        raise HTTPException(status_code=400, detail='Education level must be Junior High School or Senior High School')
     if grade_level not in EDUCATION_LEVELS[education_level]:
         raise HTTPException(status_code=400, detail='Grade level does not match education level')
     if education_level == 'Senior High School':
@@ -654,11 +584,11 @@ def validate_deped_subject(subject: str | None) -> str:
         raise HTTPException(status_code=400, detail='Subject is required')
     return cleaned
 
-def validate_quarter(value: str | None) -> str:
-    quarter = clean_text(value or 'Q1', max_length=2)
-    if quarter not in {'Q1', 'Q2', 'Q3', 'Q4'}:
-        raise HTTPException(status_code=400, detail='Quarter must be Q1, Q2, Q3, or Q4')
-    return quarter
+def validate_term(value: str | None) -> str:
+    term = clean_text(value or 'Term 1', max_length=10)
+    if term not in {'Term 1', 'Term 2', 'Term 3'}:
+        raise HTTPException(status_code=400, detail='Term must be Term 1, Term 2, or Term 3')
+    return term
 
 def validate_assessment_type(value: str | None) -> str | None:
     assessment_type = clean_text(value, required=False, max_length=120)
@@ -680,12 +610,12 @@ def get_user_class(db: Session, user: User, course_id: str) -> Course:
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='You do not have access to this class')
 
 def serialize_course(course: Course) -> dict:
-    return {'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'quarter': course.quarter, 'schoolYear': course.school_year, 'description': course.description, 'teacherId': course.teacher_id, 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'departmentId': course.department_id, 'departmentName': course.department.name if course.department else '', 'isActive': course.is_active}
+    return {'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'schoolYear': course.school_year, 'description': course.description, 'teacherId': course.teacher_id, 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'departmentId': course.department_id, 'departmentName': course.department.name if course.department else '', 'isActive': course.is_active}
 
 def summarize_grade_entries(course: Course, rows: list[GradeEntry], student_name: str | None=None) -> list[dict]:
     buckets: dict[str, dict] = {}
     for grade in rows:
-        bucket = buckets.setdefault(grade.quarter, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'quarter': grade.quarter, 'teacher': course.teacher.full_name if course.teacher else '', 'studentName': student_name, 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
+        bucket = buckets.setdefault(grade.term, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'term': grade.term, 'teacher': course.teacher.full_name if course.teacher else '', 'studentName': student_name, 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
         normalized = grade.score / grade.max_score * 100.0 if grade.max_score else 0.0
         bucket['components'].append({'id': grade.id, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or '', 'percentage': round(normalized, 2)})
         bucket['weightedScore'] += normalized * grade.weight
@@ -697,7 +627,7 @@ def summarize_grade_entries(course: Course, rows: list[GradeEntry], student_name
         bucket.pop('weightedScore')
         bucket.pop('weightTotal')
         summary.append(bucket)
-    return sorted(summary, key=lambda item: item['quarter'])
+    return sorted(summary, key=lambda item: item['term'])
 
 def log_action(db: Session, actor: User | None, action: str, entity_type: str, entity_id: str | None=None, details: str | None=None) -> None:
     db.add(AuditLog(actor_id=actor.id if actor else None, action=action, entity_type=entity_type, entity_id=entity_id, details=details))
@@ -801,14 +731,14 @@ async def generated_lesson_from_text(course: Course, filename: str, text: str, m
         essential_question = f'How can learners apply the main ideas from {title} in real-life situations?'
         objectives = 'Identify key ideas from the uploaded material. Explain the main concept. Answer a short practice task.'
         content = f'# {title}\n\n{text[:3000]}'
-    return {'melcCode': 'AI-GENERATED', 'learningCompetency': f'DepEd-aligned competency for {course.subject}; teacher should review before class use.', 'lessonObjectives': objectives, 'assessmentType': 'Written Work', 'quarter': course.quarter, 'week': 1, 'sequenceOrder': 1, 'folderName': f'{course.code}/AI Generated', 'title': title, 'summary': summary, 'essentialQuestion': essential_question, 'content': content, 'fileUrl': None, 'aiGenerated': True, 'sourceFilename': filename}
+    return {'melcCode': 'AI-GENERATED', 'learningCompetency': f'DepEd-aligned competency for {course.subject}; teacher should review before class use.', 'lessonObjectives': objectives, 'assessmentType': 'Written Work', 'term': course.term, 'week': 1, 'sequenceOrder': 1, 'folderName': f'{course.code}/AI Generated', 'title': title, 'summary': summary, 'essentialQuestion': essential_question, 'content': content, 'fileUrl': None, 'aiGenerated': True, 'sourceFilename': filename}
 
 def build_grade_summary(db: Session, student_id: str) -> list[dict]:
-    rows = db.execute(select(GradeEntry, Course).join(Course, GradeEntry.course_id == Course.id).where(GradeEntry.student_id == student_id).order_by(Course.subject.asc(), GradeEntry.quarter.asc(), GradeEntry.created_at.asc())).all()
+    rows = db.execute(select(GradeEntry, Course).join(Course, GradeEntry.course_id == Course.id).where(GradeEntry.student_id == student_id).order_by(Course.subject.asc(), GradeEntry.term.asc(), GradeEntry.created_at.asc())).all()
     buckets: dict[tuple[int, str], dict] = {}
     for grade, course in rows:
-        key = (course.id, grade.quarter)
-        bucket = buckets.setdefault(key, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'quarter': grade.quarter, 'teacher': course.teacher.full_name if course.teacher else '', 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
+        key = (course.id, grade.term)
+        bucket = buckets.setdefault(key, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'term': grade.term, 'teacher': course.teacher.full_name if course.teacher else '', 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
         normalized = grade.score / grade.max_score * 100.0 if grade.max_score else 0.0
         bucket['components'].append({'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or '', 'percentage': round(normalized, 2)})
         bucket['weightedScore'] += normalized * grade.weight
@@ -820,15 +750,15 @@ def build_grade_summary(db: Session, student_id: str) -> list[dict]:
         bucket.pop('weightedScore')
         bucket.pop('weightTotal')
         summary.append(bucket)
-    return sorted(summary, key=lambda item: (item['subject'], item['quarter']))
+    return sorted(summary, key=lambda item: (item['subject'], item['term']))
 
-def build_content_tree(db: Session, *, user: User | None=None, query: str | None=None, quarter: str | None=None, subject: str | None=None) -> list[dict]:
-    stmt = select(Module, Course).join(Course, Module.course_id == Course.id).order_by(Module.grade_level.asc(), Module.subject.asc(), Module.quarter.asc(), Module.week.asc(), Module.sequence_order.asc())
+def build_content_tree(db: Session, *, user: User | None=None, query: str | None=None, term: str | None=None, subject: str | None=None) -> list[dict]:
+    stmt = select(Module, Course).join(Course, Module.course_id == Course.id).order_by(Module.grade_level.asc(), Module.subject.asc(), Module.term.asc(), Module.week.asc(), Module.sequence_order.asc())
     if query:
         like_query = f'%{query.strip()}%'
         stmt = stmt.where(or_(Module.title.ilike(like_query), Module.summary.ilike(like_query), Module.folder_name.ilike(like_query)))
-    if quarter:
-        stmt = stmt.where(Module.quarter == quarter)
+    if term:
+        stmt = stmt.where(Module.term == term)
     if subject:
         stmt = stmt.where(Module.subject == subject)
     if user and user.role == 'admin':
@@ -840,7 +770,7 @@ def build_content_tree(db: Session, *, user: User | None=None, query: str | None
     rows = db.execute(stmt).all()
     items = []
     for module, course in rows:
-        items.append({'id': module.id, 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': module.subject, 'gradeLevel': module.grade_level, 'quarter': module.quarter, 'week': module.week, 'folderName': module.folder_name, 'melcCode': module.melc_code, 'learningCompetency': module.learning_competency or '', 'lessonObjectives': module.lesson_objectives or '', 'assessmentType': module.assessment_type or '', 'title': module.title, 'summary': module.summary, 'essentialQuestion': module.essential_question, 'pdfUrl': f'/api/content/{module.id}/pdf', 'content': module.content or ''})
+        items.append({'id': module.id, 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': module.subject, 'gradeLevel': module.grade_level, 'term': module.term, 'week': module.week, 'folderName': module.folder_name, 'melcCode': module.melc_code, 'learningCompetency': module.learning_competency or '', 'lessonObjectives': module.lesson_objectives or '', 'assessmentType': module.assessment_type or '', 'title': module.title, 'summary': module.summary, 'essentialQuestion': module.essential_question, 'pdfUrl': f'/api/content/{module.id}/pdf', 'content': module.content or ''})
     return items
 
 def build_stream(db: Session, user: User | None=None) -> list[dict]:
@@ -854,25 +784,27 @@ def build_stream(db: Session, user: User | None=None) -> list[dict]:
 
 def build_teacher_course_cards(db: Session, teacher_id: str) -> list[dict]:
     courses = db.scalars(select(Course).where(Course.teacher_id == teacher_id, Course.is_active == True).order_by(Course.subject.asc())).all()
+    course_ids = [c.id for c in courses]
+    enrollment_counts = dict(db.execute(select(Enrollment.course_id, func.count(Enrollment.id)).where(Enrollment.course_id.in_(course_ids), Enrollment.status == 'active').group_by(Enrollment.course_id)).all()) if course_ids else {}
+    module_counts = dict(db.execute(select(Module.course_id, func.count(Module.id)).where(Module.course_id.in_(course_ids)).group_by(Module.course_id)).all()) if course_ids else {}
     cards = []
     for course in courses:
-        student_total = db.query(Enrollment).filter(Enrollment.course_id == course.id).count()
-        module_total = db.query(Module).filter(Module.course_id == course.id).count()
-        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'quarter': course.quarter, 'gradeLevel': course.grade_level, 'strand': course.strand, 'studentTotal': student_total, 'moduleTotal': module_total, 'description': course.description})
+        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'term': course.term, 'gradeLevel': course.grade_level, 'strand': course.strand, 'studentTotal': enrollment_counts.get(course.id, 0), 'moduleTotal': module_counts.get(course.id, 0), 'description': course.description})
     return cards
 
 def build_admin_course_cards(db: Session) -> list[dict]:
-    courses = db.scalars(select(Course).where(Course.is_active == True).order_by(Course.subject.asc(), Course.quarter.asc())).all()
+    courses = db.scalars(select(Course).where(Course.is_active == True).order_by(Course.subject.asc(), Course.term.asc())).all()
+    course_ids = [c.id for c in courses]
+    enrollment_counts = dict(db.execute(select(Enrollment.course_id, func.count(Enrollment.id)).where(Enrollment.course_id.in_(course_ids), Enrollment.status == 'active').group_by(Enrollment.course_id)).all()) if course_ids else {}
+    module_counts = dict(db.execute(select(Module.course_id, func.count(Module.id)).where(Module.course_id.in_(course_ids)).group_by(Module.course_id)).all()) if course_ids else {}
     cards = []
     for course in courses:
-        student_total = db.query(Enrollment).filter(Enrollment.course_id == course.id).count()
-        module_total = db.query(Module).filter(Module.course_id == course.id).count()
-        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'quarter': course.quarter, 'studentTotal': student_total, 'moduleTotal': module_total, 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'description': course.description})
+        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'studentTotal': enrollment_counts.get(course.id, 0), 'moduleTotal': module_counts.get(course.id, 0), 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'description': course.description})
     return cards
 
 def build_student_course_cards(db: Session, student_id: str) -> list[dict]:
     rows = db.execute(select(Course).join(Enrollment, Enrollment.course_id == Course.id).where(Enrollment.student_id == student_id, Enrollment.status == 'active', Course.is_active == True).order_by(Course.subject.asc())).scalars().all()
-    return [{'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'quarter': course.quarter, 'description': course.description} for course in rows]
+    return [{'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'description': course.description} for course in rows]
 
 def escape_pdf_text(value: str) -> str:
     return value.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
@@ -1269,7 +1201,7 @@ def build_tutor_prompt(db: Session, current_user: User, payload: TutorRequest) -
         profile = build_student_ai_profile(db, current_user, persist=True)
         profile_lines = format_student_profile_for_prompt(profile)
         student_grades = build_grade_summary(db, current_user.id)[:2]
-        grade_lines = [f"{item['courseCode']} {item['quarter']}: {item['finalGrade']}" for item in student_grades] or []
+        grade_lines = [f"{item['courseCode']} {item['term']}: {item['finalGrade']}" for item in student_grades] or []
         
         quiz_lines = []
         if course:
@@ -1566,6 +1498,7 @@ def _check_ai_rate_limit(user_id: str) -> None:
         raise HTTPException(status_code=429, detail=f'Please wait {wait}s before sending another question.')
     _AI_USER_LAST_REQUEST[user_id] = time.monotonic()
 
+__all__ = [name for name in globals().keys() if not name.startswith('__')]
 from app.api.v1.auth import router
 from app.api.v1.admin import admin_router
 from app.api.v1.teacher import teacher_router

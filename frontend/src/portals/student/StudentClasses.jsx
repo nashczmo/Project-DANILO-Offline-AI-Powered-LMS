@@ -58,7 +58,7 @@ function ClassList() {
                   >
                     <BookOpen className="w-5 h-5" />
                   </div>
-                  <Badge color="primary">{cls.quarter}</Badge>
+                  <Badge color="primary">{cls.term}</Badge>
                 </div>
                 <h3 className="text-base font-black text-[#202124] leading-tight">{cls.subject}</h3>
                 <p className="text-sm text-[#5F6368] font-bold mt-0.5 dn-line-clamp-2">{cls.title}</p>
@@ -175,7 +175,7 @@ function ClassDetail() {
               <h1 className="text-xl font-black text-[#202124] leading-tight">{course?.subject}</h1>
               <p className="text-sm text-[#5F6368] font-bold mt-0.5">{course?.title}</p>
               <div className="flex flex-wrap items-center gap-2 mt-3">
-                <Badge color="primary">{course?.quarter}</Badge>
+                <Badge color="primary">{course?.term}</Badge>
                 <span className="text-sm text-[#9AA0A6] font-bold">{course?.gradeLevel}</span>
                 <span className="text-sm text-[#9AA0A6] font-bold">{course?.teacherName || "TBA"}</span>
               </div>
@@ -263,7 +263,7 @@ function ClassDetail() {
                       </div>
                       <div className="min-w-0">
                         <h4 className="text-sm font-bold text-[#202124] truncate">{mod.title}</h4>
-                        <p className="text-xs text-[#9AA0A6] font-bold">Week {mod.week} · {mod.quarter}</p>
+                        <p className="text-xs text-[#9AA0A6] font-bold">Week {mod.week} · {mod.term}</p>
                       </div>
                     </div>
                     <Button variant="secondary" size="sm" onClick={() => openModulePdf(mod)}>

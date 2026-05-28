@@ -53,9 +53,8 @@ async def tutor(payload: TutorRequest, current_user: User=Depends(get_current_us
     if check_safety(payload.question):
         save_ai_conversation(db, user_id=current_user.id, course_id=None, module_id=None, question=payload.question, answer=SAFETY_REDIRECT)
         return {'answer': SAFETY_REDIRECT, 'mode': 'normal', 'metrics': {}, 'context': {'moduleTitle': None, 'courseTitle': None, 'gradeSignals': []}, 'safety_filtered': True, 'sessionId': None}
-    from fastapi.concurrency import run_in_threadpool
-    system_prompt, prompt, module, course, grade_lines, mode = await run_in_threadpool(build_tutor_prompt, db, current_user, payload)
-    memory = await run_in_threadpool(build_rolling_memory, db, current_user.id, course.id if course else None, ROLLING_MEMORY_LIMIT)
+    system_prompt, prompt, module, course, grade_lines, mode = build_tutor_prompt(db, current_user, payload)
+    memory = build_rolling_memory(db, current_user.id, course.id if course else None, ROLLING_MEMORY_LIMIT)
     try:
         answer, metrics = await ask_ollama(system_prompt, prompt, mode, memory=memory)
     except HTTPException:
@@ -70,12 +69,10 @@ async def tutor(payload: TutorRequest, current_user: User=Depends(get_current_us
         logger.exception('AI runtime failed while answering tutor request for user_id=%s', current_user.id)
         metrics = {'runtime': DANILO_AI_RUNTIME, 'model': DANILO_AI_ACTIVE_MODEL, 'mode': mode, 'prompt_tokens': estimate_prompt_tokens(prompt)}
         answer = 'DANILO Tutor is offline or still getting ready. Please check the local AI runtime, then try again.'
-    # Offload blocking DB calls to thread pool
-    from fastapi.concurrency import run_in_threadpool
-    await run_in_threadpool(save_ai_conversation, db, user_id=current_user.id, course_id=course.id if course else None, module_id=module.id if module else None, question=payload.question, answer=answer)
-    chat_session = await run_in_threadpool(_get_or_create_chat_session, db, current_user.id, payload.session_id, payload.question)
-    await run_in_threadpool(_save_chat_messages, db, chat_session.id, payload.question, answer, module.id if module else None, mode)
-    await run_in_threadpool(db.commit)
+    save_ai_conversation(db, user_id=current_user.id, course_id=course.id if course else None, module_id=module.id if module else None, question=payload.question, answer=answer)
+    chat_session = _get_or_create_chat_session(db, current_user.id, payload.session_id, payload.question)
+    _save_chat_messages(db, chat_session.id, payload.question, answer, module.id if module else None, mode)
+    db.commit()
     return {'answer': answer, 'mode': mode, 'metrics': metrics, 'sessionId': chat_session.id, 'context': {'moduleTitle': module.title if module else None, 'courseTitle': course.title if course else None, 'gradeSignals': grade_lines}}
 
 @ai_router.post('/ai/tutor/stream')
@@ -89,16 +86,15 @@ async def tutor_stream(payload: TutorRequest, current_user: User=Depends(get_cur
             yield 'data: [DONE]\n\n'
         return StreamingResponse(safe_redirect(), media_type='text/event-stream')
     # Stream endpoint
-    from fastapi.concurrency import run_in_threadpool
-    system_prompt, prompt, module, course, _, mode = await run_in_threadpool(build_tutor_prompt, db, current_user, payload)
-    memory = await run_in_threadpool(build_rolling_memory, db, current_user.id, course.id if course else None, ROLLING_MEMORY_LIMIT)
+    system_prompt, prompt, module, course, _, mode = build_tutor_prompt(db, current_user, payload)
+    memory = build_rolling_memory(db, current_user.id, course.id if course else None, ROLLING_MEMORY_LIMIT)
     user_id = current_user.id
     course_id = course.id if course else None
     module_id = module.id if module else None
     question = payload.question
-    chat_session = await run_in_threadpool(_get_or_create_chat_session, db, current_user.id, payload.session_id, question)
+    chat_session = _get_or_create_chat_session(db, current_user.id, payload.session_id, question)
     session_id = chat_session.id
-    await run_in_threadpool(db.commit)
+    db.commit()
 
     async def event_stream():
         answer_parts: list[str] = []

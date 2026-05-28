@@ -18,7 +18,7 @@ export default function TeacherGrades() {
   
   const [selectedComponent, setSelectedComponent] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [newAssignment, setNewAssignment] = useState({ quarter: "Q1", component: "", maxScore: 100, weight: 1 });
+  const [newAssignment, setNewAssignment] = useState({ term: "Term 1", component: "", maxScore: 100, weight: 1 });
   
   const [studentGrades, setStudentGrades] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -31,9 +31,9 @@ export default function TeacherGrades() {
     if (!gradebook?.entries) return [];
     const map = new Map();
     gradebook.entries.forEach(e => {
-      const key = `${e.quarter}-${e.component}`;
+      const key = `${e.term}-${e.component}`;
       if (!map.has(key)) {
-        map.set(key, { quarter: e.quarter, component: e.component, maxScore: e.maxScore, weight: e.weight });
+        map.set(key, { term: e.term, component: e.component, maxScore: e.maxScore, weight: e.weight });
       }
     });
     return Array.from(map.values());
@@ -49,11 +49,11 @@ export default function TeacherGrades() {
       setSelectedComponent(val);
       
       // Pre-fill existing grades
-      const current = uniqueAssignments.find(a => `${a.quarter}-${a.component}` === val);
+      const current = uniqueAssignments.find(a => `${a.term}-${a.component}` === val);
       if (current && gradebook) {
         const gradesMap = {};
         gradebook.students.forEach(s => {
-          const entry = gradebook.entries.find(e => e.studentId === s.id && e.quarter === current.quarter && e.component === current.component);
+          const entry = gradebook.entries.find(e => e.studentId === s.id && e.term === current.term && e.component === current.component);
           gradesMap[s.id] = {
             score: entry ? entry.score : "",
             remarks: entry ? entry.remarks : "",
@@ -70,7 +70,7 @@ export default function TeacherGrades() {
     setSubmitting(true);
     setNotice("");
     
-    let targetAssignment = isCreating ? newAssignment : uniqueAssignments.find(a => `${a.quarter}-${a.component}` === selectedComponent);
+    let targetAssignment = isCreating ? newAssignment : uniqueAssignments.find(a => `${a.term}-${a.component}` === selectedComponent);
     if (!targetAssignment || !targetAssignment.component.trim()) {
       setNoticeType("error");
       setNotice("Please define the assignment details.");
@@ -85,7 +85,7 @@ export default function TeacherGrades() {
         
         const payload = {
           studentId: student.id,
-          quarter: targetAssignment.quarter,
+          term: targetAssignment.term,
           component: targetAssignment.component,
           score: parseFloat(gradeData.score) || 0,
           maxScore: parseFloat(targetAssignment.maxScore) || 100,
@@ -106,13 +106,13 @@ export default function TeacherGrades() {
       setNotice("Grades successfully recorded!");
       await refreshGradebook();
       setIsCreating(false);
-      setSelectedComponent(`${targetAssignment.quarter}-${targetAssignment.component}`);
+      setSelectedComponent(`${targetAssignment.term}-${targetAssignment.component}`);
       
       // Update local state to map new gradeIds
       const newGradebook = await apiRequest(`/teacher/courses/${selectedCourseId}/gradebook`);
       const gradesMap = {};
       newGradebook.students.forEach(s => {
-        const entry = newGradebook.entries.find(e => e.studentId === s.id && e.quarter === targetAssignment.quarter && e.component === targetAssignment.component);
+        const entry = newGradebook.entries.find(e => e.studentId === s.id && e.term === targetAssignment.term && e.component === targetAssignment.component);
         gradesMap[s.id] = {
           score: entry ? entry.score : "",
           remarks: entry ? entry.remarks : "",
@@ -129,7 +129,7 @@ export default function TeacherGrades() {
     }
   };
 
-  const currentMaxScore = isCreating ? newAssignment.maxScore : (uniqueAssignments.find(a => `${a.quarter}-${a.component}` === selectedComponent)?.maxScore || 100);
+  const currentMaxScore = isCreating ? newAssignment.maxScore : (uniqueAssignments.find(a => `${a.term}-${a.component}` === selectedComponent)?.maxScore || 100);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -172,7 +172,7 @@ export default function TeacherGrades() {
             <option value="">Choose a class…</option>
             {activeCourses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.subject} — {c.gradeLevel} {c.quarter}
+                {c.subject} - {c.gradeLevel} {c.term}
               </option>
             ))}
           </select>
@@ -197,8 +197,8 @@ export default function TeacherGrades() {
               >
                 <option value="" disabled>Select an assignment...</option>
                 {uniqueAssignments.map(a => (
-                  <option key={`${a.quarter}-${a.component}`} value={`${a.quarter}-${a.component}`}>
-                    [{a.quarter}] {a.component} (Max: {a.maxScore}, Wt: {a.weight})
+                  <option key={`${a.term}-${a.component}`} value={`${a.term}-${a.component}`}>
+                    [{a.term}] {a.component} (Max: {a.maxScore}, Wt: {a.weight})
                   </option>
                 ))}
                 <option value="NEW">+ Create New Assignment</option>
@@ -209,9 +209,11 @@ export default function TeacherGrades() {
           {isCreating && (
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6 p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]">
               <div>
-                <label className="block text-xs font-bold text-[#5F6368] mb-1">Quarter</label>
-                <select className="dn-input" value={newAssignment.quarter} onChange={e => setNewAssignment({...newAssignment, quarter: e.target.value})}>
-                  <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+                <label className="block text-xs font-bold text-[#5F6368] mb-1">Term</label>
+                <select className="dn-input" value={newAssignment.term} onChange={e => setNewAssignment({...newAssignment, term: e.target.value})}>
+                  <option value="Term 1">Term 1</option>
+                  <option value="Term 2">Term 2</option>
+                  <option value="Term 3">Term 3</option>
                 </select>
               </div>
               <div>

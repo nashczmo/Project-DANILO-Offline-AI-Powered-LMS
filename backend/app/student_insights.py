@@ -108,7 +108,7 @@ def analyze_student_performance(db: Session, class_id: str) -> dict:
             topic_scores.setdefault(topic, []).append(pct)
             if pct < LOW_SCORE_THRESHOLD:
                 low_scores += 1
-            history_grades.append({"id": grade.id, "topic": topic, "quarter": grade.quarter, "score": grade.score, "maxScore": grade.max_score, "percentage": round(pct, 1), "remarks": grade.remarks or ""})
+            history_grades.append({"id": grade.id, "topic": topic, "term": grade.term, "score": grade.score, "maxScore": grade.max_score, "percentage": round(pct, 1), "remarks": grade.remarks or ""})
 
         for assignment in assignments:
             submission = submissions_by_student.get((student.id, assignment.id))

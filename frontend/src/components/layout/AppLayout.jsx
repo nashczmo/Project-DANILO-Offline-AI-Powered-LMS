@@ -34,7 +34,7 @@ const NAV_CONFIG = {
     { to: "/teacher/classes", icon: BookOpen, label: "My Classes" },
     { to: "/teacher/grades", icon: GraduationCap, label: "Grades" },
     { to: "/teacher/announcements", icon: Bell, label: "Announcements" },
-    { to: "/teacher/quizzes", icon: ClipboardList, label: "AI Quizzes" },
+
     { to: "/teacher/insights", icon: Sparkles, label: "AI Insights", highlight: true },
   ],
   admin: [

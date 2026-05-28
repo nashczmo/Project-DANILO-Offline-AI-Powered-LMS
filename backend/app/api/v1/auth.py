@@ -90,8 +90,8 @@ def stream(current_user: User=Depends(get_current_user), db: Session=Depends(get
     return build_stream(db, current_user)
 
 @router.get('/content', tags=['content'])
-def content(query: str | None=None, quarter: str | None=None, subject: str | None=None, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
-    return build_content_tree(db, user=current_user, query=query, quarter=quarter, subject=subject)
+def content(query: str | None=None, term: str | None=None, subject: str | None=None, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
+    return build_content_tree(db, user=current_user, query=query, term=term, subject=subject)
 
 @router.get('/content/workflow', tags=['content'])
 def content_workflow(current_user: User=Depends(get_current_user)) -> dict:
@@ -113,7 +113,7 @@ def content_pdf(module_id: str, current_user: User=Depends(get_current_user), db
         ensure_teacher_course(db, current_user, module.course_id)
     if current_user.role == 'student':
         ensure_student_enrolled(db, current_user, module.course_id)
-    lines = [f'MELC: {module.melc_code}', f"Learning Competency: {module.learning_competency or 'Not specified'}", f"Lesson Objectives: {module.lesson_objectives or 'Not specified'}", f"Assessment Type: {module.assessment_type or 'Not specified'}", f'Folder: {module.folder_name}', f'Week {module.week} | Quarter {module.quarter}', f'Summary: {module.summary}', f'Guide Question: {module.essential_question}', 'Prepared for offline classroom delivery through Project DANILO.']
+    lines = [f'MELC: {module.melc_code}', f"Learning Competency: {module.learning_competency or 'Not specified'}", f"Lesson Objectives: {module.lesson_objectives or 'Not specified'}", f"Assessment Type: {module.assessment_type or 'Not specified'}", f'Folder: {module.folder_name}', f'Week {module.week} | {module.term}', f'Summary: {module.summary}', f'Guide Question: {module.essential_question}', 'Prepared for offline classroom delivery through Project DANILO.']
     pdf_bytes = build_pdf_document(module.title, lines)
     headers = {'Content-Disposition': f'''inline; filename="{module.title.lower().replace(' ', '-')}.pdf"'''}
     return Response(content=pdf_bytes, media_type='application/pdf', headers=headers)

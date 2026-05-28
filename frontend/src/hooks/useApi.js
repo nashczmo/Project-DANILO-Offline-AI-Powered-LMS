@@ -32,11 +32,13 @@ export function useApi(path, options = {}) {
 
   const refresh = useCallback(() => execute(pathRef.current), [execute]);
 
+  const depsString = JSON.stringify(deps);
+
   useEffect(() => {
     if (immediate && path) {
       execute(path);
     }
-  }, [path, immediate, execute, ...deps]);
+  }, [path, immediate, execute, depsString]);
 
   return { data, loading, error, execute, refresh, setData };
 }

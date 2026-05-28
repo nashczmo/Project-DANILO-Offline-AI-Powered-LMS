@@ -27,22 +27,116 @@ def student_grades(current_user: User=Depends(get_current_user), db: Session=Dep
 def student_assignments(current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
     rows = db.execute(select(Assignment, Course).join(Course, Assignment.course_id == Course.id).join(Enrollment, Enrollment.course_id == Course.id).where(Enrollment.student_id == current_user.id, Enrollment.status == 'active', Assignment.is_active == True).order_by(Assignment.created_at.desc())).all()
     submissions = {item.assignment_id: item for item in db.scalars(select(Submission).where(Submission.student_id == current_user.id)).all()}
-    return [{'id': assignment.id, 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'title': assignment.title, 'instructions': assignment.instructions, 'points': assignment.points, 'status': submissions.get(assignment.id).status if submissions.get(assignment.id) else 'not_started', 'responseText': submissions.get(assignment.id).response_text if submissions.get(assignment.id) else ''} for assignment, course in rows]
+    
+    result = []
+    for assignment, course in rows:
+        sub = submissions.get(assignment.id)
+        
+        questions = db.scalars(select(AssignmentQuestion).where(AssignmentQuestion.assignment_id == assignment.id).order_by(AssignmentQuestion.id.asc())).all()
+        questions_data = [{'id': q.id, 'questionText': q.question_text, 'type': q.question_type, 'choicesJson': q.choices_json or '', 'answerKey': q.answer_key or '', 'points': q.points} for q in questions]
+
+        result.append({
+            'id': assignment.id, 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 
+            'title': assignment.title, 'instructions': assignment.instructions, 'points': assignment.points, 
+            'assignmentType': assignment.assignment_type, 'attachmentsJson': assignment.attachments_json,
+            'questions': questions_data,
+            'status': sub.status if sub else 'not_started', 
+            'responseText': sub.response_text if sub else '',
+            'answersJson': sub.answers_json if sub else None,
+            'attachmentsJson': sub.attachments_json if sub else '[]',
+            'score': sub.score if sub else None,
+            'feedback': sub.feedback if sub else ''
+        })
+    return result
 
 @student_router.post('/student/assignments/{assignment_id}/submit')
 def student_submit_assignment(assignment_id: str, payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     assignment = db.get(Assignment, assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail='Assignment not found')
-    ensure_student_enrolled(db, current_user, assignment.course_id)
+    course = ensure_student_enrolled(db, current_user, assignment.course_id)
     submission = db.scalar(select(Submission).where(Submission.assignment_id == assignment_id, Submission.student_id == current_user.id))
     if not submission:
         submission = Submission(assignment_id=assignment_id, student_id=current_user.id)
         db.add(submission)
-    submission.response_text = clean_text(payload.get('responseText') or payload.get('response_text'), max_length=6000)
+        
+    submission.response_text = clean_text(payload.get('responseText') or payload.get('response_text'), required=False, max_length=6000)
+    
+    if 'answersJson' in payload:
+        submission.answers_json = json.dumps(payload.get('answersJson'))
+    if 'attachmentsJson' in payload:
+        submission.attachments_json = json.dumps(payload.get('attachmentsJson'))
+        
     submission.status = 'submitted'
+    
+    answers = payload.get('answersJson') or {}
+    questions = db.scalars(select(AssignmentQuestion).where(AssignmentQuestion.assignment_id == assignment.id)).all()
+    
+    if questions and answers:
+        earned_points = 0.0
+        for q in questions:
+            if q.question_type in ['multiple_choice', 'true_false', 'identification']:
+                given = str(answers.get(str(q.id), '')).strip().lower()
+                expected = str(q.answer_key or '').strip().lower()
+                if expected and given == expected:
+                    earned_points += q.points
+            elif q.question_type == 'checkbox':
+                given_list = answers.get(str(q.id), [])
+                if not isinstance(given_list, list): given_list = [given_list]
+                given_set = {str(v).strip().lower() for v in given_list}
+                
+                try:
+                    expected_list = json.loads(q.answer_key)
+                except:
+                    expected_list = [q.answer_key]
+                if not isinstance(expected_list, list): expected_list = [expected_list]
+                expected_set = {str(v).strip().lower() for v in expected_list if v}
+                
+                if expected_set and given_set == expected_set:
+                    earned_points += q.points
+                    
+        submission.score = earned_points
+        submission.status = 'graded'
+        
+        grade_entry = db.scalar(select(GradeEntry).where(
+            GradeEntry.student_id == current_user.id,
+            GradeEntry.course_id == course.id,
+            GradeEntry.component == f"Assignment: {assignment.title[:65]}"
+        ))
+        if grade_entry:
+            grade_entry.score = earned_points
+        else:
+            db.add(GradeEntry(
+                student_id=current_user.id,
+                course_id=course.id,
+                term=course.term,
+                component=f"Assignment: {assignment.title[:65]}",
+                score=earned_points,
+                max_score=assignment.points,
+                weight=1.0,
+                remarks='',
+                recorded_by=current_user.id
+            ))
+            
     db.commit()
-    return {'ok': True, 'submission': {'status': submission.status, 'responseText': submission.response_text, 'score': submission.score, 'feedback': submission.feedback or ''}}
+    return {'ok': True, 'submission': {'status': submission.status, 'responseText': submission.response_text, 'answersJson': submission.answers_json, 'attachmentsJson': submission.attachments_json, 'score': submission.score, 'feedback': submission.feedback or ''}}
+
+@student_router.post('/student/assignments/{assignment_id}/upload')
+async def student_upload_assignment_file(assignment_id: str, file: UploadFile=File(...), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+    assignment = db.get(Assignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail='Assignment not found')
+    ensure_student_enrolled(db, current_user, assignment.course_id)
+    upload_dir = os.path.join(os.getcwd(), 'data', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    import uuid
+    file_id = str(uuid.uuid4())
+    ext = os.path.splitext(file.filename)[1]
+    safe_filename = f"{file_id}{ext}"
+    filepath = os.path.join(upload_dir, safe_filename)
+    with open(filepath, "wb") as f:
+        f.write(await file.read())
+    return {'ok': True, 'filename': file.filename, 'url': f"/api/uploads/{safe_filename}"}
 
 @student_router.post('/student/assignments/{assignment_id}/complete')
 def student_complete_assignment(assignment_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:

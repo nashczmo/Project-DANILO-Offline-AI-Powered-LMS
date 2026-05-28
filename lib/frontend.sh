@@ -156,15 +156,10 @@ validate_frontend_dist() {
 }
 
 build_frontend_static() {
-  require_command npm
   validate_frontend_files
   mkdir -p "${APP_ROOT}/frontend/public"
   printf 'danilo-frontend-build=%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" > "${APP_ROOT}/frontend/public/danilo-build.txt"
-  run_step_command "Installing DANILO frontend dependencies" npm --prefix "${APP_ROOT}/frontend" install --no-audit --no-fund
-  run_step_command "Building DANILO frontend static assets" npm --prefix "${APP_ROOT}/frontend" run build
-  run_step_command "Setting readable permissions for gateway-served frontend assets" chmod -R a+rX "${APP_ROOT}/frontend/dist"
-  run_step_command "Setting local Nunito font permissions" chmod -R a+rX "${APP_ROOT}/frontend/public/fonts"
-  validate_frontend_dist
+  note "Frontend static build will be handled inside Docker via multi-stage build"
 }
 
 clear_frontend_build_cache() {

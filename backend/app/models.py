@@ -49,7 +49,7 @@ class Department(Base):
 class Course(Base):
     __tablename__ = "courses"
     __table_args__ = (
-        CheckConstraint("quarter IN ('Q1', 'Q2', 'Q3', 'Q4')", name="ck_courses_quarter"),
+        CheckConstraint("term IN ('Term 1', 'Term 2', 'Term 3')", name="ck_courses_term"),
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
@@ -59,10 +59,10 @@ class Course(Base):
     education_level = Column(String(40), nullable=False, default="Junior High School")
     grade_level = Column(String(50), nullable=False)
     strand = Column(String(80), nullable=True)
-    quarter = Column(String(2), nullable=False)
+    term = Column(String(10), nullable=False)
     school_year = Column(String(20), nullable=False)
     description = Column(Text, nullable=False)
-    teacher_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    teacher_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     department_id = Column(String(36), ForeignKey("departments.id"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -82,8 +82,8 @@ class Enrollment(Base):
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     status = Column(String(30), nullable=False, default="active")
     enrolled_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -94,18 +94,18 @@ class Enrollment(Base):
 class Module(Base):
     __tablename__ = "modules"
     __table_args__ = (
-        CheckConstraint("quarter IN ('Q1', 'Q2', 'Q3', 'Q4')", name="ck_modules_quarter"),
+        CheckConstraint("term IN ('Term 1', 'Term 2', 'Term 3')", name="ck_modules_term"),
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
     melc_code = Column(String(120), nullable=False)
     learning_competency = Column(Text, nullable=True)
     lesson_objectives = Column(Text, nullable=True)
     assessment_type = Column(String(120), nullable=True)
     grade_level = Column(String(50), nullable=False)
     subject = Column(String(120), nullable=False)
-    quarter = Column(String(2), nullable=False)
+    term = Column(String(10), nullable=False)
     week = Column(Integer, nullable=False)
     sequence_order = Column(Integer, nullable=False, default=1)
     folder_name = Column(String(255), nullable=False)
@@ -124,7 +124,7 @@ class StreamPost(Base):
     __tablename__ = "stream_posts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
     author_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     title = Column(String(255), nullable=False)
     body = Column(Text, nullable=False)
@@ -139,17 +139,35 @@ class Assignment(Base):
     __tablename__ = "assignments"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     instructions = Column(Text, nullable=False)
     due_at = Column(DateTime(timezone=True), nullable=True)
     points = Column(Float, nullable=False, default=100)
+    assignment_type = Column(String(50), nullable=False, default="written_response") # quiz, file_submission, written_response, mixed
+    attachments_json = Column(Text, nullable=False, default="[]")
     is_active = Column(Boolean, nullable=False, default=True)
     created_by = Column(String(36), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     course = relationship("Course")
     creator = relationship("User")
+    questions = relationship("AssignmentQuestion", back_populates="assignment", cascade="all, delete-orphan")
+
+
+class AssignmentQuestion(Base):
+    __tablename__ = "assignment_questions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    assignment_id = Column(String(36), ForeignKey("assignments.id"), nullable=False)
+    section_name = Column(String(120), nullable=True)
+    question_text = Column(Text, nullable=False)
+    question_type = Column(String(50), nullable=False, default="multiple_choice") # multiple_choice, checkbox, short_answer, identification, true_false
+    choices_json = Column(Text, nullable=True)
+    answer_key = Column(Text, nullable=True)
+    points = Column(Float, nullable=False, default=1)
+
+    assignment = relationship("Assignment", back_populates="questions")
 
 
 class Submission(Base):
@@ -159,9 +177,11 @@ class Submission(Base):
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    assignment_id = Column(String(36), ForeignKey("assignments.id"), nullable=False)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    assignment_id = Column(String(36), ForeignKey("assignments.id"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     response_text = Column(Text, nullable=True)
+    answers_json = Column(Text, nullable=True)
+    attachments_json = Column(Text, nullable=False, default="[]")
     status = Column(String(30), nullable=False, default="submitted")
     score = Column(Float, nullable=True)
     feedback = Column(Text, nullable=True)
@@ -231,13 +251,13 @@ class AuditLog(Base):
 class GradeEntry(Base):
     __tablename__ = "grade_entries"
     __table_args__ = (
-        CheckConstraint("quarter IN ('Q1', 'Q2', 'Q3', 'Q4')", name="ck_grade_entries_quarter"),
+        CheckConstraint("term IN ('Term 1', 'Term 2', 'Term 3')", name="ck_grade_entries_term"),
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False)
-    quarter = Column(String(2), nullable=False)
+    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
+    term = Column(String(10), nullable=False)
     component = Column(String(80), nullable=False)
     score = Column(Float, nullable=False)
     max_score = Column(Float, nullable=False)

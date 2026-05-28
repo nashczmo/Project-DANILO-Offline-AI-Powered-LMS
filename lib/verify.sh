@@ -147,37 +147,6 @@ verify_frontend_served_build_marker() {
   fi
 }
 
-verify_frontend_dist() {
-  if [[ -f "${APP_ROOT}/frontend/dist/index.html" ]]; then
-    verify_pass "Frontend dist index.html exists"
-  else
-    verify_fail "Frontend dist index.html exists"
-  fi
-
-  if [[ -d "${APP_ROOT}/frontend/dist/assets" ]] && find "${APP_ROOT}/frontend/dist/assets" -type f | grep -q .; then
-    verify_pass "Frontend dist assets are present"
-  else
-    verify_fail "Frontend dist assets are present"
-  fi
-
-  if [[ -f "${APP_ROOT}/frontend/dist/index.html" ]] && ! grep -q '/src/main.jsx' "${APP_ROOT}/frontend/dist/index.html"; then
-    verify_pass "Frontend dist uses built asset references"
-  else
-    verify_fail "Frontend dist uses built asset references"
-  fi
-
-  if [[ -d "${APP_ROOT}/frontend/dist/assets" ]] && find "${APP_ROOT}/frontend/dist/assets" -type f -name '*.js' | grep -q .; then
-    verify_pass "Frontend dist JavaScript bundle exists"
-  else
-    verify_fail "Frontend dist JavaScript bundle exists"
-  fi
-
-  if [[ -f "${APP_ROOT}/frontend/dist/danilo-build.txt" ]]; then
-    verify_pass "Frontend dist build marker exists"
-  else
-    verify_fail "Frontend dist build marker exists"
-  fi
-}
 
 verify_container() {
   local service="$1"
@@ -362,7 +331,7 @@ verify_mode() {
   done
   verify_optional_container ollama
 
-  verify_frontend_dist
+
   verify_backend_direct_health
   verify_http "Backend API reachable" "http://127.0.0.1/api/health" '"status"'
   verify_http_status "Frontend reachable" "http://127.0.0.1/"
