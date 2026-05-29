@@ -17,7 +17,7 @@ class User(Base):
     grade_level = Column(String(50), nullable=True)
     strand = Column(String(80), nullable=True)
     section_name = Column(String(120), nullable=True)
-    department_id = Column(String(36), ForeignKey("departments.id"), nullable=True)
+    department_id = Column(String(36), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     password_salt = Column(String(255), nullable=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -37,7 +37,7 @@ class Department(Base):
     name = Column(String(120), nullable=False, unique=True)
     code = Column(String(20), nullable=False, unique=True)
     description = Column(Text, nullable=True)
-    head_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    head_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -62,8 +62,8 @@ class Course(Base):
     term = Column(String(10), nullable=False)
     school_year = Column(String(20), nullable=False)
     description = Column(Text, nullable=False)
-    teacher_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)
-    department_id = Column(String(36), ForeignKey("departments.id"), nullable=True)
+    teacher_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    department_id = Column(String(36), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -82,9 +82,9 @@ class Enrollment(Base):
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
-    status = Column(String(30), nullable=False, default="active")
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(30), nullable=False, default="active", index=True)
     enrolled_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     course = relationship("Course", back_populates="enrollments")
@@ -98,7 +98,7 @@ class Module(Base):
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
     melc_code = Column(String(120), nullable=False)
     learning_competency = Column(Text, nullable=True)
     lesson_objectives = Column(Text, nullable=True)
@@ -124,8 +124,8 @@ class StreamPost(Base):
     __tablename__ = "stream_posts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
-    author_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     body = Column(Text, nullable=False)
     post_type = Column(String(40), nullable=False, default="announcement")
@@ -139,7 +139,7 @@ class Assignment(Base):
     __tablename__ = "assignments"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     instructions = Column(Text, nullable=False)
     due_at = Column(DateTime(timezone=True), nullable=True)
@@ -159,7 +159,7 @@ class AssignmentQuestion(Base):
     __tablename__ = "assignment_questions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    assignment_id = Column(String(36), ForeignKey("assignments.id"), nullable=False)
+    assignment_id = Column(String(36), ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False)
     section_name = Column(String(120), nullable=True)
     question_text = Column(Text, nullable=False)
     question_type = Column(String(50), nullable=False, default="multiple_choice") # multiple_choice, checkbox, short_answer, identification, true_false
@@ -177,12 +177,12 @@ class Submission(Base):
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    assignment_id = Column(String(36), ForeignKey("assignments.id"), nullable=False, index=True)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    assignment_id = Column(String(36), ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     response_text = Column(Text, nullable=True)
     answers_json = Column(Text, nullable=True)
     attachments_json = Column(Text, nullable=False, default="[]")
-    status = Column(String(30), nullable=False, default="submitted")
+    status = Column(String(30), nullable=False, default="submitted", index=True)
     score = Column(Float, nullable=True)
     feedback = Column(Text, nullable=True)
     submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -195,7 +195,7 @@ class Quiz(Base):
     __tablename__ = "quizzes"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     instructions = Column(Text, nullable=False)
     is_published = Column(Boolean, nullable=False, default=False)
@@ -210,7 +210,7 @@ class QuizQuestion(Base):
     __tablename__ = "quiz_questions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    quiz_id = Column(String(36), ForeignKey("quizzes.id"), nullable=False)
+    quiz_id = Column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
     question_text = Column(Text, nullable=False)
     choices_json = Column(Text, nullable=True)
     answer_key = Column(Text, nullable=True)
@@ -223,8 +223,8 @@ class QuizAttempt(Base):
     __tablename__ = "quiz_attempts"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    quiz_id = Column(String(36), ForeignKey("quizzes.id"), nullable=False)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    quiz_id = Column(String(36), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     answers_json = Column(Text, nullable=True)
     score = Column(Float, nullable=True)
     started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -238,7 +238,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    actor_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    actor_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     action = Column(String(120), nullable=False)
     entity_type = Column(String(80), nullable=False)
     entity_id = Column(String(36), nullable=True)
@@ -255,8 +255,8 @@ class GradeEntry(Base):
     )
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=False, index=True)
+    student_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
     term = Column(String(10), nullable=False)
     component = Column(String(80), nullable=False)
     score = Column(Float, nullable=False)
@@ -283,7 +283,7 @@ class Section(Base):
     education_level = Column(String(40), nullable=False, default="Junior High School")
     strand = Column(String(80), nullable=True)
     school_year = Column(String(20), nullable=False, default="2026-2027")
-    adviser_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    adviser_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -294,9 +294,9 @@ class AIConversation(Base):
     __tablename__ = "ai_conversations"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    course_id = Column(String(36), ForeignKey("courses.id"), nullable=True)
-    module_id = Column(String(36), ForeignKey("modules.id"), nullable=True)
+    student_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id = Column(String(36), ForeignKey("courses.id", ondelete="CASCADE"), nullable=True)
+    module_id = Column(String(36), ForeignKey("modules.id", ondelete="CASCADE"), nullable=True)
     prompt = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -310,7 +310,7 @@ class StudentAIProfile(Base):
     __tablename__ = "student_ai_profiles"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    student_id = Column(String(36), ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    student_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     strengths_json = Column(Text, nullable=False, default="[]")
     weak_concepts_json = Column(Text, nullable=False, default="[]")
     learning_trends_json = Column(Text, nullable=False, default="[]")
@@ -342,10 +342,10 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    session_id = Column(String(36), ForeignKey("chat_sessions.id"), nullable=False)
+    session_id = Column(String(36), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
-    module_id = Column(String(36), ForeignKey("modules.id"), nullable=True)
+    module_id = Column(String(36), ForeignKey("modules.id", ondelete="CASCADE"), nullable=True)
     response_mode = Column(String(20), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

@@ -46,7 +46,7 @@ from sqlalchemy import func, inspect, or_, select, text
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .database import Base, SessionLocal, engine, get_db, wait_for_database
 
@@ -783,7 +783,7 @@ def build_stream(db: Session, user: User | None=None) -> list[dict]:
     return [{'id': post.id, 'courseId': course.id, 'title': post.title, 'body': post.body, 'postType': post.post_type, 'createdAt': post.created_at.isoformat() if post.created_at else '', 'courseCode': course.code, 'courseTitle': course.title, 'authorName': author.full_name} for post, course, author in rows]
 
 def build_teacher_course_cards(db: Session, teacher_id: str) -> list[dict]:
-    courses = db.scalars(select(Course).where(Course.teacher_id == teacher_id, Course.is_active == True).order_by(Course.subject.asc())).all()
+    courses = db.scalars(select(Course).options(joinedload(Course.teacher), joinedload(Course.department)).where(Course.teacher_id == teacher_id, Course.is_active == True).order_by(Course.subject.asc())).unique().all()
     course_ids = [c.id for c in courses]
     enrollment_counts = dict(db.execute(select(Enrollment.course_id, func.count(Enrollment.id)).where(Enrollment.course_id.in_(course_ids), Enrollment.status == 'active').group_by(Enrollment.course_id)).all()) if course_ids else {}
     module_counts = dict(db.execute(select(Module.course_id, func.count(Module.id)).where(Module.course_id.in_(course_ids)).group_by(Module.course_id)).all()) if course_ids else {}
@@ -793,7 +793,7 @@ def build_teacher_course_cards(db: Session, teacher_id: str) -> list[dict]:
     return cards
 
 def build_admin_course_cards(db: Session) -> list[dict]:
-    courses = db.scalars(select(Course).where(Course.is_active == True).order_by(Course.subject.asc(), Course.term.asc())).all()
+    courses = db.scalars(select(Course).options(joinedload(Course.teacher), joinedload(Course.department)).where(Course.is_active == True).order_by(Course.subject.asc(), Course.term.asc())).unique().all()
     course_ids = [c.id for c in courses]
     enrollment_counts = dict(db.execute(select(Enrollment.course_id, func.count(Enrollment.id)).where(Enrollment.course_id.in_(course_ids), Enrollment.status == 'active').group_by(Enrollment.course_id)).all()) if course_ids else {}
     module_counts = dict(db.execute(select(Module.course_id, func.count(Module.id)).where(Module.course_id.in_(course_ids)).group_by(Module.course_id)).all()) if course_ids else {}
