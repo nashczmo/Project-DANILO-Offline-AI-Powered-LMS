@@ -4,17 +4,14 @@ import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
 import { Settings, Cpu, Wifi, BookOpen, Plus, Trash2, Server, Activity, Pencil, X, MemoryStick, HardDrive, Thermometer, Clock } from "lucide-react";
 
-const GRADE_OPTIONS = {
-  "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
-  "Senior High School": ["Grade 11", "Grade 12"],
-};
-
-const STRAND_OPTIONS = ["STEM", "ABM", "HUMSS", "GAS", "TVL", "Sports", "Arts & Design"];
 
 export default function AdminSystem() {
   const { data: systemStatus, loading, error, refresh } = useApi("/admin/system", { immediate: true });
   const { data: activity, refresh: refreshActivity } = useApi("/admin/activity", { immediate: true });
   const { data: sections, refresh: refreshSections } = useApi("/admin/sections", { immediate: true });
+  const { data: metadata } = useApi("/metadata", { immediate: true });
+  const GRADE_OPTIONS = metadata?.gradeLevels || {};
+  const STRAND_OPTIONS = metadata?.strands || [];
   const [showSectionForm, setShowSectionForm] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState(null);
   const [formData, setFormData] = useState({});

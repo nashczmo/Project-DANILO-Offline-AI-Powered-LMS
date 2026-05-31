@@ -55,8 +55,9 @@ export default {
       },
       fontFamily: {
         sans: [
-          "Lato",
           "Inter",
+          "Google Sans",
+          "Arial",
           "system-ui",
           "-apple-system",
           "Segoe UI",

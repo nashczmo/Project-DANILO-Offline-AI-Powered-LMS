@@ -84,15 +84,15 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center gap-5">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#1A73E8] flex items-center justify-center shadow-md">
-            <span className="text-white font-black text-xl">D</span>
+      <div className="min-h-screen bg-danilo-bg flex flex-col items-center justify-center gap-6 animate-fade-in">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-3xl bg-danilo-primary flex items-center justify-center shadow-glow z-10 relative">
+            <span className="text-white font-black text-2xl tracking-tighter">D</span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 border-[3px] border-[#1A73E8]/20 border-t-[#1A73E8] rounded-full animate-spin" />
-            <p className="text-sm font-bold text-[#9AA0A6]">Loading your workspace…</p>
-          </div>
+          <div className="absolute inset-0 rounded-3xl bg-danilo-primary/30 animate-ping" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm font-bold text-danilo-text-secondary animate-pulse">Project DANILO is loading...</p>
         </div>
       </div>
     );

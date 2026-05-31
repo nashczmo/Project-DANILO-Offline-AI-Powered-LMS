@@ -81,6 +81,11 @@ def analyze_student_performance(db: Session, class_id: str) -> dict:
         questions_by_quiz.setdefault(question.quiz_id, []).append(question)
     quiz_max_by_id = {quiz_id: sum(question.points or 1 for question in questions) or None for quiz_id, questions in questions_by_quiz.items()}
 
+    assignment_questions = db.scalars(select(AssignmentQuestion).join(Assignment, AssignmentQuestion.assignment_id == Assignment.id).where(Assignment.course_id == class_id)).all()
+    questions_by_assignment: dict[str, list[AssignmentQuestion]] = {}
+    for question in assignment_questions:
+        questions_by_assignment.setdefault(question.assignment_id, []).append(question)
+
     modules = db.scalars(select(Module).where(Module.course_id == class_id).order_by(Module.week.asc(), Module.sequence_order.asc())).all()
     module_topics = [topic_label(module.title or module.learning_competency, course.subject) for module in modules]
 
@@ -112,11 +117,24 @@ def analyze_student_performance(db: Session, class_id: str) -> dict:
 
         for assignment in assignments:
             submission = submissions_by_student.get((student.id, assignment.id))
-            is_missing = submission is None or submission.status not in {"submitted", "completed"}
+            is_missing = submission is None or submission.status not in {"submitted", "completed", "graded"}
             if is_missing:
                 missing_count += 1
                 topic = topic_label(assignment.title, course.subject)
                 class_topic_risk[topic] = class_topic_risk.get(topic, 0) + 1
+            else:
+                try:
+                    answers = json.loads(submission.answers_json or "{}")
+                except json.JSONDecodeError:
+                    answers = {}
+                for question in questions_by_assignment.get(assignment.id, []):
+                    given = str(answers.get(str(question.id), answers.get(question.id, ""))).strip().lower() if isinstance(answers, dict) else ""
+                    expected = str(question.answer_key or "").strip().lower()
+                    if expected and given and given != expected:
+                        repeated_incorrect += 1
+                        q_topic = topic_label(question.section_name or question.question_text, assignment.title)
+                        class_topic_risk[q_topic] = class_topic_risk.get(q_topic, 0) + 1
+
             history_assignments.append({"id": assignment.id, "title": assignment.title, "points": assignment.points, "status": submission.status if submission else "missing", "submittedAt": submission.submitted_at.isoformat() if submission and submission.submitted_at else None})
 
         for attempt, quiz in quiz_rows:

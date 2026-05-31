@@ -211,7 +211,7 @@ export default function TeacherInsights() {
                       {s.studentName?.charAt(0)?.toUpperCase() || "?"}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-[#202124]">{s.studentName || "Student"}</p>
+                      <p className="text-sm font-bold text-[#202124]">{s.studentName || "Unknown"}</p>
                       <p className="text-xs text-[#9AA0A6] font-bold">{s.reason || "Needs attention"}</p>
                     </div>
                     <Badge color="error" className="ml-auto flex-shrink-0">At Risk</Badge>

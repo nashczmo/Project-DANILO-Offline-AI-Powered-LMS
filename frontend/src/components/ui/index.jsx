@@ -240,3 +240,4 @@ export function Alert({ type = "info", children }) {
 }
 
 export { ErrorBoundary } from "./ErrorBoundary";
+export { MathText } from "./MathText";

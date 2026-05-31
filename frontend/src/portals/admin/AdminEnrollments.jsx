@@ -11,7 +11,7 @@ export default function AdminEnrollments() {
   const { data: sections } = useApi("/admin/sections", { immediate: true });
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const { data: courseDetail, loading: detailLoading, refresh: refreshDetail } = useApi(
-    selectedCourseId ? `/classes/${selectedCourseId}/people` : null,
+    selectedCourseId ? `/admin/courses/${selectedCourseId}/people` : null,
     { immediate: !!selectedCourseId }
   );
   const [enrollStudentId, setEnrollStudentId] = useState("");

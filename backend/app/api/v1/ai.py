@@ -155,3 +155,14 @@ def get_session_messages(session_id: str, offset: int=0, limit: int=60, current_
     messages = db.scalars(select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).offset(offset).limit(limit)).all()
     return {'sessionId': session_id, 'title': session.title, 'total': total, 'messages': [{'id': m.id, 'role': m.role, 'content': m.content, 'moduleId': m.module_id, 'responseMode': m.response_mode, 'createdAt': m.created_at.isoformat()} for m in messages]}
 
+
+@ai_router.get('/ai/quick_actions')
+def get_quick_actions() -> list[dict]:
+    return [
+        {"label": "Simplify", "mode": "simplify"},
+        {"label": "Step-by-Step", "mode": "step_by_step"},
+        {"label": "In Filipino", "mode": "filipino"},
+        {"label": "Quiz Me", "mode": "quiz_me"},
+        {"label": "Practice", "mode": "practice"},
+        {"label": "Real-Life Example", "mode": "real_life"},
+    ]

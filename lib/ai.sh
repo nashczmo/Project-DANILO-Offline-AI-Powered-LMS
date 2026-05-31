@@ -124,30 +124,22 @@ detect_ai_hardware_profile() {
 
   DANILO_AI_RUNTIME="ollama"
 
-  local vram_large="${DANILO_VRAM_LARGE_THRESHOLD:-16384}"
-  local vram_gpu="${DANILO_VRAM_GPU_THRESHOLD:-8192}"
-  local ram_high="${DANILO_RAM_HIGH_THRESHOLD:-16384}"
-  local ram_balanced="${DANILO_RAM_BALANCED_THRESHOLD:-8192}"
-  local cpu_high="${DANILO_CPU_HIGH_THRESHOLD:-6}"
-  local cpu_balanced="${DANILO_CPU_BALANCED_THRESHOLD:-4}"
+  local ram_high="${DANILO_RAM_HIGH_THRESHOLD:-65536}"
+  local ram_mid="${DANILO_RAM_MID_THRESHOLD:-32768}"
 
-  if (( gpu_vram_mb >= vram_large && (cuda_supported == 1 || rocm_supported == 1) && storage_available_mb >= 20480 )); then
-    profile="large-gpu"
-  elif (( gpu_vram_mb >= vram_gpu && (cuda_supported == 1 || rocm_supported == 1) && storage_available_mb >= 12288 )); then
-    profile="gpu-accelerated"
-  elif (( mem_mb >= ram_high && cpu_count >= cpu_high )); then
-    profile="high-memory"
-  elif (( mem_mb >= ram_balanced && cpu_count >= cpu_balanced )); then
-    profile="balanced"
+  if (( mem_mb >= ram_high && dedicated_gpu == 1 )); then
+    profile="high"
+  elif (( mem_mb < ram_mid && dedicated_gpu == 0 && integrated_gpu == 0 )); then
+    profile="low"
   else
-    profile="constrained"
+    profile="mid"
   fi
 
   case "${profile}" in
-    large-gpu)
+    high)
       selected_model="${DANILO_AI_MODEL_HIGH}"
-      selected_fallback="${DANILO_AI_MODEL_GPU}"
-      selected_optional="${DANILO_AI_MODEL_BALANCED}"
+      selected_fallback="${DANILO_AI_MODEL_MID}"
+      selected_optional=""
       model_class="large"
       quantization="${DANILO_AI_QUANTIZATION:-q5_K_M}"
       num_gpu=999
@@ -161,60 +153,26 @@ detect_ai_hardware_profile() {
       [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
       [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
       ;;
-    gpu-accelerated)
-      selected_model="${DANILO_AI_MODEL_GPU}"
-      selected_fallback="${DANILO_AI_MODEL_BALANCED}"
-      selected_optional="${DANILO_AI_MODEL_LOW}"
-      model_class="gpu"
+    mid)
+      selected_model="${DANILO_AI_MODEL_MID}"
+      selected_fallback="${DANILO_AI_MODEL_LOW}"
+      selected_optional=""
+      model_class="mid-cpu"
       quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
-      num_gpu=999
-      num_batch=384
+      num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
+      num_batch=256
       kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
-      scheduler="gpu-balanced"
+      scheduler="fair-queue"
       [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
       [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
       [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=2048
       [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=10m
-      [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
-      [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3200
-      ;;
-    high-memory)
-      selected_model="${DANILO_AI_MODEL_BALANCED}"
-      selected_fallback="${DANILO_AI_MODEL_LOW}"
-      selected_optional="${DANILO_AI_MODEL_GPU}"
-      model_class="mid-cpu"
-      quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
-      num_gpu=0
-      num_batch=256
-      kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
-      scheduler="cpu-throughput"
-      [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
-      [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
-      [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=2048
-      [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=5m
       [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
       [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
       ;;
-    balanced)
-      selected_model="${DANILO_AI_MODEL_BALANCED}"
-      selected_fallback="${DANILO_AI_MODEL_LOW}"
-      selected_optional="${DANILO_AI_MODEL_GPU}"
-      model_class="mid-cpu"
-      quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
-      num_gpu=0
-      num_batch=192
-      kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
-      scheduler="fair-queue"
-      [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=1
-      [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=1
-      [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=1536
-      [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=3m
-      [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
-      [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=2400
-      ;;
-    *)
+    low|*)
       selected_model="${DANILO_AI_MODEL_LOW}"
-      selected_fallback="${DANILO_AI_MODEL_BALANCED}"
+      selected_fallback=""
       selected_optional=""
       model_class="lightweight"
       quantization="${DANILO_AI_QUANTIZATION:-q4_0}"
@@ -344,98 +302,7 @@ configure_ollama_model() {
     fi
   fi
 
-  gguf_file="$(find "${models_dir}" -maxdepth 1 -type f -iname "*${DANILO_AI_QUANTIZATION}*.gguf" | sort | head -n 1 || true)"
-  if [[ -z "${gguf_file}" ]]; then
-    gguf_file="$(find "${models_dir}" -maxdepth 1 -type f -name '*.gguf' | sort | head -n 1 || true)"
-  fi
-
-  if [[ -n "${gguf_file}" ]]; then
-    echo "Custom GGUF detected: ${gguf_file}"
-    gguf_path="$(realpath "${gguf_file}")"
-    if [[ ! -f "${gguf_path}" ]]; then
-      echo "GGUF file not found"
-      exit 1
-    fi
-
-      cat > "${modelfile}" <<EOF
-FROM ${gguf_path}
-
-PARAMETER temperature ${DANILO_AI_TEMP:-0.3}
-PARAMETER top_p ${DANILO_AI_TOP_P:-0.9}
-PARAMETER repeat_penalty ${DANILO_AI_REPEAT_PENALTY:-1.1}
-PARAMETER num_ctx ${OLLAMA_NUM_CTX}
-PARAMETER num_batch ${OLLAMA_NUM_BATCH}
-PARAMETER num_gpu ${OLLAMA_NUM_GPU}
-PARAMETER num_predict ${DANILO_AI_NUM_PREDICT:-220}
-
-SYSTEM \${DANILO_SYSTEM_PROMPT}
-EOF
-
-    export DANILO_CUSTOM_GGUF_PATH="${gguf_path}"
-    export DANILO_CUSTOM_MODELFILE="${modelfile}"
-    export DANILO_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL}"
-    OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL}"
-    echo "Using custom model: ${DANILO_CUSTOM_OLLAMA_MODEL} (${DANILO_AI_QUANTIZATION} plan)"
-  else
-    echo "No custom GGUF found"
-    export DANILO_CUSTOM_GGUF_PATH=""
-    export DANILO_CUSTOM_MODELFILE=""
-    export DANILO_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL}"
-    OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL}"
-    echo "Using default model: ${DANILO_DEFAULT_OLLAMA_MODEL}"
-  fi
-
-}
-
-preload_ollama_model() {
-  local container="$1"
-  local container_models_dir="/tmp/danilo-models"
-
-  if [[ "${OLLAMA_MODEL}" == "${DANILO_CUSTOM_OLLAMA_MODEL}" && -n "${DANILO_CUSTOM_GGUF_PATH:-}" ]]; then
-    if [[ ! -f "${DANILO_CUSTOM_GGUF_PATH}" ]]; then
-      echo "GGUF file not found"
-      exit 1
-    fi
-
-    if ollama_model_exists_in_container "${container}" "${DANILO_CUSTOM_OLLAMA_MODEL}"; then
-      echo "Custom model already exists, skipping creation"
-      return 0
-    fi
-
-    run_step_command "Preparing custom GGUF model files" docker exec "${container}" mkdir -p "${container_models_dir}"
-    run_step_command "Copying DANILO custom GGUF into Ollama preload container" docker cp "${DANILO_CUSTOM_GGUF_PATH}" "${container}:${container_models_dir}/custom.gguf"
-    run_step_command "Writing container Modelfile for DANILO custom model" docker exec "${container}" sh -c "cat > '${container_models_dir}/Modelfile' <<'EOF'
-FROM ${container_models_dir}/custom.gguf
-
-PARAMETER temperature ${DANILO_AI_TEMP:-0.3}
-PARAMETER top_p ${DANILO_AI_TOP_P:-0.9}
-PARAMETER repeat_penalty ${DANILO_AI_REPEAT_PENALTY:-1.1}
-PARAMETER num_ctx ${OLLAMA_NUM_CTX}
-PARAMETER num_batch ${OLLAMA_NUM_BATCH}
-PARAMETER num_gpu ${OLLAMA_NUM_GPU}
-PARAMETER num_predict ${DANILO_AI_NUM_PREDICT:-220}
-
-SYSTEM \${DANILO_SYSTEM_PROMPT}
-EOF"
-
-    if run_step_command "Creating Ollama custom model ${DANILO_CUSTOM_OLLAMA_MODEL}" docker exec "${container}" ollama create "${DANILO_CUSTOM_OLLAMA_MODEL}" -f "${container_models_dir}/Modelfile"; then
-      echo "Using custom model: ${DANILO_CUSTOM_OLLAMA_MODEL}"
-      if [[ -n "${DANILO_FALLBACK_OLLAMA_MODEL}" && "${DANILO_FALLBACK_OLLAMA_MODEL}" != "${DANILO_CUSTOM_OLLAMA_MODEL}" ]]; then
-        docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}" || note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled; continuing with custom model only"
-      fi
-      if [[ -n "${DANILO_OPTIONAL_OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${DANILO_CUSTOM_OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${DANILO_FALLBACK_OLLAMA_MODEL:-}" ]]; then
-        docker exec "${container}" ollama pull "${DANILO_OPTIONAL_OLLAMA_MODEL}" || note "Optional model ${DANILO_OPTIONAL_OLLAMA_MODEL} could not be pulled; continuing with custom model only"
-      fi
-      return 0
-    fi
-
-    echo "Custom GGUF could not be registered; falling back to default model"
-    export DANILO_CUSTOM_GGUF_PATH=""
-    export DANILO_CUSTOM_MODELFILE=""
-    export DANILO_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL}"
-    OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL}"
-    write_env_file
-  fi
+  local embed_model="${DANILO_AI_EMBEDDING_MODEL:-nomic-embed-text}"
 
   if ollama_model_exists_in_container "${container}" "${OLLAMA_MODEL}"; then
     note "Ollama model ${OLLAMA_MODEL} is already cached; skipping pull"
@@ -449,12 +316,10 @@ EOF"
       timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}" || note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled; primary model remains available"
     fi
   fi
-  if [[ -n "${DANILO_OPTIONAL_OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${DANILO_FALLBACK_OLLAMA_MODEL:-}" ]]; then
-    if ollama_model_exists_in_container "${container}" "${DANILO_OPTIONAL_OLLAMA_MODEL}"; then
-      note "Optional model ${DANILO_OPTIONAL_OLLAMA_MODEL} is already cached; skipping pull"
-    else
-      timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_OPTIONAL_OLLAMA_MODEL}" || note "Optional model ${DANILO_OPTIONAL_OLLAMA_MODEL} could not be pulled; primary/fallback model remains available"
-    fi
+  if ollama_model_exists_in_container "${container}" "${embed_model}"; then
+    note "Embeddings model ${embed_model} is already cached; skipping pull"
+  else
+    run_step_command "Pulling Embeddings model ${embed_model}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${embed_model}"
   fi
 }
 

@@ -4,12 +4,6 @@ import { apiRequest } from "../../api";
 import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
 import { Users, Plus, UserCheck, UserX, RefreshCw, ChevronDown, X } from "lucide-react";
 
-const GRADE_OPTIONS = {
-  "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
-  "Senior High School": ["Grade 11", "Grade 12"],
-};
-
-const STRAND_OPTIONS = ["STEM", "ABM", "HUMSS", "GAS", "TVL", "Sports", "Arts & Design"];
 
 const ROLE_BADGE = {
   admin:   { color: "error",   label: "Admin" },
@@ -30,6 +24,9 @@ export default function AdminDirectory() {
     { immediate: true, deps: [roleFilter] }
   );
   const { data: sections } = useApi("/admin/sections", { immediate: true });
+  const { data: metadata } = useApi("/metadata", { immediate: true });
+  const GRADE_OPTIONS = metadata?.gradeLevels || {};
+  const STRAND_OPTIONS = metadata?.strands || [];
   const users = data || [];
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({});

@@ -75,7 +75,7 @@ export default function TeacherDashboard() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Overview"
-        description={`Welcome back, ${user?.fullName || "Teacher"}. Here's a summary of your classes.`}
+        description={`Welcome back, ${user?.fullName || "there"}. Here's a summary of your classes.`}
       />
 
       {/* ── Stat Cards ── */}

@@ -146,16 +146,14 @@ def _detected_hardware() -> dict:
     opencl = _env_int('DANILO_AI_OPENCL', 0, minimum=0, maximum=1)
     profile = os.getenv('DANILO_AI_HARDWARE_PROFILE', 'auto').strip().lower() or 'auto'
     if profile == 'auto':
-        if gpu_vram_mb >= 16384 and (cuda or rocm) and (storage_available_mb == 0 or storage_available_mb >= 20480):
-            profile = 'large-gpu'
-        elif gpu_vram_mb >= 8192 and (cuda or rocm):
-            profile = 'gpu-accelerated'
-        elif ram_mb >= 16384 and cpu_count >= 6:
-            profile = 'high-memory'
-        elif ram_mb >= 8192 and cpu_count >= 4:
-            profile = 'balanced'
+        ram_high = _env_int('DANILO_RAM_HIGH_THRESHOLD', 65536)
+        ram_mid = _env_int('DANILO_RAM_MID_THRESHOLD', 32768)
+        if ram_mb >= ram_high and dedicated_gpu:
+            profile = 'high'
+        elif ram_mb < ram_mid and not dedicated_gpu and not integrated_gpu:
+            profile = 'low'
         else:
-            profile = 'constrained'
+            profile = 'mid'
     return {'profile': profile, 'cpuModel': os.getenv('DANILO_AI_CPU_MODEL', 'unknown'), 'ramMb': ram_mb, 'ramAvailableMb': ram_available_mb, 'cpuCount': cpu_count, 'gpuName': os.getenv('DANILO_AI_GPU_NAME', 'none'), 'gpuVramMb': gpu_vram_mb, 'integratedGpu': bool(integrated_gpu), 'dedicatedGpu': bool(dedicated_gpu), 'cuda': bool(cuda), 'rocm': bool(rocm), 'avx2': bool(avx2), 'avx512': bool(avx512), 'vulkan': bool(vulkan), 'opencl': bool(opencl), 'storageAvailableMb': storage_available_mb}
 
 _HARDWARE = _detected_hardware()
@@ -163,19 +161,16 @@ _HARDWARE = _detected_hardware()
 def _profile_defaults() -> dict:
     profile = _HARDWARE['profile']
     cpu_count = int(_HARDWARE['cpuCount'])
-    defaults = {'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:1.5b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:3b'), 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'queue_timeout': 45.0, 'timeout': 180.0, 'ctx': 1024, 'context_chars': 1800, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 0, 'batch': 128, 'kv_cache': 'q8_0', 'scheduler': 'low-memory-fair-queue', 'cache_size': 120, 'cooldown': 5.0}
-    if profile == 'balanced':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:3b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:1.5b'), 'optional_model': os.getenv('DANILO_AI_MODEL_GPU', 'llama3.1:8b'), 'model_class': 'mid-cpu', 'quantization': 'q4_K_M', 'timeout': 150.0, 'ctx': 1536, 'context_chars': 2400, 'threads': max(1, min(cpu_count, 6)), 'batch': 192, 'scheduler': 'fair-queue', 'cache_size': 200, 'cooldown': 4.0})
-    elif profile == 'high-memory':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:3b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:1.5b'), 'optional_model': os.getenv('DANILO_AI_MODEL_GPU', 'llama3.1:8b'), 'model_class': 'mid-cpu', 'quantization': 'q4_K_M', 'concurrency': 1, 'timeout': 150.0, 'ctx': 2048, 'context_chars': 3000, 'threads': max(1, min(cpu_count, 8)), 'batch': 256, 'scheduler': 'cpu-throughput', 'cache_size': 300, 'cooldown': 3.0})
-    elif profile == 'gpu-accelerated':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_GPU', 'llama3.1:8b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:3b'), 'optional_model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:1.5b'), 'model_class': 'gpu', 'quantization': 'q4_K_M', 'concurrency': 1, 'timeout': 120.0, 'ctx': 4096, 'context_chars': 5600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'scheduler': 'gpu-balanced', 'cache_size': 400, 'cooldown': 2.0})
-    elif profile == 'large-gpu':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_HIGH', 'qwen2.5:14b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_GPU', 'llama3.1:8b'), 'optional_model': os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:3b'), 'model_class': 'large', 'quantization': 'q5_K_M', 'concurrency': 3, 'timeout': 120.0, 'ctx': 4096, 'context_chars': 5600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 600, 'cooldown': 1.5})
+    dedicated_gpu = _HARDWARE['dedicatedGpu']
+    defaults = {'model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'queue_timeout': 45.0, 'timeout': 180.0, 'ctx': 1024, 'context_chars': 1800, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 0, 'batch': 128, 'kv_cache': 'q8_0', 'scheduler': 'low-memory-fair-queue', 'cache_size': 120, 'cooldown': 5.0}
+    if profile == 'mid':
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_MID', 'llama3:8b-instruct-q4_K_M'), 'fallback_model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'model_class': 'mid-cpu', 'quantization': 'q4_K_M', 'timeout': 150.0, 'ctx': 2048, 'context_chars': 3000, 'threads': max(1, min(cpu_count, 6)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 256, 'scheduler': 'fair-queue', 'cache_size': 200, 'cooldown': 4.0})
+    elif profile == 'high':
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_HIGH', 'llama3.1:70b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_MID', 'llama3:8b-instruct-q4_K_M'), 'model_class': 'large', 'quantization': 'q5_K_M', 'concurrency': 3, 'timeout': 120.0, 'ctx': 4096, 'context_chars': 5600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 600, 'cooldown': 1.5})
     if not _HARDWARE['avx2'] and (not _HARDWARE['cuda']) and (not _HARDWARE['rocm']):
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:1.5b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128, 'scheduler': 'compatibility-cpu'})
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128, 'scheduler': 'compatibility-cpu'})
     if 0 < int(_HARDWARE['storageAvailableMb']) < 8192:
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:1.5b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128})
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128})
     return defaults
 
 _PROFILE_DEFAULTS = _profile_defaults()
@@ -196,7 +191,7 @@ _OLLAMA_MODEL_ENV = (os.getenv('OLLAMA_MODEL') or os.getenv('DANILO_OLLAMA_MODEL
 
 OLLAMA_MODEL = _PROFILE_DEFAULTS['model'] if _OLLAMA_MODEL_ENV.lower() in {'', 'auto'} else _OLLAMA_MODEL_ENV
 
-DANILO_AI_PRIMARY_MODEL = os.getenv('DANILO_AI_PRIMARY_MODEL', 'microsoft_Phi-4-mini-instruct-Q4_K_M.gguf')
+DANILO_AI_PRIMARY_MODEL = os.getenv('DANILO_AI_PRIMARY_MODEL', '')
 
 DANILO_AI_FALLBACK_MODEL = os.getenv('DANILO_AI_FALLBACK_MODEL', _PROFILE_DEFAULTS['fallback_model'])
 
@@ -833,21 +828,40 @@ def build_pdf_document(title: str, lines: list[str]) -> bytes:
 
 DEFAULT_SYSTEM_PROMPT = '''You are DANILO, an intelligent, offline educational AI tutor for Filipino students.
 Your goal is to guide students to answers through Socratic dialogue, not spoon-feed them.
-Be conversational, warm, and natural. Do not act like a robotic textbook.
+Be clear, short, and step-by-step. Do not act like a robotic textbook.
 If the user asks a non-academic question, gently pivot back to their curriculum.
 Do not use robotic lists unless explicitly asked.
-Use the provided <curriculum_context> and <student_profile> to inform your answers, but do not directly reference them as "the context provided".
+
+CRITICAL INSTRUCTIONS:
+1. You MUST base your answers ONLY on the provided <curriculum_context>, <student_profile>, and <document_context>.
+2. Priority: 1 student database, 2 grades, 3 attendance, 4 uploaded school files, 5 embeddings, 6 AI reasoning.
+3. NEVER invent or guess any grades, deadlines, attendance, or announcements.
+4. If the requested information is missing, you MUST state exactly: "I couldn't find that in Project DANILO."
+5. If you use information from the context, you should cite its source using the provided [Source: ...] tags internally.
 '''
 
 SYSTEM_PROMPT = os.getenv('DANILO_SYSTEM_PROMPT', DEFAULT_SYSTEM_PROMPT)
 
 SYSTEM_PROMPT_TEACHER = '''You are DANILO, an intelligent AI Instructional Designer and Teaching Assistant for Filipino teachers.
 Your goal is to assist teachers with lesson planning, rubric generation, grading insights, and pedagogical strategies.
-Be professional, supportive, and pedagogical. Use the provided <curriculum_context> to assist the teacher.'''
+Be structured and professional.
+
+CRITICAL INSTRUCTIONS:
+1. You MUST base your answers ONLY on the provided <curriculum_context> and <document_context>.
+2. Priority: 1 student database, 2 grades, 3 attendance, 4 uploaded school files, 5 embeddings, 6 AI reasoning.
+3. NEVER invent or guess any grades, deadlines, attendance, or announcements.
+4. If the requested information is missing, you MUST state exactly: "I couldn't find that in Project DANILO."
+5. Use the [Source: ...] tags internally to trace where your information came from.'''
 
 SYSTEM_PROMPT_ADMIN = '''You are DANILO, a DevOps and Systems Administration AI for the Project DANILO LMS platform.
 Your goal is to assist school administrators with system configuration, network troubleshooting, and server maintenance.
-Be concise, technical, and precise.'''
+Be concise and data-first.
+
+CRITICAL INSTRUCTIONS:
+1. You MUST base your answers ONLY on the provided system context.
+2. Priority: 1 student database, 2 grades, 3 attendance, 4 uploaded school files, 5 embeddings, 6 AI reasoning.
+3. NEVER invent or guess any server statuses, student records, grades, deadlines, attendance, or announcements.
+4. If the requested information is missing, state clearly: "I couldn't find that in Project DANILO."'''
 
 SAFETY_KEYWORDS = {'suicide', 'kill', 'murder', 'bomb', 'weapon', 'drugs', 'porn', 'sex', 'hack', 'exploit', 'violence', 'gore', 'terrorist', 'abuse'}
 
@@ -1201,7 +1215,7 @@ def build_tutor_prompt(db: Session, current_user: User, payload: TutorRequest) -
         profile = build_student_ai_profile(db, current_user, persist=True)
         profile_lines = format_student_profile_for_prompt(profile)
         student_grades = build_grade_summary(db, current_user.id)[:2]
-        grade_lines = [f"{item['courseCode']} {item['term']}: {item['finalGrade']}" for item in student_grades] or []
+        grade_lines = [f"[Source: DB Grade Record] {item['courseCode']} {item['term']}: {item['finalGrade']}" for item in student_grades] or []
         
         quiz_lines = []
         if course:
@@ -1209,7 +1223,7 @@ def build_tutor_prompt(db: Session, current_user: User, payload: TutorRequest) -
                 QuizAttempt.student_id == current_user.id, Quiz.course_id == course.id
             ).order_by(QuizAttempt.submitted_at.desc()).limit(2)
             for attempt, quiz in db.execute(quiz_query).all():
-                quiz_lines.append(f'Quiz "{trim_text(quiz.title, 40)}": {attempt.score}%')
+                quiz_lines.append(f'[Source: DB Quiz Record] Quiz "{trim_text(quiz.title, 40)}": {attempt.score}%')
                 
         if profile_lines or grade_lines or quiz_lines:
             context_parts.append("<student_profile>")
@@ -1230,10 +1244,22 @@ def build_tutor_prompt(db: Session, current_user: User, payload: TutorRequest) -
     context_budget = max(400, OLLAMA_CONTEXT_CHARS // 2)
     
     if course:
-        lesson_lines.append(f'Class: {course.title} | Subject: {course.subject}')
+        lesson_lines.append(f'[Source: {course.subject} Class Context] Class: {course.title} | Subject: {course.subject}')
+        
+        # Add Recent Assignments
+        assignment_query = select(Assignment).where(Assignment.course_id == course.id, Assignment.is_active == True).order_by(Assignment.due_at.desc()).limit(2)
+        for assignment in db.scalars(assignment_query).all():
+            due_str = assignment.due_at.strftime("%Y-%m-%d %H:%M") if assignment.due_at else "No due date"
+            lesson_lines.append(f'[Source: DB Assignment Record] Assignment "{assignment.title}" Due: {due_str}')
+            
+        # Add Recent Announcements
+        post_query = select(StreamPost, User).join(User, StreamPost.author_id == User.id).where(StreamPost.course_id == course.id).order_by(StreamPost.created_at.desc()).limit(2)
+        for post, author in db.execute(post_query).all():
+            lesson_lines.append(f'[Source: Teacher Announcement from {author.full_name}] Announcement "{post.title}": {trim_text(post.body, 150)}')
+
     if module:
         content_parts = [f'Lesson: {trim_text(module.title, 80)}', f'Summary: {trim_text(module.summary, 300)}']
-        lesson_lines.append(' | '.join(content_parts))
+        lesson_lines.append(f'[Source: {course.subject if course else "Module"} > {module.title}] ' + ' | '.join(content_parts))
         
     retrieved_chunks = retrieve_lesson_context(payload.question, course.id if course else None, module.id if module else None, limit=2)
     
@@ -1242,16 +1268,15 @@ def build_tutor_prompt(db: Session, current_user: User, payload: TutorRequest) -
         if lesson_lines:
             context_parts.append(" ".join(lesson_lines))
         if retrieved_chunks:
-            rag_lines = [f"{item['title']}: {item['content']}" for item in retrieved_chunks]
+            rag_lines = [f"[Source: Lesson - {item['title']}] {item['content']}" for item in retrieved_chunks]
             context_parts.append("Excerpts: " + trim_text(" || ".join(rag_lines), context_budget))
         context_parts.append("</curriculum_context>")
-
 
     # 2.5 Document Context (User Uploaded Files)
     file_chunks = retrieve_user_file_context(payload.question, current_user.id, limit=3)
     if file_chunks:
         context_parts.append("<document_context>")
-        file_lines = [f"File '{item['filename']}': {item['content']}" for item in file_chunks]
+        file_lines = [f"[Source: Uploaded File - {item['filename']}] {item['content']}" for item in file_chunks]
         context_parts.append("Excerpts: " + trim_text(" || ".join(file_lines), context_budget * 2))
         context_parts.append("</document_context>")
 

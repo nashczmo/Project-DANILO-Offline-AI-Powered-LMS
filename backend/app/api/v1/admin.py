@@ -221,6 +221,14 @@ def admin_assign_students_to_section(section_id: str, payload: dict=Body(default
 def admin_courses(current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> list[dict]:
     return build_admin_course_cards(db)
 
+@admin_router.get('/admin/courses/{course_id}/people')
+def admin_course_people(course_id: str, current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail='Class not found')
+    rows = db.execute(select(User, Enrollment).join(Enrollment, Enrollment.student_id == User.id).where(Enrollment.course_id == course.id, Enrollment.status == 'active').order_by(User.full_name.asc())).all()
+    return {'teacher': serialize_user(course.teacher) if course.teacher else None, 'students': [{**serialize_user(student), 'enrollmentStatus': enrollment.status} for student, enrollment in rows]}
+
 @admin_router.post('/admin/courses')
 def admin_create_course(payload: dict=Body(default={}), current_user: User=Depends(get_current_user), db: Session=Depends(get_db)) -> dict:
     teacher_id = parse_id(payload.get('teacherId') or payload.get('teacher_id'), 'Faculty', required=False)

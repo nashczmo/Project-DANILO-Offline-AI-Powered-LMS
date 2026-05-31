@@ -148,10 +148,6 @@ ieee80211n=1
 wmm_enabled=1
 auth_algs=1
 ignore_broadcast_ssid=0
-wpa=2
-wpa_passphrase=${WIFI_PASSPHRASE}
-wpa_key_mgmt=WPA-PSK
-rsn_pairwise=CCMP
 EOF
   chmod 0644 /etc/hostapd/hostapd.conf
 

@@ -79,3 +79,19 @@ def class_grades(course_id: str, current_user: User=Depends(get_current_user), d
             summaries.append(item)
     return {'course': serialize_course(course), 'entries': [{'id': grade.id, 'studentId': student.id, 'studentName': student.full_name, 'term': grade.term, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or ''} for grade, student in grades], 'grades': summaries}
 
+
+@classes_router.get('/metadata')
+def get_metadata() -> dict:
+    return {
+        "gradeLevels": {
+            "Junior High School": ["Grade 7", "Grade 8", "Grade 9", "Grade 10"],
+            "Senior High School": ["Grade 11", "Grade 12"]
+        },
+        "strands": ["STEM", "ABM", "HUMSS", "GAS", "TVL", "Sports", "Arts & Design"],
+        "roles": ["student", "teacher", "admin"],
+        "subjects": [
+            "Pre-Calculus", "General Chemistry 1", "Statistics and Probability", 
+            "Reading and Writing Skills", "Empowerment Technologies", 
+            "21st Century Literature", "Physical Education and Health"
+        ]
+    }

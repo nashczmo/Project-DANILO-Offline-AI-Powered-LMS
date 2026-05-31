@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Card, PageHeader, Button } from "../../components/ui";
+import { Card, PageHeader, Button, MathText } from "../../components/ui";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
   Bot,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { apiUrl, apiRequest } from "../../api";
+import { useApi } from "../../hooks/useApi";
 
 function MarkdownPreview({ content }) {
   if (!content) return null;
@@ -41,7 +43,7 @@ function MarkdownPreview({ content }) {
             </div>
           );
         }
-        return <span key={index} className="whitespace-pre-wrap">{part}</span>;
+        return <MathText key={index} text={part} className="whitespace-pre-wrap" />;
       })}
     </div>
   );
@@ -207,14 +209,8 @@ export default function StudentTutor() {
     }
   };
 
-  const quickActions = [
-    { label: "Simplify", mode: "simplify" },
-    { label: "Step-by-Step", mode: "step_by_step" },
-    { label: "In Filipino", mode: "filipino" },
-    { label: "Quiz Me", mode: "quiz_me" },
-    { label: "Practice", mode: "practice" },
-    { label: "Real-Life Example", mode: "real_life" },
-  ];
+  const { data: quickActionsData } = useApi("/ai/quick_actions", { immediate: true });
+  const quickActions = quickActionsData || [];
 
   const handleSend = async (text, mode = "normal") => {
     if (!text.trim()) return;
@@ -332,136 +328,207 @@ export default function StudentTutor() {
 
       <Card className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 rounded-2xl relative">
         {/* Sessions Sidebar Overlay */}
-        {showSessions && (
-          <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-sm flex">
-            <div ref={sidebarRef} className="w-full max-w-sm border-r border-[#E0E0E0] bg-white flex flex-col">
-              <div className="p-4 border-b border-[#E0E0E0] flex items-center justify-between">
-                <h3 className="text-base font-black text-[#202124]">Conversations</h3>
-                <button onClick={() => setShowSessions(false)} className="p-1.5 rounded-lg hover:bg-[#F1F3F4]">
-                  <ChevronLeft className="w-4 h-4 text-[#5F6368]" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {sessions.length === 0 && (
-                  <p className="text-sm text-[#9AA0A6] font-bold text-center py-8">No conversations yet.</p>
-                )}
-                {sessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${
-                      currentSessionId === s.id
-                        ? "bg-[#E8F0FE] border-[#1A73E8]/20"
-                        : "bg-white border-[#E0E0E0] hover:bg-[#F8F9FA]"
-                    }`}
-                    onClick={() => loadSession(s.id)}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-[#202124] truncate">{s.title}</p>
-                      <p className="text-xs text-[#9AA0A6] font-bold">{s.messageCount} messages</p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(s.id);
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-[#FCE8E6] hover:text-[#D93025] text-[#9AA0A6] transition-colors"
+        <AnimatePresence>
+          {showSessions && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-20 bg-white/60 backdrop-blur-md flex"
+            >
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                ref={sidebarRef}
+                className="w-full max-w-sm border-r border-[#E0E0E0] bg-white flex flex-col shadow-2xl"
+              >
+                <div className="p-4 border-b border-[#E0E0E0] flex items-center justify-between">
+                  <h3 className="text-base font-black text-[#202124]">Conversations</h3>
+                  <button onClick={() => setShowSessions(false)} className="p-1.5 rounded-lg hover:bg-[#F1F3F4] transition-colors">
+                    <ChevronLeft className="w-4 h-4 text-[#5F6368]" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {sessions.length === 0 && (
+                    <p className="text-sm text-[#9AA0A6] font-bold text-center py-8">No conversations yet.</p>
+                  )}
+                  {sessions.map((s) => (
+                    <motion.div
+                      key={s.id}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${
+                        currentSessionId === s.id
+                          ? "bg-[#E8F0FE] border-[#1A73E8]/30 shadow-sm"
+                          : "bg-white border-[#E0E0E0] hover:bg-[#F8F9FA] hover:shadow-sm"
+                      }`}
+                      onClick={() => loadSession(s.id)}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1" onClick={() => setShowSessions(false)} />
-          </div>
-        )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-[#202124] truncate">{s.title}</p>
+                        <p className="text-xs text-[#9AA0A6] font-bold">{s.messageCount} messages</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(s.id);
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-[#FCE8E6] hover:text-[#D93025] text-[#9AA0A6] transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+              <div className="flex-1" onClick={() => setShowSessions(false)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  msg.role === "user" ? "bg-[#1A73E8] text-white" : "bg-[#E8F0FE] text-[#1A73E8]"
-                }`}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scroll-smooth bg-[#F8F9FA]/30">
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className={`flex gap-3.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
               >
-                {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-              </div>
-              <div
-                className={`max-w-[85%] sm:max-w-[75%] group ${
-                  msg.role === "user"
-                    ? "bg-[#1A73E8] text-white rounded-2xl rounded-tr-sm px-5 py-3.5 text-[15px] shadow-sm leading-relaxed"
-                    : "bg-white border border-[#E0E0E0] rounded-2xl rounded-tl-sm px-5 py-3.5 text-[15px] shadow-sm leading-relaxed text-[#202124]"
-                }`}
-              >
-                <MarkdownPreview content={msg.content} />
-                {msg.role === "assistant" && !isTyping && msg.content && (
-                  <div className="flex justify-end gap-1.5 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleCopy(msg.id, msg.content)}
-                      className="p-1.5 text-[#9AA0A6] hover:text-[#1A73E8] hover:bg-[#E8F0FE] rounded-md transition-colors"
-                      title="Copy"
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
+                    msg.role === "user"
+                      ? "bg-gradient-to-br from-[#1A73E8] to-[#1557B0] text-white"
+                      : "bg-gradient-to-br from-white to-[#F8F9FA] border border-[#E0E0E0] text-[#1A73E8]"
+                  }`}
+                >
+                  {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                </div>
+                <div
+                  className={`max-w-[85%] sm:max-w-[75%] group ${
+                    msg.role === "user"
+                      ? "bg-gradient-to-br from-[#1A73E8] to-[#1557B0] text-white rounded-[24px] rounded-tr-[4px] px-5 py-4 text-[15px] shadow-sm leading-relaxed"
+                      : "bg-white border border-[#E0E0E0]/80 rounded-[24px] rounded-tl-[4px] px-5 py-4 text-[15px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] leading-relaxed text-[#202124]"
+                  }`}
+                >
+                  <MarkdownPreview content={msg.content} />
+                  {msg.role === "assistant" && !isTyping && msg.content && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex justify-end gap-1.5 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      {copiedId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+                      <button
+                        onClick={() => handleCopy(msg.id, msg.content)}
+                        className="p-1.5 text-[#9AA0A6] hover:text-[#1A73E8] hover:bg-[#E8F0FE] rounded-md transition-colors"
+                        title="Copy"
+                      >
+                        {copiedId === msg.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+            {isTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+                className="flex gap-3.5"
+              >
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-white to-[#F8F9FA] border border-[#E0E0E0] text-[#1A73E8] flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div className="bg-white border border-[#E0E0E0]/80 rounded-[24px] rounded-tl-[4px] px-5 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col justify-center gap-1.5 min-w-[120px]">
+                  <div className="flex items-center gap-1.5">
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
+                      transition={{ repeat: Infinity, duration: 1.2, delay: 0 }}
+                      className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]"
+                    />
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
+                      transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
+                      className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]"
+                    />
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
+                      transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
+                      className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]"
+                    />
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4" />
-              </div>
-              <div className="bg-white border border-[#E0E0E0] rounded-2xl rounded-tl-sm flex items-center gap-1.5 h-10 px-4">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]/50 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]/50 animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+                  <span className="text-[10px] font-bold text-[#1A73E8] tracking-widest uppercase opacity-70">
+                    DANILO is thinking
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <div ref={messagesEndRef} className="h-2" />
         </div>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-[#E0E0E0] bg-white">
-          {files.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {files.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E8F0FE] border border-[#1A73E8]/20 text-[#1A73E8] rounded-full text-xs font-bold"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span className="max-w-[120px] truncate">{f.filename}</span>
-                  <button onClick={() => handleRemoveFile(f.id)} className="hover:text-[#1557B0] ml-1">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="p-4 bg-white/80 backdrop-blur-xl border-t border-[#E0E0E0]/60 relative z-10">
+          <AnimatePresence>
+            {files.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex flex-wrap gap-2 mb-3"
+              >
+                {files.map((f) => (
+                  <motion.div
+                    key={f.id}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E8F0FE]/80 border border-[#1A73E8]/20 text-[#1A73E8] rounded-full text-xs font-bold shadow-sm"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="max-w-[120px] truncate">{f.filename}</span>
+                    <button onClick={() => handleRemoveFile(f.id)} className="hover:text-[#1557B0] ml-1 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {uploadError && (
-            <div className="mb-3 px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025]">
-              {uploadError}
-            </div>
-          )}
+          <AnimatePresence>
+            {uploadError && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="mb-3 px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025] shadow-sm"
+              >
+                {uploadError}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex flex-wrap gap-2 mb-3">
             {quickActions.map((action) => (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 key={action.mode}
                 onClick={() => {
                   const text = input.trim() || "Explain this topic";
                   handleSend(text, action.mode);
                 }}
-                className="dn-chip hover:bg-[#E8F0FE] hover:text-[#1A73E8] hover:border-[#1A73E8]/20 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold bg-[#F1F3F4] text-[#5F6368] border border-transparent hover:bg-[#E8F0FE] hover:text-[#1A73E8] hover:border-[#1A73E8]/20 transition-colors shadow-sm cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#1A73E8]" />
+                <Sparkles className="w-3.5 h-3.5" />
                 {action.label}
-              </button>
+              </motion.button>
             ))}
           </div>
 
@@ -470,23 +537,38 @@ export default function StudentTutor() {
               e.preventDefault();
               handleSend(input, "normal");
             }}
-            className="flex gap-2 items-end"
+            className="flex gap-2 items-end relative"
           >
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.docx,.pptx,.txt" />
-            <Button type="button" variant="secondary" className="px-3 py-2.5" disabled={isUploading} onClick={() => fileInputRef.current?.click()}>
-              {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-            </Button>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={isUploading ? "Processing file..." : "Ask DANILO anything..."}
-              className="dn-input flex-1"
-              disabled={isUploading || isTyping}
-            />
-            <Button type="submit" disabled={!input.trim() || isTyping || isUploading} className="px-4 py-2.5">
-              <Send className="w-4 h-4" />
-            </Button>
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button" 
+              className="p-3 bg-[#F1F3F4] hover:bg-[#E8F0FE] text-[#5F6368] hover:text-[#1A73E8] rounded-xl transition-colors disabled:opacity-50" 
+              disabled={isUploading} 
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
+            </motion.button>
+            <div className="flex-1 relative group">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={isUploading ? "Processing file..." : "Ask DANILO anything..."}
+                className="w-full bg-[#F1F3F4] group-hover:bg-white focus:bg-white border border-transparent group-hover:border-[#E0E0E0] focus:border-[#1A73E8] rounded-xl px-5 py-3.5 text-[15px] text-[#202124] placeholder-[#9AA0A6] outline-none transition-all shadow-sm focus:shadow-[0_0_0_3px_rgba(26,115,232,0.12)]"
+                disabled={isUploading || isTyping}
+              />
+            </div>
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="submit" 
+              disabled={!input.trim() || isTyping || isUploading} 
+              className={`p-3.5 rounded-xl text-white transition-all shadow-sm ${!input.trim() || isTyping || isUploading ? 'bg-[#BDC1C6]' : 'bg-[#1A73E8] hover:bg-[#1557B0] hover:shadow-md'}`}
+            >
+              <Send className="w-5 h-5" />
+            </motion.button>
           </form>
         </div>
       </Card>

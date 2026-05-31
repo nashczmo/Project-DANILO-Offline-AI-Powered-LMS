@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../../store/useAppStore";
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton, EmptyState, Badge } from "../../components/ui";
+import { Card, PageHeader, Skeleton, EmptyState, Badge, MathText } from "../../components/ui";
 import { ClipboardList, FileText, TrendingUp, Sparkles, Bell, ArrowRight, BookOpen } from "lucide-react";
 
 export default function StudentDashboard() {
@@ -22,13 +22,7 @@ export default function StudentDashboard() {
   const pendingAssignments = assignments.filter((a) => a.status === "not_started").slice(0, 5);
   const recentGrades = grades.slice(0, 5);
   const announcements = stream.filter((s) => s.postType === "announcement").slice(0, 3);
-  const suggestions = aiProfile?.recommendations?.length
-    ? aiProfile.recommendations.slice(0, 3)
-    : [
-        "Ask your AI Tutor to explain today's lesson in simpler words.",
-        "Review one weak topic for 10 minutes before class.",
-        "Use Quiz Me mode before your next exam.",
-      ];
+  const suggestions = aiProfile?.recommendations || [];
 
   // Quick stat cards
   const stats = loading
@@ -70,7 +64,7 @@ export default function StudentDashboard() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="My Overview"
-        description={`Welcome back, ${user?.fullName || "Student"}. Here is everything you need for today.`}
+        description={`Welcome back, ${user?.fullName || "there"}. Here is everything you need for today.`}
       />
 
       {/* ── Quick Stats ── */}
@@ -110,8 +104,8 @@ export default function StudentDashboard() {
             <p className="text-sm font-black text-[#202124]">AI Learning Insights</p>
             <p className="text-sm text-[#5F6368] leading-relaxed mt-0.5 dn-line-clamp-2">
               {aiProfile?.recommendations?.length
-                ? aiProfile.recommendations[0]
-                : "Interact with the AI Tutor to receive personalized learning recommendations."}
+                ? <MathText text={aiProfile.recommendations[0]} />
+                : "Interact with the AI Tutor to start receiving personalized learning recommendations."}
             </p>
           </div>
           <button
@@ -149,7 +143,7 @@ export default function StudentDashboard() {
                       <ClipboardList className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-[#202124] truncate">{task.title}</p>
+                      <p className="text-sm font-bold text-[#202124] truncate"><MathText text={task.title} /></p>
                       <p className="text-xs text-[#9AA0A6] font-bold">{task.courseTitle}</p>
                     </div>
                   </div>
@@ -191,7 +185,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-[#202124] truncate">
-                        {work.component || "Assessment"}
+                        <MathText text={work.component || "Assessment"} />
                       </p>
                       <p className="text-xs text-[#9AA0A6] font-bold">{work.courseCode}</p>
                     </div>
@@ -222,19 +216,27 @@ export default function StudentDashboard() {
           <Sparkles className="w-5 h-5 text-[#1A73E8]" />
           <h2 className="text-base font-black text-[#202124]">AI Study Suggestions</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {suggestions.map((item, idx) => (
-            <div
-              key={idx}
-              className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0] flex gap-3"
-            >
-              <span className="w-5 h-5 rounded-full bg-[#1A73E8] text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">
-                {idx + 1}
-              </span>
-              <p className="text-sm text-[#5F6368] leading-relaxed font-bold">{item}</p>
-            </div>
-          ))}
-        </div>
+        {suggestions.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {suggestions.map((item, idx) => (
+              <div
+                key={idx}
+                className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0] flex gap-3"
+              >
+                <span className="w-5 h-5 rounded-full bg-[#1A73E8] text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">
+                  {idx + 1}
+                </span>
+                <p className="text-sm text-[#5F6368] leading-relaxed font-bold"><MathText text={item} /></p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Sparkles}
+            title="No AI Recommendations yet"
+            description="Keep interacting with your AI Tutor and complete assignments to get personalized insights."
+          />
+        )}
       </Card>
 
       {/* ── Announcements ── */}
@@ -252,9 +254,9 @@ export default function StudentDashboard() {
               >
                 <div className="flex items-start gap-2 mb-2">
                   <Badge color="primary">Pinned</Badge>
-                  <h4 className="text-sm font-bold text-[#202124] leading-snug">{item.title}</h4>
+                  <h4 className="text-sm font-bold text-[#202124] leading-snug"><MathText text={item.title} /></h4>
                 </div>
-                <p className="text-sm text-[#5F6368] leading-relaxed">{item.body}</p>
+                <p className="text-sm text-[#5F6368] leading-relaxed"><MathText text={item.body} /></p>
                 <div className="flex items-center gap-3 mt-3">
                   <span className="text-xs text-[#9AA0A6] font-bold">
                     {item.courseTitle || "School"}
