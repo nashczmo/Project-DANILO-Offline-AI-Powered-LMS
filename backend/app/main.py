@@ -840,10 +840,11 @@ Do not use robotic lists unless explicitly asked.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST base your answers ONLY on the provided <curriculum_context>, <student_profile>, and <document_context>.
-2. Priority: 1 student database, 2 grades, 3 attendance, 4 uploaded school files, 5 embeddings, 6 AI reasoning.
-3. NEVER invent or guess any grades, deadlines, attendance, or announcements.
-4. If the requested information is missing, you MUST state exactly: "I couldn't find that in Project DANILO."
-5. If you use information from the context, you should cite its source using the provided [Source: ...] tags internally.
+2. Always query in this exact priority: 1 students, 2 teachers, 3 grades, 4 attendance, 5 schedules, 6 announcements, 7 uploaded files, 8 vector search. Never answer before checking database contexts.
+3. NEVER guess grades, deadlines, attendance, teacher data, announcements.
+4. If missing, say exactly: "I couldn't find that in Project DANILO."
+5. For academic explanations, if unsure, say: "I'm not fully certain. Please verify with your teacher."
+6. If you use information from the context, cite its source internally using [Source: ...].
 '''
 
 SYSTEM_PROMPT = os.getenv('DANILO_SYSTEM_PROMPT', DEFAULT_SYSTEM_PROMPT)
@@ -854,10 +855,11 @@ Be structured and professional.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST base your answers ONLY on the provided <curriculum_context> and <document_context>.
-2. Priority: 1 student database, 2 grades, 3 attendance, 4 uploaded school files, 5 embeddings, 6 AI reasoning.
-3. NEVER invent or guess any grades, deadlines, attendance, or announcements.
-4. If the requested information is missing, you MUST state exactly: "I couldn't find that in Project DANILO."
-5. Use the [Source: ...] tags internally to trace where your information came from.'''
+2. Always query in this exact priority: 1 students, 2 teachers, 3 grades, 4 attendance, 5 schedules, 6 announcements, 7 uploaded files, 8 vector search. Never answer before checking database contexts.
+3. NEVER guess grades, deadlines, attendance, teacher data, announcements.
+4. If missing, say exactly: "I couldn't find that in Project DANILO."
+5. For academic explanations, if unsure, say: "I'm not fully certain. Please verify with your teacher."
+6. Use the [Source: ...] tags internally to trace where your information came from.'''
 
 SYSTEM_PROMPT_ADMIN = '''You are DANILO, a DevOps and Systems Administration AI for the Project DANILO LMS platform.
 Your goal is to assist school administrators with system configuration, network troubleshooting, and server maintenance.
@@ -865,9 +867,9 @@ Be concise and data-first.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST base your answers ONLY on the provided system context.
-2. Priority: 1 student database, 2 grades, 3 attendance, 4 uploaded school files, 5 embeddings, 6 AI reasoning.
-3. NEVER invent or guess any server statuses, student records, grades, deadlines, attendance, or announcements.
-4. If the requested information is missing, state clearly: "I couldn't find that in Project DANILO."'''
+2. Always query in this exact priority: 1 students, 2 teachers, 3 grades, 4 attendance, 5 schedules, 6 announcements, 7 uploaded files, 8 vector search. Never answer before checking database contexts.
+3. NEVER guess server statuses, student records, grades, deadlines, attendance, or announcements.
+4. If missing, say exactly: "I couldn't find that in Project DANILO."'''
 
 SAFETY_KEYWORDS = {'suicide', 'kill', 'murder', 'bomb', 'weapon', 'drugs', 'porn', 'sex', 'hack', 'exploit', 'violence', 'gore', 'terrorist', 'abuse'}
 
@@ -1102,7 +1104,18 @@ def ollama_chat_payload(system_prompt: str, prompt: str, mode: str, *, stream: b
     if memory:
         messages.extend(memory)
     messages.append({'role': 'user', 'content': prompt})
-    return {'model': model or OLLAMA_MODEL, 'stream': stream, 'keep_alive': os.getenv('OLLAMA_KEEP_ALIVE', '10m'), 'messages': messages, 'options': {'temperature': 0.3, 'top_p': 0.9, 'top_k': 40, 'repeat_penalty': 1.1, 'num_ctx': OLLAMA_NUM_CTX, 'num_predict': RESPONSE_MODE_OPTIONS.get(mode, RESPONSE_MODE_OPTIONS['normal'])['num_predict'], 'num_thread': OLLAMA_NUM_THREADS, 'num_batch': OLLAMA_NUM_BATCH, 'num_gpu': OLLAMA_NUM_GPU if gpu_layers is None else gpu_layers}}
+    
+    ctx_size = OLLAMA_NUM_CTX
+    if _psutil:
+        try:
+            vm = _psutil.virtual_memory()
+            available_mb = vm.available / 1024 / 1024
+            if available_mb < 4096:
+                ctx_size = max(1024, OLLAMA_NUM_CTX // 2)
+        except Exception:
+            pass
+
+    return {'model': model or OLLAMA_MODEL, 'stream': stream, 'keep_alive': os.getenv('OLLAMA_KEEP_ALIVE', '10m'), 'messages': messages, 'options': {'temperature': 0.2, 'top_p': 0.9, 'top_k': 40, 'repeat_penalty': 1.1, 'num_ctx': ctx_size, 'num_predict': RESPONSE_MODE_OPTIONS.get(mode, RESPONSE_MODE_OPTIONS['normal'])['num_predict'], 'num_thread': OLLAMA_NUM_THREADS, 'num_batch': OLLAMA_NUM_BATCH, 'num_gpu': OLLAMA_NUM_GPU if gpu_layers is None else gpu_layers}}
 
 def _json_loads(value: str | None, fallback):
     try:
@@ -1312,12 +1325,25 @@ def _models_to_try() -> list[str]:
 def _inference_attempts() -> list[tuple[str, int, str]]:
     attempts: list[tuple[str, int, str]] = []
     primary_gpu = OLLAMA_NUM_GPU
-    for model_name in _models_to_try():
+    models = _models_to_try()
+    
+    pressured, _ = _runtime_pressure()
+    if pressured and len(models) > 1:
+        if '70b' in models[0].lower():
+            models = models[1:]
+        elif '8b' in models[0].lower():
+            models = models[1:]
+            
+    if not models:
+        models = [DANILO_AI_FALLBACK_MODEL or "phi3:mini"]
+
+    for model_name in models:
         if primary_gpu > 0 and model_name == OLLAMA_MODEL:
             attempts.append((model_name, primary_gpu, 'gpu'))
             attempts.append((model_name, 0, 'cpu-fallback'))
         else:
             attempts.append((model_name, 0 if model_name != OLLAMA_MODEL else primary_gpu, 'fallback'))
+            
     deduped: list[tuple[str, int, str]] = []
     seen = set()
     for item in attempts:
@@ -1362,8 +1388,7 @@ async def ask_ollama(system_prompt: str, prompt: str, mode: str, memory: list[di
     timeout = httpx.Timeout(AI_TIMEOUT_SECONDS, connect=5.0)
     pressured, pressure_reason = _runtime_pressure()
     if pressured:
-        ai_logger.warning('AI request shed because runtime is under pressure reason=%s', pressure_reason)
-        raise HTTPException(status_code=503, detail='DANILO is protecting system memory and CPU right now. Please try again shortly.')
+        ai_logger.warning('AI request pressured, attempting live switching downgrade reason=%s', pressure_reason)
     queue_depth = _ai_queue_depth()
     if queue_depth > 0:
         ai_logger.info('AI queue depth=%s user will wait for semaphore', queue_depth)
@@ -1437,8 +1462,7 @@ async def stream_ollama(system_prompt: str, prompt: str, mode: str, memory: list
     timeout = httpx.Timeout(AI_TIMEOUT_SECONDS, connect=5.0)
     pressured, pressure_reason = _runtime_pressure()
     if pressured:
-        ai_logger.warning('AI stream shed because runtime is under pressure reason=%s', pressure_reason)
-        raise HTTPException(status_code=503, detail='DANILO is protecting system memory and CPU right now. Please try again shortly.')
+        ai_logger.warning('AI stream pressured, attempting live switching downgrade reason=%s', pressure_reason)
     queue_depth = _ai_queue_depth()
     if queue_depth > 0:
         yield {'queued': True, 'position': queue_depth, 'done': False}
