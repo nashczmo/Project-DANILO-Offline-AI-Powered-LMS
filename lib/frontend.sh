@@ -14,6 +14,11 @@ write_frontend_files() {
 
   rm -rf "${APP_ROOT}/frontend/src" "${APP_ROOT}/frontend/public"
   cp -r "${src_dir}/package.json" "${APP_ROOT}/frontend/package.json"
+  if [[ -f "${src_dir}/package-lock.json" ]]; then
+    cp -r "${src_dir}/package-lock.json" "${APP_ROOT}/frontend/package-lock.json"
+  else
+    rm -f "${APP_ROOT}/frontend/package-lock.json"
+  fi
   cp -r "${src_dir}/vite.config.js" "${APP_ROOT}/frontend/vite.config.js"
   cp -r "${src_dir}/postcss.config.js" "${APP_ROOT}/frontend/postcss.config.js"
   cp -r "${src_dir}/tailwind.config.js" "${APP_ROOT}/frontend/tailwind.config.js"

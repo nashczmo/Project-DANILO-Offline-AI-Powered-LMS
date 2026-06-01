@@ -6,8 +6,8 @@ write_gateway_files() {
   cat > "${APP_ROOT}/gateway/Dockerfile" <<'EOF'
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY frontend/package.json ./
-RUN npm install
+COPY frontend/package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY frontend/ ./
 RUN npm run build
 

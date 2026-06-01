@@ -75,7 +75,7 @@ verify_command_available() {
 
 validate_ubuntu_version() {
   if [[ ! -r /etc/os-release ]]; then
-    echo "Cannot read /etc/os-release; this installer supports Ubuntu 24.04."
+    echo "Cannot read /etc/os-release; this installer supports Ubuntu Linux."
     exit 1
   fi
 

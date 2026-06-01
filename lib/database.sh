@@ -154,7 +154,7 @@ setup_automated_backups() {
 set -e
 BACKUP_DIR="/var/backups/danilo"
 mkdir -p "\${BACKUP_DIR}"
-cd /opt/danilo/app && docker compose exec -T postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "\${BACKUP_DIR}/danilo-db-\$(date +%F).sql"
+cd "${APP_ROOT}" && docker compose exec -T postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "\${BACKUP_DIR}/danilo-db-\$(date +%F).sql"
 # Keep last 7 days of backups
 find "\${BACKUP_DIR}" -name "danilo-db-*.sql" -type f -mtime +7 -delete
 EOF

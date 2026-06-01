@@ -265,16 +265,15 @@ detect_ai_hardware_profile() {
 
 configure_ollama_model() {
   detect_ai_hardware_profile
-  local gguf_file=""
-  local gguf_path=""
   local models_dir="${SCRIPT_DIR}/models"
-  local modelfile="${models_dir}/Modelfile"
+  local gguf_file=""
+  local custom_model_name="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-local}"
 
   mkdir -p "${models_dir}"
 
   # WhichLLM Dynamic hardware-aware AI model selection
   if command_missing whichllm; then
-    if command_exists pip3 && internet_reachable_now; then
+    if command -v pip3 >/dev/null 2>&1 && internet_reachable_now; then
       note "Internet and pip3 detected. Installing whichllm for dynamic hardware AI benchmarking..."
       pip3 install --break-system-packages whichllm >/dev/null 2>&1 || true
     fi
@@ -302,12 +301,57 @@ configure_ollama_model() {
     fi
   fi
 
+  if [[ -n "${DANILO_CUSTOM_GGUF_PATH:-}" && -f "${DANILO_CUSTOM_GGUF_PATH}" ]]; then
+    gguf_file="${DANILO_CUSTOM_GGUF_PATH}"
+  else
+    gguf_file="$(find "${models_dir}" -maxdepth 1 -type f -iname '*.gguf' | sort | head -n1 || true)"
+  fi
+
+  if [[ -n "${gguf_file}" ]]; then
+    note "Local GGUF model detected; configuring Ollama model name: ${custom_model_name}"
+    OLLAMA_MODEL="${custom_model_name}"
+    DANILO_OLLAMA_MODEL="${custom_model_name}"
+  fi
+
+  export OLLAMA_MODEL DANILO_OLLAMA_MODEL
+}
+
+preload_ollama_model() {
+  local container="$1"
   local embed_model="${DANILO_AI_EMBEDDING_MODEL:-nomic-embed-text}"
+  local gguf_file=""
+  local custom_model_name="${DANILO_CUSTOM_OLLAMA_MODEL:-danilo-local}"
+  local modelfile=""
+
+  if [[ -n "${DANILO_CUSTOM_GGUF_PATH:-}" && -f "${DANILO_CUSTOM_GGUF_PATH}" ]]; then
+    gguf_file="${DANILO_CUSTOM_GGUF_PATH}"
+  else
+    gguf_file="$(find "${SCRIPT_DIR}/models" -maxdepth 1 -type f -iname '*.gguf' | sort | head -n1 || true)"
+  fi
+
+  if [[ -n "${gguf_file}" ]]; then
+    note "Registering local GGUF model with Ollama: ${gguf_file}"
+    modelfile="$(mktemp)"
+    if [[ -n "${DANILO_CUSTOM_MODELFILE:-}" && -f "${DANILO_CUSTOM_MODELFILE}" ]]; then
+      cp "${DANILO_CUSTOM_MODELFILE}" "${modelfile}"
+    else
+      printf 'FROM /models/%s\n' "$(basename "${gguf_file}")" > "${modelfile}"
+    fi
+    docker exec "${container}" mkdir -p /models
+    docker cp "${modelfile}" "${container}:/tmp/DANILO-Modelfile"
+    docker cp "${gguf_file}" "${container}:/models/$(basename "${gguf_file}")"
+    if ! run_step_command "Creating Ollama model ${custom_model_name} from local GGUF" docker exec "${container}" ollama create "${custom_model_name}" -f /tmp/DANILO-Modelfile; then
+      warn "Local GGUF model could not be registered; the LMS will continue with degraded AI."
+    fi
+    rm -f "${modelfile}"
+    OLLAMA_MODEL="${custom_model_name}"
+    DANILO_OLLAMA_MODEL="${custom_model_name}"
+  fi
 
   if ollama_model_exists_in_container "${container}" "${OLLAMA_MODEL}"; then
     note "Ollama model ${OLLAMA_MODEL} is already cached; skipping pull"
-  else
-    run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"
+  elif ! run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"; then
+    warn "Primary Ollama model ${OLLAMA_MODEL} could not be loaded; the core LMS will continue with degraded AI."
   fi
   if [[ -n "${DANILO_FALLBACK_OLLAMA_MODEL}" && "${DANILO_FALLBACK_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" ]]; then
     if ollama_model_exists_in_container "${container}" "${DANILO_FALLBACK_OLLAMA_MODEL}"; then
@@ -318,8 +362,8 @@ configure_ollama_model() {
   fi
   if ollama_model_exists_in_container "${container}" "${embed_model}"; then
     note "Embeddings model ${embed_model} is already cached; skipping pull"
-  else
-    run_step_command "Pulling Embeddings model ${embed_model}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${embed_model}"
+  elif ! run_step_command "Pulling Embeddings model ${embed_model}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${embed_model}"; then
+    warn "Embeddings model ${embed_model} could not be loaded; retrieval-enhanced AI will be degraded."
   fi
 }
 
