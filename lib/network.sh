@@ -130,8 +130,16 @@ dhcp-option=6,${LAN_IP}
 dhcp-option=114,"http://${PORTAL_DOMAIN}/"
 address=/#/${LAN_IP}
 address=/${PORTAL_DOMAIN}/${LAN_IP}
+address=/captive.apple.com/${LAN_IP}
+address=/www.apple.com/${LAN_IP}
+address=/www.appleiphonecell.com/${LAN_IP}
+address=/www.itools.info/${LAN_IP}
+address=/www.ibook.info/${LAN_IP}
+address=/www.thinkdifferent.us/${LAN_IP}
 address=/connectivitycheck.gstatic.com/${LAN_IP}
 address=/clients3.google.com/${LAN_IP}
+address=/connectivitycheck.android.com/${LAN_IP}
+address=/play.googleapis.com/${LAN_IP}
 log-queries
 log-dhcp
 EOF

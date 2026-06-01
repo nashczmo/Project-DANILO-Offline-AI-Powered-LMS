@@ -107,8 +107,9 @@ def seed_defaults(session: Session, *, admin_username: str, admin_password: str,
     
     courses = {}
     for s in subjects:
-        for term in ["1st Term", "2nd Term", "3rd Term"]:
-            c = Course(code=s["code"], title=s["title"], subject=s["subj"], education_level="Senior High School", grade_level="Grade 11", strand="STEM", term=term, school_year="2026-2027", description=f"{s['title']} for Grade 11 STEM", teacher_id=s["teacher"].id, is_active=True)
+        for term in ["Term 1", "Term 2", "Term 3"]:
+            term_suffix = term.replace("Term ", "T")
+            c = Course(code=f"{s['code']}-{term_suffix}", title=s["title"], subject=s["subj"], education_level="Senior High School", grade_level="Grade 11", strand="STEM", term=term, school_year="2026-2027", description=f"{s['title']} for Grade 11 STEM", teacher_id=s["teacher"].id, is_active=True)
             session.add(c)
     session.flush()
 
@@ -134,14 +135,14 @@ def seed_defaults(session: Session, *, admin_username: str, admin_password: str,
     session.flush()
 
     # Create polynomial functions quiz for Pre-Calculus
-    precalc_course = session.scalar(select(Course).where(Course.code == "PRECALC-11", Course.term == "1st Term"))
+    precalc_course = session.scalar(select(Course).where(Course.code == "PRECALC-11-T1", Course.term == "Term 1"))
     quiz = Quiz(course_id=precalc_course.id, title="Polynomial Functions Quiz", instructions="Answer the 25 items carefully across 3 parts.", created_by=teachers["t_precalc"].id, is_published=True)
     session.add(quiz)
     session.flush()
     
     for i in range(1, 26):
         part = "Part 1: Roots" if i <= 10 else "Part 2: Graphing" if i <= 20 else "Part 3: Applications"
-        qq = QuizQuestion(quiz_id=quiz.id, question_text=f"({part}) Question {i} about Polynomial Functions", question_type="multiple_choice", choices_json='["A", "B", "C", "D"]', answer_key="A", points=1)
+        qq = QuizQuestion(quiz_id=quiz.id, question_text=f"({part}) Question {i} about Polynomial Functions", choices_json='["A", "B", "C", "D"]', answer_key="A", points=1)
         session.add(qq)
         
     assignment = Assignment(course_id=precalc_course.id, title="Rational Functions Homework", instructions="Solve the problems.", points=100, assignment_type="quiz", attachments_json="[]", created_by=teachers["t_precalc"].id)
@@ -158,7 +159,7 @@ def seed_defaults(session: Session, *, admin_username: str, admin_password: str,
     # Add dummy grades for all students
     for st in st_objects:
         for c in all_courses:
-            score = 85 if c.term == "1st Term" else 88 if c.term == "2nd Term" else 92
+            score = 85 if c.term == "Term 1" else 88 if c.term == "Term 2" else 92
             session.add(GradeEntry(student_id=st.id, course_id=c.id, term=c.term, component="Written Work (WW)", score=score*0.3, max_score=30, weight=0.3, recorded_by=c.teacher_id))
             session.add(GradeEntry(student_id=st.id, course_id=c.id, term=c.term, component="Performance Tasks (PT)", score=score*0.5, max_score=50, weight=0.5, recorded_by=c.teacher_id))
             session.add(GradeEntry(student_id=st.id, course_id=c.id, term=c.term, component="Quarterly Assessment (QA)", score=score*0.2, max_score=20, weight=0.2, recorded_by=c.teacher_id))

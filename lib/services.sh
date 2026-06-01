@@ -145,8 +145,22 @@ server {
 
 server {
   listen ${FRONTEND_PORT:-80};
+  server_name captive.apple.com
+              www.apple.com
+              www.appleiphonecell.com
+              www.itools.info
+              www.airport.us
+              www.ibook.info
+              www.thinkdifferent.us;
+  return 302 http://${PORTAL_DOMAIN}/;
+}
+
+server {
+  listen ${FRONTEND_PORT:-80};
   server_name connectivitycheck.gstatic.com
               clients3.google.com
+              connectivitycheck.android.com
+              play.googleapis.com
               connectivity-check.ubuntu.com;
   return 302 http://${PORTAL_DOMAIN}/;
 }
