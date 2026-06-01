@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../../store/useAppStore";
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton, EmptyState, Badge, MathText } from "../../components/ui";
+import { Card, PageHeader, Skeleton, EmptyState, Badge, MathText, StatCard } from "../../components/ui";
 import { ClipboardList, FileText, TrendingUp, Sparkles, Bell, ArrowRight, BookOpen } from "lucide-react";
 
 export default function StudentDashboard() {
@@ -75,21 +75,17 @@ export default function StudentDashboard() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {stats.map((s) => (
-            <Card
+            <StatCard
               key={s.label}
-              hover
+              label={s.label}
+              value={s.value}
+              icon={s.icon}
+              iconBg={s.iconBg}
+              iconColor={s.iconColor}
+              trendLabel={s.trend}
+              trend={s.trendColor === "text-[#188038]" ? "up" : s.trendColor === "text-[#E37400]" ? "down" : "neutral"}
               onClick={s.onClick}
-              className="flex flex-col gap-4 p-5 cursor-pointer"
-            >
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor}`}>
-                <s.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-3xl font-black text-[#202124] leading-none">{s.value}</p>
-                <p className="text-sm font-black text-[#202124] mt-2">{s.label}</p>
-                <p className={`text-xs font-bold mt-0.5 ${s.trendColor}`}>{s.trend}</p>
-              </div>
-            </Card>
+            />
           ))}
         </div>
       )}

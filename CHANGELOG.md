@@ -2,37 +2,39 @@
 
 All notable changes to Project DANILO will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [v1.0-alpha] - Project DANILO v1.0 Alpha
 
-## [1.3.0] - 2026-05-27
+### Summary
+Project DANILO v1.0 Alpha is the first public alpha release of the offline-first, AI-powered Learning Management System designed for local school deployments. It provides a robust, Dockerized stack with an automated installer for Ubuntu, featuring a Captive Portal for mobile access and local AI capabilities via Ollama.
 
-### Added
-- Self-hosted Lato fonts (WOFF2) for guaranteed offline availability without relying on Google Fonts CDN.
+### Major Features
+- **Offline LMS:** Full LMS functionality without internet access, including Admin, Teacher, and Student portals.
+- **Local AI Tutor & Insights:** AI capabilities powered by Ollama running entirely offline.
+- **Dockerized Stack:** FastAPI backend, React/Vite frontend, PostgreSQL database, and Nginx gateway.
+- **Ubuntu Installer:** Single-command `danilo.sh` script to install, update, verify, and uninstall the system.
+- **WiFi Captive Portal:** Built-in AP support to serve the LMS locally to mobile devices without an internet connection.
 
-### Changed
-- Comprehensive UI/UX redesign inspired by Material Design 3 and Google Workspace.
-- Redesigned all 14 portal pages (Admin, Student, Teacher) with a unified, clean, and polished design language.
-- Implemented a robust global design system in Tailwind CSS (`index.css`) with consistent tokens, utility classes, and keyframe entrance animations.
-- Refactored shared UI components (Cards, Buttons, Badges, EmptyStates, PageHeaders) for a premium look and feel.
-- Removed legacy Inter font and Google Fonts CDN links.
+### Installation Notes
+- Target OS: **Ubuntu 24.04 LTS** (recommended) with sudo/root access.
+- Requires internet access during initial setup to pull Docker images and AI models.
+- Run `sudo bash danilo.sh --install` to begin.
+- Use `sudo bash danilo.sh --verify` after installation to confirm system health.
 
-## [1.2.0] - 2026-05-26
+### Upgrade Notes
+- As this is the first alpha release, there are no prior versions to upgrade from.
+- Future updates can be applied using `sudo bash danilo.sh --update`.
 
-### Added
-- Comprehensive GitHub metadata and contributing rules.
-- Robust installer diagnostics (`--verify` mode).
-- Graceful degradation for Ollama and Wi-Fi AP services.
-- Detailed architecture and developer documentation.
+### Breaking Changes
+- N/A (Initial alpha release).
 
-### Changed
-- Refactored `docker-compose.yml` to rely on `service_healthy` rather than `service_started` for PostgreSQL, fully stabilizing FastAPI startup routines.
-- Updated default `NODE_MAJOR` fallback to LTS version 20 to widen Ubuntu compatibility.
-- Streamlined `danilo.sh` pre-flight to proactively install missing tools (`jq`, `curl`, `awk`) via noninteractive `apt-get` loops.
+### Known Limitations & Issues
+- **Captive Portal Popup:** Automatic captive portal popup behavior is OS-dependent (iOS/Android). Users may need to manually navigate to `http://10.10.0.1` or disable "Private DNS"/VPNs.
+- **Local AI Performance:** AI generation speed depends on host hardware and model quantization.
+- **Alpha Stability:** This is an alpha release. It is not yet recommended for production deployments containing sensitive student data without strict manual review of backups, security, and data persistence.
 
-## [1.1.0-beta] - 2026-05-24
-
-### Added
-- Integrated WhichLLM for dynamic offline hardware benchmarking.
-- Added modular API routers to FastAPI backend.
-- Deployed rate limiting (slowapi) and robust RBAC dependency injection.
+### Recommended Deployment Checklist
+- [ ] Test on a clean Ubuntu environment before real-world deployment.
+- [ ] Verify WiFi adapter compatibility for the Captive Portal feature.
+- [ ] Ensure adequate storage for AI models (typically 5GB+ depending on the model).
+- [ ] Record the automatically generated admin credentials safely.
+- [ ] Run `sudo bash danilo.sh --verify` to ensure all components are active.

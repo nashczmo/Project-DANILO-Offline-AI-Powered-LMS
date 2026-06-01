@@ -80,6 +80,34 @@ verify_http_status() {
   fi
 }
 
+verify_captive_redirect() {
+  local label="$1"
+  local host="$2"
+  local path="$3"
+  local result=""
+  local status_code=""
+  local redirect_url=""
+
+  result="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' -H "Host: ${host}" "http://127.0.0.1${path}" 2>/dev/null || true)"
+  status_code="${result%% *}"
+  redirect_url="${result#* }"
+
+  if [[ "${status_code}" == "302" && "${redirect_url}" == "http://${PORTAL_DOMAIN}/"* ]]; then
+    verify_pass "${label}"
+  else
+    verify_fail "${label} (HTTP ${status_code:-no response}, redirect ${redirect_url:-none})"
+  fi
+}
+
+verify_captive_redirects() {
+  verify_captive_redirect "iOS captive check redirects to portal domain" "captive.apple.com" "/hotspot-detect.html"
+  verify_captive_redirect "iOS success check redirects to portal domain" "www.apple.com" "/library/test/success.html"
+  verify_captive_redirect "Android captive check redirects to portal domain" "connectivitycheck.gstatic.com" "/generate_204"
+  verify_captive_redirect "Android clients check redirects to portal domain" "clients3.google.com" "/generate_204"
+  verify_captive_redirect "Android Google check redirects to portal domain" "www.google.com" "/generate_204"
+  verify_captive_redirect "Windows captive check redirects to portal domain" "www.msftncsi.com" "/ncsi.txt"
+}
+
 active_ai_runtime() {
   printf '%s' "ollama"
 }
@@ -311,6 +339,50 @@ verify_admin_seed() {
   fi
 }
 
+verify_ai_matrix_status() {
+  local container_state=""
+  local ollama_api_reachable=0
+  local active_model="${DANILO_OLLAMA_MODEL:-${OLLAMA_MODEL:-}}"
+
+  if [[ -f "${APP_ROOT}/.env" ]]; then
+    active_model="$(read_env_value "${APP_ROOT}/.env" "OLLAMA_MODEL" 2>/dev/null || true)"
+  fi
+  [[ -z "${active_model}" ]] && active_model="${OLLAMA_MODEL:-auto}"
+
+  if [[ ! -f "${APP_ROOT}/docker-compose.yml" ]]; then
+    printf '  %s[INFO]%s AI Status: %sOFFLINE%s (missing compose file)\n' "${BOLD}" "${RESET}" "${RED}" "${RESET}"
+    return 0
+  fi
+
+  local container_id="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps -q ollama 2>/dev/null | head -n1 || true)"
+  if [[ -z "${container_id}" ]]; then
+    printf '  %s[INFO]%s AI Status: %sOFFLINE%s (container not found)\n' "${BOLD}" "${RESET}" "${RED}" "${RESET}"
+    return 0
+  fi
+
+  container_state="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null || true)"
+  if [[ "${container_state}" == "starting" ]]; then
+    printf '  %s[INFO]%s AI Status: %sSTARTING%s\n' "${BOLD}" "${RESET}" "${YELLOW}" "${RESET}"
+    return 0
+  elif [[ "${container_state}" != "healthy" && "${container_state}" != "running" ]]; then
+    printf '  %s[INFO]%s AI Status: %sOFFLINE%s (container %s)\n' "${BOLD}" "${RESET}" "${RED}" "${RESET}" "${container_state}"
+    return 0
+  fi
+
+  local tags_body="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://${OLLAMA_HOST:-ollama}:${OLLAMA_PORT:-11434}/api/tags', timeout=5).read().decode())" 2>/dev/null || true)"
+  if [[ "${tags_body}" != *'"models"'* ]]; then
+    printf '  %s[INFO]%s AI Status: %sDEGRADED%s (API unreachable)\n' "${BOLD}" "${RESET}" "${YELLOW}" "${RESET}"
+    return 0
+  fi
+
+  local model_list="$(docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama list 2>/dev/null || true)"
+  if printf '%s\n' "${model_list}" | awk -v model="${active_model}" 'NR > 1 && ($1 == model || $1 == model ":latest") { found = 1 } END { exit found ? 0 : 1 }'; then
+    printf '  %s[INFO]%s AI Status: %sREADY%s (%s)\n' "${BOLD}" "${RESET}" "${GREEN}" "${RESET}" "${active_model}"
+  else
+    printf '  %s[INFO]%s AI Status: %sMODEL MISSING%s (%s)\n' "${BOLD}" "${RESET}" "${YELLOW}" "${RESET}" "${active_model}"
+  fi
+}
+
 verify_mode() {
   print_install_intro
   step 1 1 "Post-install verification"
@@ -336,6 +408,7 @@ verify_mode() {
   verify_http "Backend API reachable" "http://127.0.0.1/api/health" '"status"'
   verify_http_status "Frontend reachable" "http://127.0.0.1/"
   verify_frontend_html "Frontend static bundle reachable" "http://127.0.0.1/"
+  verify_captive_redirects
   verify_frontend_served_build_marker
   verify_compose_command "Database connection works" exec -T postgres pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
   verify_database_schema
@@ -343,6 +416,7 @@ verify_mode() {
   verify_compose_warn_command "Ollama CLI reachable" exec -T ollama ollama list
   verify_ollama_api
   verify_active_model
+  verify_ai_matrix_status
 
   if getent hosts "${PORTAL_DOMAIN}" >/dev/null 2>&1 || grep -q "${PORTAL_DOMAIN}" /etc/hosts 2>/dev/null; then
     verify_pass "${PORTAL_DOMAIN} resolves locally"

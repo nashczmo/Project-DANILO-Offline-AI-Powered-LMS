@@ -137,9 +137,14 @@ address=/www.itools.info/${LAN_IP}
 address=/www.ibook.info/${LAN_IP}
 address=/www.thinkdifferent.us/${LAN_IP}
 address=/connectivitycheck.gstatic.com/${LAN_IP}
+address=/www.gstatic.com/${LAN_IP}
 address=/clients3.google.com/${LAN_IP}
+address=/www.google.com/${LAN_IP}
+address=/google.com/${LAN_IP}
+address=/android.clients.google.com/${LAN_IP}
 address=/connectivitycheck.android.com/${LAN_IP}
 address=/play.googleapis.com/${LAN_IP}
+address=/www.googleapis.com/${LAN_IP}
 log-queries
 log-dhcp
 EOF
@@ -271,4 +276,3 @@ get_container_ip() {
   [[ -n "${container_id}" ]] || return 1
   docker inspect --format '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${container_id}" 2>/dev/null
 }
-

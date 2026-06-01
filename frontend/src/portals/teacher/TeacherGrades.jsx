@@ -172,7 +172,7 @@ export default function TeacherGrades() {
             <option value="">Choose a class…</option>
             {activeCourses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.subject} - {c.gradeLevel} {c.term}
+                {c.subject} - {c.gradeLevel} {c.term} (S.Y. {c.schoolYear || "Unknown"})
               </option>
             ))}
           </select>

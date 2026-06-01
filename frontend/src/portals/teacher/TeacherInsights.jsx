@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../../hooks/useApi";
 import { apiRequest } from "../../api";
-import { Card, PageHeader, Skeleton, EmptyState, Badge, Button } from "../../components/ui";
+import { Card, PageHeader, Skeleton, EmptyState, Badge, Button, ErrorRetry } from "../../components/ui";
 import { AlertTriangle, Users, Cpu, Sparkles, Send, BookOpen } from "lucide-react";
 
 export default function TeacherInsights() {
-  const { data: courses } = useApi("/teacher/courses", { immediate: true });
+  const { data: courses, loading: coursesLoading, error: coursesError, refresh: refreshCourses } = useApi("/teacher/courses", { immediate: true });
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [chatInput, setChatInput] = useState("");
   const [chatAnswer, setChatAnswer] = useState("");
@@ -15,6 +15,12 @@ export default function TeacherInsights() {
     selectedCourseId ? `/teacher/insights?class_id=${selectedCourseId}&include_ai=true` : null,
     { immediate: !!selectedCourseId }
   );
+
+  useEffect(() => {
+    if (!selectedCourseId && courses?.length) {
+      setSelectedCourseId(String(courses[0].id));
+    }
+  }, [courses, selectedCourseId]);
 
   const sendInsightChat = async (e) => {
     e.preventDefault();
@@ -55,8 +61,11 @@ export default function TeacherInsights() {
           className="dn-input"
           value={selectedCourseId || ""}
           onChange={(e) => setSelectedCourseId(e.target.value || null)}
+          disabled={coursesLoading || !!coursesError || !courses?.length}
         >
-          <option value="">Choose a class to analyze…</option>
+          <option value="">
+            {coursesLoading ? "Loading classes..." : "Choose a class to analyze..."}
+          </option>
           {(courses || []).map((c) => (
             <option key={c.id} value={c.id}>
               {c.subject} - {c.gradeLevel} {c.term}
@@ -65,46 +74,77 @@ export default function TeacherInsights() {
         </select>
       </Card>
 
-      {/* AI Chat */}
-      <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-[#1A73E8]" />
-          <h3 className="text-base font-black text-[#202124]">Ask DANILO</h3>
-          <span className="text-xs text-[#9AA0A6] font-bold">
-            Intervention ideas, rubric help, or subject planning
-          </span>
+      {coursesLoading && (
+        <div className="space-y-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-40" />
         </div>
-        <form onSubmit={sendInsightChat} className="flex flex-col sm:flex-row gap-2">
-          <input
-            className="dn-input flex-1"
-            placeholder="e.g. Which students need remediation in fractions?"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            aria-label="Ask AI a question"
-            disabled={chatLoading}
-          />
-          <Button type="submit" disabled={chatLoading || !chatInput.trim()}>
-            <Send className="w-4 h-4" />
-            {chatLoading ? "Thinking…" : "Send"}
-          </Button>
-        </form>
-        {chatError && (
-          <div
-            role="alert"
-            className="mt-3 px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025]"
-          >
-            {chatError}
-          </div>
-        )}
-        {chatAnswer && (
-          <div className="mt-4 p-4 bg-[#E8F0FE]/40 rounded-xl border border-[#1A73E8]/15">
-            <p className="text-xs font-black text-[#1A73E8] uppercase tracking-wide mb-2">DANILO's Response</p>
-            <p className="text-sm text-[#202124] leading-relaxed whitespace-pre-line">{chatAnswer}</p>
-          </div>
-        )}
-      </Card>
+      )}
 
-      {selectedCourseId && loading && (
+      {!coursesLoading && coursesError && (
+        <Card>
+          <ErrorRetry message={coursesError} onRetry={refreshCourses} />
+        </Card>
+      )}
+
+      {!coursesLoading && !coursesError && courses?.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={BookOpen}
+            title="No classes available"
+            description="AI Insights will appear after a class is assigned to your teacher account."
+          />
+        </Card>
+      )}
+
+      {/* AI Chat */}
+      {!coursesLoading && !coursesError && courses?.length > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-[#1A73E8]" />
+            <h3 className="text-base font-black text-[#202124]">Ask DANILO</h3>
+            <span className="text-xs text-[#9AA0A6] font-bold">
+              Intervention ideas, rubric help, or subject planning
+            </span>
+          </div>
+          <form onSubmit={sendInsightChat} className="flex flex-col sm:flex-row gap-2">
+            <input
+              className="dn-input flex-1"
+              placeholder="e.g. Which students need remediation in fractions?"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              aria-label="Ask AI a question"
+              disabled={chatLoading}
+            />
+            <Button type="submit" disabled={chatLoading || !chatInput.trim()}>
+              <Send className="w-4 h-4" />
+              {chatLoading ? "Thinking..." : "Send"}
+            </Button>
+          </form>
+          {chatError && (
+            <div
+              role="alert"
+              className="mt-3 px-4 py-3 rounded-xl bg-[#FCE8E6] border border-[#D93025]/20 text-sm font-bold text-[#D93025]"
+            >
+              {chatError}
+            </div>
+          )}
+          {chatAnswer && (
+            <div className="mt-4 p-4 bg-[#E8F0FE]/40 rounded-xl border border-[#1A73E8]/15">
+              <p className="text-xs font-black text-[#1A73E8] uppercase tracking-wide mb-2">DANILO's Response</p>
+              <p className="text-sm text-[#202124] leading-relaxed whitespace-pre-line">{chatAnswer}</p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {selectedCourseId && error && (
+        <Card>
+          <ErrorRetry message={error} onRetry={refresh} />
+        </Card>
+      )}
+
+      {selectedCourseId && loading && !error && (
         <div className="space-y-4">
           <Skeleton className="h-40" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -114,7 +154,7 @@ export default function TeacherInsights() {
         </div>
       )}
 
-      {selectedCourseId && !loading && insights && (
+      {selectedCourseId && !loading && !error && insights && (
         <div className="space-y-6 animate-fade-in">
           {/* AI Summary */}
           <Card className="border-[#1A73E8]/20">

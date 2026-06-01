@@ -1,5 +1,5 @@
 import { useAppStore } from "../../store/useAppStore";
-import { Card, PageHeader, Skeleton, EmptyState, Badge } from "../../components/ui";
+import { Card, PageHeader, Skeleton, EmptyState, Badge, StatCard } from "../../components/ui";
 import { FileText, Activity, BookOpen, ArrowRight, Sparkles, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -81,28 +81,17 @@ export default function TeacherDashboard() {
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((s) => (
-          <Card
+          <StatCard
             key={s.label}
-            hover
+            label={s.label}
+            value={s.value}
+            icon={s.icon}
+            iconBg={s.iconBg}
+            iconColor={s.iconColor}
+            description={s.description}
+            linkLabel={s.linkLabel}
             onClick={s.onClick}
-            className="flex flex-col gap-4 p-5 cursor-pointer"
-          >
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor}`}>
-              <s.icon className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              {s.value !== null ? (
-                <p className="text-3xl font-black text-[#202124] leading-none">{s.value}</p>
-              ) : null}
-              <p className="text-sm font-black text-[#202124] mt-2">{s.label}</p>
-              {s.description && (
-                <p className="text-xs text-[#9AA0A6] font-bold mt-0.5 leading-relaxed">{s.description}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-sm font-black text-[#1A73E8] border-t border-[#E0E0E0] pt-3">
-              {s.linkLabel} <ArrowRight className="w-3.5 h-3.5" />
-            </div>
-          </Card>
+          />
         ))}
       </div>
 

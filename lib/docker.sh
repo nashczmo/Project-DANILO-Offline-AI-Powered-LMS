@@ -130,27 +130,31 @@ prefetch_container_assets() {
   run_step_command "Building DANILO backend and gateway images" docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" build "${build_args[@]}" backend gateway
 
   if [[ "${DANILO_AI_RUNTIME:-ollama}" == "ollama" ]]; then
-    note "Preloading the Ollama model into the persistent stack volume"
-    run_step_command "Creating the DANILO Ollama model volume" docker volume create "${STACK_NAME}_ollama_data"
-    docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null 2>&1 || true
-    run_step_command "Starting temporary Ollama container for model preload" docker run -d \
-      --name "${TEMP_OLLAMA_CONTAINER}" \
-      -v "${STACK_NAME}_ollama_data:/root/.ollama" \
-      ollama/ollama:latest
+    if [[ "${DANILO_AI_ENABLE:-0}" -eq 1 ]]; then
+      note "Preloading the Ollama model into the persistent stack volume"
+      run_step_command "Creating the DANILO Ollama model volume" docker volume create "${STACK_NAME}_ollama_data"
+      docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null 2>&1 || true
+      run_step_command "Starting temporary Ollama container for model preload" docker run -d \
+        --name "${TEMP_OLLAMA_CONTAINER}" \
+        -v "${STACK_NAME}_ollama_data:/root/.ollama" \
+        ollama/ollama:latest
 
-    local attempts=0
-    until docker exec "${TEMP_OLLAMA_CONTAINER}" ollama list >/dev/null 2>&1; do
-      attempts=$((attempts + 1))
-      if [[ "${attempts}" -gt 60 ]]; then
-        echo "Temporary Ollama service did not become ready in time."
-        docker logs "${TEMP_OLLAMA_CONTAINER}" || true
-        exit 1
-      fi
-      sleep 2
-    done
+      local attempts=0
+      until docker exec "${TEMP_OLLAMA_CONTAINER}" ollama list >/dev/null 2>&1; do
+        attempts=$((attempts + 1))
+        if [[ "${attempts}" -gt 60 ]]; then
+          echo "Temporary Ollama service did not become ready in time."
+          docker logs "${TEMP_OLLAMA_CONTAINER}" || true
+          exit 1
+        fi
+        sleep 2
+      done
 
-    preload_ollama_model "${TEMP_OLLAMA_CONTAINER}"
-    docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null
+      preload_ollama_model "${TEMP_OLLAMA_CONTAINER}"
+      docker rm -f "${TEMP_OLLAMA_CONTAINER}" >/dev/null
+    else
+      note "Skipping heavy Ollama model preload (Fast Install mode). Set DANILO_AI_ENABLE=1 or use --full-install to override."
+    fi
   else
     note "Skipping Ollama preload because the Ollama runtime is disabled in the current environment"
   fi

@@ -245,16 +245,6 @@ apt_update_once() {
 install_base_dependencies() {
   export DEBIAN_FRONTEND=noninteractive
   
-  # Fix broken apt lists from previous failed runs
-  if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
-    rm -f /etc/apt/sources.list.d/docker.list
-  fi
-  if [[ ! -f /etc/apt/keyrings/nodesource.gpg ]]; then
-    rm -f /etc/apt/sources.list.d/nodesource.list
-  fi
-
-  apt_update_once
-
   local packages=(
     apt-transport-https ca-certificates curl wget gnupg gpg software-properties-common
     lsb-release jq unzip tar git build-essential pkg-config
@@ -263,9 +253,30 @@ install_base_dependencies() {
     python3 python3-venv python3-pip
   )
 
-  if ! run_resilient_command "Installing base OS dependencies" apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -o DPkg::Lock::Timeout=120 "${packages[@]}"; then
-    fail "Failed to install base dependencies. Please check your internet connection or apt sources."
-    exit 1
+  local missing_packages=()
+  for pkg in "${packages[@]}"; do
+    if ! dpkg -l "${pkg}" 2>/dev/null | awk '{print $1}' | grep -Eq "^ii$"; then
+      missing_packages+=("${pkg}")
+    fi
+  done
+
+  if (( ${#missing_packages[@]} == 0 )); then
+    note "All base dependencies are already installed. Skipping apt update."
+  else
+    # Fix broken apt lists from previous failed runs
+    if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+      rm -f /etc/apt/sources.list.d/docker.list
+    fi
+    if [[ ! -f /etc/apt/keyrings/nodesource.gpg ]]; then
+      rm -f /etc/apt/sources.list.d/nodesource.list
+    fi
+
+    apt_update_once
+
+    if ! run_resilient_command "Installing missing dependencies" apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -o DPkg::Lock::Timeout=120 "${missing_packages[@]}"; then
+      fail "Failed to install base dependencies. Please check your internet connection or apt sources."
+      exit 1
+    fi
   fi
   
   # Verify critical base commands installed correctly

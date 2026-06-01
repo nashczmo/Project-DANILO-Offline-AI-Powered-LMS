@@ -170,6 +170,26 @@ export default function AppLayout({ children, role }) {
             {isOffline ? <WifiOff className="w-4 h-4 flex-shrink-0" /> : <Wifi className="w-4 h-4 flex-shrink-0" />}
             {!isSidebarCollapsed && <span className="truncate">{isOffline ? "Offline Mode" : "Connected"}</span>}
           </div>
+
+          {/* User Profile Block */}
+          <div 
+            className={`flex items-center ${isSidebarCollapsed ? 'justify-center mx-auto' : 'gap-3 px-2 py-2 w-full rounded-xl hover:bg-[#F1F3F4] transition-colors cursor-default'}`}
+            title={isSidebarCollapsed ? `${user?.fullName || user?.name || "User"} (${user?.displayRole || user?.role || "User"})` : undefined}
+          >
+            <div className="w-9 h-9 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
+              {initials}
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="text-left min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#202124] leading-tight truncate">
+                  {user?.fullName || user?.name || "User"}
+                </p>
+                <p className="text-[11px] text-[#5F6368] capitalize leading-none mt-1 truncate">
+                  {user?.displayRole || user?.role || "User"}
+                </p>
+              </div>
+            )}
+          </div>
           
           {/* Sign Out Button */}
           <button
@@ -206,24 +226,9 @@ export default function AppLayout({ children, role }) {
           </div>
 
           <div className="hidden md:flex items-center gap-4 flex-1">
-            {/* Header Content can go here, like breadcrumbs or search */}
             <p className="text-[15px] text-[#5F6368]">
               Welcome back, <span className="font-bold text-[#202124]">{user?.fullName || user?.name || "User"}</span>
             </p>
-          </div>
-
-          <div className="flex items-center gap-2 pl-2 pr-3 py-1.5">
-            <div className="w-8 h-8 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-bold text-[13px] flex-shrink-0">
-              {initials}
-            </div>
-            <div className="hidden sm:block text-left max-w-[120px]">
-              <p className="text-[13px] font-bold text-[#202124] leading-tight truncate">
-                {user?.fullName || user?.name || "User"}
-              </p>
-              <p className="text-[11px] text-[#5F6368] capitalize leading-none mt-0.5 truncate">
-                {user?.displayRole || user?.role || "User"}
-              </p>
-            </div>
           </div>
         </header>
 
@@ -252,9 +257,9 @@ export default function AppLayout({ children, role }) {
                 </NavLink>
               ))}
             </nav>
-            <div className="px-4 py-3 border-t border-[#E0E0E0]">
+            <div className="px-4 py-4 border-t border-[#E0E0E0] flex flex-col gap-4">
               <div
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold self-start ${
                   isOffline
                     ? "bg-[#FEF7E0] text-[#E37400]"
                     : "bg-[#E6F4EA] text-[#188038]"
@@ -262,6 +267,30 @@ export default function AppLayout({ children, role }) {
               >
                 {isOffline ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
                 <span>{isOffline ? "Offline Mode" : "Connected"}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
+                    {initials}
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-[14px] font-bold text-[#202124] leading-tight truncate">
+                      {user?.fullName || user?.name || "User"}
+                    </p>
+                    <p className="text-[12px] text-[#5F6368] capitalize leading-none mt-1 truncate">
+                      {user?.displayRole || user?.role || "User"}
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleLogout}
+                  className="p-2 ml-2 text-[#5F6368] hover:bg-[#FCE8E6] hover:text-[#D93025] rounded-full transition-colors flex-shrink-0"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
               </div>
             </div>
           </div>

@@ -140,7 +140,7 @@ server {
 server {
   listen ${FRONTEND_PORT:-80};
   server_name _;
-  return 302 http://${PORTAL_DOMAIN}\$request_uri;
+  return 302 http://${PORTAL_DOMAIN}/;
 }
 
 server {
@@ -158,8 +158,13 @@ server {
 server {
   listen ${FRONTEND_PORT:-80};
   server_name connectivitycheck.gstatic.com
+              www.gstatic.com
               clients3.google.com
+              www.google.com
+              google.com
+              android.clients.google.com
               connectivitycheck.android.com
+              www.googleapis.com
               play.googleapis.com
               connectivity-check.ubuntu.com;
   return 302 http://${PORTAL_DOMAIN}/;
@@ -456,6 +461,67 @@ sudo bash danilo.sh --install
 AI responses stream by sentence or semantic chunk so learners see progress without distracting character-by-character output. Repeated questions are served from an LRU cache without re-running inference. Lesson modules are indexed into a lightweight local SQLite retrieval store at `/var/lib/danilo/ai_index.sqlite3` so prompts include relevant class excerpts without increasing the base model size.
 
 Use **Short** mode for fastest student help; **Detailed** only when a fuller explanation is needed.
+
+## AI Reliability and Status Matrix
+
+DANILO is designed to gracefully degrade if the AI backend is unavailable. The core LMS will continue to function.
+To enforce that the AI must be fully ready before the installer completes, run the installer with strict mode:
+```bash
+sudo DANILO_AI_REQUIRE_READY=1 bash danilo.sh --install
+```
+
+### Checking AI Status
+Run the built-in verification tool to check the health of the entire stack, including the AI:
+```bash
+sudo bash danilo.sh --verify
+```
+
+The AI can be in one of the following states:
+- **READY**: Ollama API is reachable, and the configured model is installed and active.
+- **DEGRADED**: Ollama is reachable, but the model is missing, or the backend AI health check reports degraded.
+- **OFFLINE**: Ollama container is down or unreachable.
+- **MODEL MISSING**: Ollama is up but the active model is not loaded.
+- **STARTING**: The container is still initializing.
+
+## Recovery Playbook
+
+If the AI features are unavailable, try the following steps to diagnose and repair:
+
+### 1. Ollama container not running (OFFLINE)
+Check if the container is running and view its logs:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo ps
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo logs ollama
+```
+Restart the container:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama
+```
+
+### 2. Model Missing
+If the verification script reports MODEL MISSING, you can attempt to pull it manually or run the quick installer again:
+```bash
+# To reinstall and ensure AI model pulls:
+sudo DANILO_AI_ENABLE=1 bash danilo.sh --install
+```
+Alternatively, pull it directly:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec ollama ollama pull <model-name>
+```
+
+### 3. Backend cannot reach Ollama (DEGRADED/Timeout)
+If the LMS is up but AI requests timeout, verify the backend network connection:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama backend
+```
+
+### 4. Slow Hardware
+If responses are too slow, consider downgrading the model class in `/opt/danilo/app/.env` and restarting the stack:
+```bash
+# Edit OLLAMA_MODEL to a smaller model like qwen2.5:1.5b
+sudo nano /opt/danilo/app/.env
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo up -d
+```
 EOF
 }
 
@@ -578,7 +644,12 @@ wait_for_stack_readiness() {
   if wait_for_service_running ollama 0 20; then
     ollama_available=1
   else
-    warn "Ollama service is not running yet; continuing with core LMS startup and degraded AI"
+    if [[ "${DANILO_AI_REQUIRE_READY:-0}" -eq 1 ]]; then
+      fail "Ollama service is not running, but DANILO_AI_REQUIRE_READY=1 is set. Aborting."
+      exit 1
+    else
+      warn "Ollama service is not running yet; continuing with core LMS startup and degraded AI"
+    fi
   fi
 
   note "Checking compose health status"
@@ -587,8 +658,13 @@ wait_for_stack_readiness() {
   wait_for_container_healthy gateway "Gateway/frontend healthcheck"
   if [[ "${ollama_available}" -eq 1 ]]; then
     if ! wait_for_container_healthy ollama "Ollama service readiness" 0 60; then
-      warn "Ollama did not become healthy; continuing with core LMS startup and degraded AI"
-      ollama_available=0
+      if [[ "${DANILO_AI_REQUIRE_READY:-0}" -eq 1 ]]; then
+        fail "Ollama did not become healthy, and DANILO_AI_REQUIRE_READY=1 is set. Aborting."
+        exit 1
+      else
+        warn "Ollama did not become healthy; continuing with core LMS startup and degraded AI"
+        ollama_available=0
+      fi
     fi
   fi
 
@@ -636,12 +712,23 @@ wait_for_stack_readiness() {
         fi
       fi
       if [[ "${attempts}" -gt 60 ]]; then
-        warn "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
-        warn "The core LMS will remain available, but AI features will be degraded."
-        break
+        if [[ "${DANILO_AI_REQUIRE_READY:-0}" -eq 1 ]]; then
+          fail "Ollama is available, but the required local model is missing: ${OLLAMA_MODEL}. DANILO_AI_REQUIRE_READY=1 is set. Aborting."
+          exit 1
+        else
+          warn "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
+          warn "The core LMS will remain available, but AI features will be degraded."
+          break
+        fi
       fi
       sleep 3
     done
+    if ollama_model_exists_in_compose "${OLLAMA_MODEL}"; then
+      note "Running AI model warmup ping"
+      if [[ -n "${ollama_ip}" ]]; then
+        curl -fsS -X POST "http://${ollama_ip}:${OLLAMA_PORT:-11434}/api/generate" -d '{"model": "'"${OLLAMA_MODEL}"'", "prompt": "hi", "options": {"num_predict": 1}}' >/dev/null 2>&1 || true
+      fi
+    fi
   fi
 
   note "Checking backend API through gateway"

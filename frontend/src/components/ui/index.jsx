@@ -152,9 +152,9 @@ export function ErrorRetry({ message, onRetry }) {
 }
 
 /* ── Stat Card ───────────────────────────────────────────── */
-export function StatCard({ label, value, icon: Icon, iconBg, iconColor, trend, trendLabel, onClick }) {
+export function StatCard({ label, value, icon: Icon, iconBg, iconColor, trend, trendLabel, description, linkLabel, onClick }) {
   return (
-    <Card hover={!!onClick} onClick={onClick} className="flex flex-col gap-4">
+    <Card hover={!!onClick} onClick={onClick} className="flex flex-col gap-4 p-5">
       <div className="flex items-start justify-between">
         <div
           className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg} ${iconColor}`}
@@ -162,14 +162,24 @@ export function StatCard({ label, value, icon: Icon, iconBg, iconColor, trend, t
           <Icon className="w-5 h-5" />
         </div>
       </div>
-      <div>
-        <p className="text-3xl font-black text-[#202124] leading-none">{value}</p>
-        <p className="text-sm text-[#5F6368] mt-1.5 font-bold">{label}</p>
+      <div className="flex-1">
+        {value !== null && value !== undefined && (
+          <p className="text-3xl font-black text-[#202124] leading-none">{value}</p>
+        )}
+        <p className="text-sm font-black text-[#202124] mt-2">{label}</p>
+        {description && (
+          <p className="text-xs text-[#9AA0A6] font-bold mt-0.5 leading-relaxed">{description}</p>
+        )}
+        {trendLabel && (
+          <p className={`text-xs font-bold mt-0.5 ${trend === "up" ? "text-[#188038]" : trend === "down" ? "text-[#D93025]" : "text-[#9AA0A6]"}`}>
+            {trendLabel}
+          </p>
+        )}
       </div>
-      {trendLabel && (
-        <p className={`text-xs font-bold ${trend === "up" ? "text-[#188038]" : trend === "down" ? "text-[#D93025]" : "text-[#9AA0A6]"}`}>
-          {trendLabel}
-        </p>
+      {linkLabel && (
+        <div className="flex items-center gap-1 text-sm font-black text-[#1A73E8] border-t border-[#E0E0E0] pt-3 mt-auto">
+          {linkLabel} <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
       )}
     </Card>
   );

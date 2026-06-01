@@ -616,7 +616,7 @@ def serialize_course(course: Course) -> dict:
 def summarize_grade_entries(course: Course, rows: list[GradeEntry], student_name: str | None=None) -> list[dict]:
     buckets: dict[str, dict] = {}
     for grade in rows:
-        bucket = buckets.setdefault(grade.term, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'term': grade.term, 'teacher': course.teacher.full_name if course.teacher else '', 'studentName': student_name, 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
+        bucket = buckets.setdefault(grade.term, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'term': grade.term, 'schoolYear': course.school_year, 'teacher': course.teacher.full_name if course.teacher else '', 'studentName': student_name, 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
         normalized = grade.score / grade.max_score * 100.0 if grade.max_score else 0.0
         bucket['components'].append({'id': grade.id, 'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or '', 'percentage': round(normalized, 2)})
         bucket['weightedScore'] += normalized * grade.weight
@@ -739,7 +739,7 @@ def build_grade_summary(db: Session, student_id: str) -> list[dict]:
     buckets: dict[tuple[int, str], dict] = {}
     for grade, course in rows:
         key = (course.id, grade.term)
-        bucket = buckets.setdefault(key, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'term': grade.term, 'teacher': course.teacher.full_name if course.teacher else '', 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
+        bucket = buckets.setdefault(key, {'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 'subject': course.subject, 'term': grade.term, 'schoolYear': course.school_year, 'teacher': course.teacher.full_name if course.teacher else '', 'components': [], 'weightedScore': 0.0, 'weightTotal': 0.0})
         normalized = grade.score / grade.max_score * 100.0 if grade.max_score else 0.0
         bucket['components'].append({'component': grade.component, 'score': grade.score, 'maxScore': grade.max_score, 'weight': grade.weight, 'remarks': grade.remarks or '', 'percentage': round(normalized, 2)})
         bucket['weightedScore'] += normalized * grade.weight
@@ -790,7 +790,7 @@ def build_teacher_course_cards(db: Session, teacher_id: str) -> list[dict]:
     module_counts = dict(db.execute(select(Module.course_id, func.count(Module.id)).where(Module.course_id.in_(course_ids)).group_by(Module.course_id)).all()) if course_ids else {}
     cards = []
     for course in courses:
-        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'term': course.term, 'gradeLevel': course.grade_level, 'strand': course.strand, 'studentTotal': enrollment_counts.get(course.id, 0), 'moduleTotal': module_counts.get(course.id, 0), 'description': course.description})
+        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'term': course.term, 'schoolYear': course.school_year, 'gradeLevel': course.grade_level, 'strand': course.strand, 'studentTotal': enrollment_counts.get(course.id, 0), 'moduleTotal': module_counts.get(course.id, 0), 'description': course.description})
     return cards
 
 def build_admin_course_cards(db: Session) -> list[dict]:
@@ -800,12 +800,12 @@ def build_admin_course_cards(db: Session) -> list[dict]:
     module_counts = dict(db.execute(select(Module.course_id, func.count(Module.id)).where(Module.course_id.in_(course_ids)).group_by(Module.course_id)).all()) if course_ids else {}
     cards = []
     for course in courses:
-        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'studentTotal': enrollment_counts.get(course.id, 0), 'moduleTotal': module_counts.get(course.id, 0), 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'description': course.description})
+        cards.append({'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'schoolYear': course.school_year, 'studentTotal': enrollment_counts.get(course.id, 0), 'moduleTotal': module_counts.get(course.id, 0), 'teacherName': course.teacher.full_name if course.teacher else 'Unassigned', 'description': course.description})
     return cards
 
 def build_student_course_cards(db: Session, student_id: str) -> list[dict]:
     rows = db.execute(select(Course).join(Enrollment, Enrollment.course_id == Course.id).where(Enrollment.student_id == student_id, Enrollment.status == 'active', Course.is_active == True).order_by(Course.subject.asc())).scalars().all()
-    return [{'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'description': course.description} for course in rows]
+    return [{'id': course.id, 'code': course.code, 'title': course.title, 'subject': course.subject, 'educationLevel': course.education_level, 'gradeLevel': course.grade_level, 'strand': course.strand, 'term': course.term, 'schoolYear': course.school_year, 'description': course.description} for course in rows]
 
 def escape_pdf_text(value: str) -> str:
     return value.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')

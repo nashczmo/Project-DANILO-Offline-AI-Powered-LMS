@@ -36,7 +36,7 @@ export function useApi(path, options = {}) {
 
   useEffect(() => {
     if (immediate && path) {
-      execute(path);
+      execute(path).catch(() => {});
     }
   }, [path, immediate, execute, depsString]);
 

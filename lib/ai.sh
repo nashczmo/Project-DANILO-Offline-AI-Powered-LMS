@@ -272,33 +272,35 @@ configure_ollama_model() {
   mkdir -p "${models_dir}"
 
   # WhichLLM Dynamic hardware-aware AI model selection
-  if command_missing whichllm; then
-    if command -v pip3 >/dev/null 2>&1 && internet_reachable_now; then
-      note "Internet and pip3 detected. Installing whichllm for dynamic hardware AI benchmarking..."
-      pip3 install --break-system-packages whichllm >/dev/null 2>&1 || true
-    fi
-  fi
-
-  if command -v whichllm >/dev/null 2>&1 || python3 -m whichllm --version >/dev/null 2>&1; then
-    note "Running whichllm to benchmark hardware and recommend the best model..."
-    local best_model=""
-    # Fallback execution in case 'whichllm' is not in PATH but accessible via python module
-    local whichllm_cmd="whichllm"
+  if [[ "${DANILO_AI_ENABLE:-0}" -eq 1 ]]; then
     if command_missing whichllm; then
-      whichllm_cmd="python3 -m whichllm"
+      if command -v pip3 >/dev/null 2>&1 && internet_reachable_now; then
+        note "Internet and pip3 detected. Installing whichllm for dynamic hardware AI benchmarking..."
+        pip3 install --break-system-packages whichllm >/dev/null 2>&1 || true
+      fi
     fi
-    
-    # Run whichllm and try to parse the best model from the JSON output array
-    best_model="$(${whichllm_cmd} --json 2>/dev/null | jq -r '.[0] | .ollama_model // .model // .name // .id // .repo_id' 2>/dev/null | sed 's/ gguf//gi' | sed 's/ .*//g' || true)"
-    
-    if [[ -n "${best_model}" && "${best_model}" != "null" ]]; then
-      ok "WhichLLM dynamically selected the optimal model: ${best_model}"
-      DANILO_DEFAULT_OLLAMA_MODEL="${best_model}"
-      OLLAMA_MODEL="${best_model}"
-      DANILO_OLLAMA_MODEL="${best_model}"
-    else
-      warn "WhichLLM did not return a valid model name; falling back to conservative static plan (${DANILO_DEFAULT_OLLAMA_MODEL})"
+
+    if command -v whichllm >/dev/null 2>&1 || python3 -m whichllm --version >/dev/null 2>&1; then
+      note "Running whichllm to benchmark hardware and recommend the best model..."
+      local best_model=""
+      local whichllm_cmd="whichllm"
+      if command_missing whichllm; then
+        whichllm_cmd="python3 -m whichllm"
+      fi
+      
+      best_model="$(${whichllm_cmd} --json 2>/dev/null | jq -r '.[0] | .ollama_model // .model // .name // .id // .repo_id' 2>/dev/null | sed 's/ gguf//gi' | sed 's/ .*//g' || true)"
+      
+      if [[ -n "${best_model}" && "${best_model}" != "null" ]]; then
+        ok "WhichLLM dynamically selected the optimal model: ${best_model}"
+        DANILO_DEFAULT_OLLAMA_MODEL="${best_model}"
+        OLLAMA_MODEL="${best_model}"
+        DANILO_OLLAMA_MODEL="${best_model}"
+      else
+        warn "WhichLLM did not return a valid model name; falling back to conservative static plan (${DANILO_DEFAULT_OLLAMA_MODEL})"
+      fi
     fi
+  else
+    note "Skipping dynamic hardware benchmarking (Fast Install mode). Using static plan: ${DANILO_DEFAULT_OLLAMA_MODEL}"
   fi
 
   if [[ -n "${DANILO_CUSTOM_GGUF_PATH:-}" && -f "${DANILO_CUSTOM_GGUF_PATH}" ]]; then

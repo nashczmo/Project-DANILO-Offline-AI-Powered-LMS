@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton, EmptyState, MathText } from "../../components/ui";
+import { Card, PageHeader, Skeleton, EmptyState, MathText, Badge } from "../../components/ui";
 import { TrendingUp, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 function getScoreColor(score, maxScore) {
-  if (!maxScore) return "text-[#202124]";
+  if (score === null || score === undefined || !maxScore) return "text-[#202124]";
   const pct = (score / maxScore) * 100;
   if (pct >= 85) return "text-[#188038]";
   if (pct >= 70) return "text-[#1A73E8]";
@@ -13,43 +13,72 @@ function getScoreColor(score, maxScore) {
   return "text-[#D93025]";
 }
 
+function getTermOrder(term) {
+  const match = String(term || "").match(/term\s*(\d+)/i);
+  return match ? Number(match[1]) : 999;
+}
+
 export default function StudentGrades() {
   const { data, loading, error, refresh } = useApi("/student/grades", { immediate: true });
   const grades = data || [];
   const navigate = useNavigate();
 
-  // Group grades for Global Overview Table
-  const overviewData = useMemo(() => {
-    const map = {};
+  const groupedGrades = useMemo(() => {
+    const bySy = {};
     grades.forEach(g => {
-      if (!map[g.courseId]) {
-        map[g.courseId] = {
-          courseId: g.courseId,
-          code: g.courseTitle?.split(' ')[0] || "SBJ",
-          subjectName: g.subject || "Subject",
-          section: g.courseTitle || "Section",
-          teacher: g.teacherName || "TBA",
-          terms: { "Term 1": null, "Term 2": null, "Term 3": null },
-        };
-      }
-      // Map API terms to exact 1,2,3 for DepEd table format
-      const tMap = { "Term 1": "Term 1", "Term 2": "Term 2", "Term 3": "Term 3", "Q1": "Term 1", "Q2": "Term 2", "Q3": "Term 3" };
-      const termKey = tMap[g.term] || "Term 1";
-      map[g.courseId].terms[termKey] = g.finalGrade;
+      const sy = g.schoolYear || "School Year Not Specified";
+      const term = g.term || "Term 1";
+      if (!bySy[sy]) bySy[sy] = {};
+      if (!bySy[sy][term]) bySy[sy][term] = [];
+      bySy[sy][term].push(g);
     });
 
-    return Object.values(map).map(c => {
-      const validGrades = Object.values(c.terms).filter(v => v !== null);
-      c.finalGrade = validGrades.length ? validGrades.reduce((a,b)=>a+b, 0) / validGrades.length : null;
-      return c;
+    // Sort school years descending
+    const sortedSy = Object.keys(bySy).sort((a, b) => b.localeCompare(a));
+    
+    return sortedSy.map(sy => {
+      const terms = bySy[sy];
+      const sortedTerms = Object.keys(terms).sort((a, b) => getTermOrder(a) - getTermOrder(b));
+      
+      return {
+        schoolYear: sy,
+        terms: sortedTerms.map(t => {
+          const termGrades = terms[t];
+          let totalScore = 0;
+          let totalPossible = 0;
+          let validFinalGrades = 0;
+          let sumFinalGrades = 0;
+          let entryCount = 0;
+
+          termGrades.forEach(subj => {
+            if (subj.finalGrade !== undefined && subj.finalGrade !== null) {
+              validFinalGrades++;
+              sumFinalGrades += subj.finalGrade;
+            }
+            if (subj.components) {
+              entryCount += subj.components.length;
+              subj.components.forEach(comp => {
+                if (comp.score !== null && comp.maxScore) {
+                   totalScore += comp.score;
+                   totalPossible += comp.maxScore;
+                }
+              });
+            }
+          });
+
+          return {
+            term: t,
+            subjects: termGrades,
+            subjectCount: termGrades.length,
+            entryCount,
+            average: validFinalGrades ? (sumFinalGrades / validFinalGrades) : null,
+            totalScore,
+            totalPossible
+          };
+        })
+      };
     });
   }, [grades]);
-
-  const gwa = useMemo(() => {
-    const valid = overviewData.filter(d => d.finalGrade !== null);
-    if (!valid.length) return null;
-    return valid.reduce((acc, curr) => acc + curr.finalGrade, 0) / valid.length;
-  }, [overviewData]);
 
   if (loading) {
     return (
@@ -78,82 +107,120 @@ export default function StudentGrades() {
     );
   }
 
-  // GLOBAL OVERVIEW TABLE ONLY
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
+    <div className="space-y-8 animate-fade-in pb-10">
       <PageHeader
         title="My Grades"
-        description="Global summary of your academic performance across all terms."
+        description="View your grades organized by school year and term."
       />
 
-      {overviewData.length === 0 ? (
+      {groupedGrades.length === 0 ? (
         <EmptyState
           icon={GraduationCap}
           title="No grades recorded yet"
           description="Your grades will appear here once your teachers record them."
         />
       ) : (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#F8F9FA] border-b border-[#E0E0E0]">
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide whitespace-nowrap">Subject Code</th>
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide">Subject Name</th>
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide hidden sm:table-cell">Section</th>
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide hidden lg:table-cell">Teacher</th>
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide text-right whitespace-nowrap">1st Term</th>
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide text-right whitespace-nowrap">2nd Term</th>
-                  <th className="p-4 text-xs font-black text-[#5F6368] uppercase tracking-wide text-right whitespace-nowrap">3rd Term</th>
-                  <th className="p-4 text-xs font-black text-[#1A73E8] uppercase tracking-wide text-right whitespace-nowrap bg-[#E8F0FE]/30">Final Grade</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E0E0E0]">
-                {overviewData.map((row) => (
-                  <tr 
-                    key={row.courseId}
-                    onClick={() => navigate(`/student/classes/${row.courseId}?tab=grades`)}
-                    className="hover:bg-[#F8F9FA] transition-colors cursor-pointer group"
-                    title="Click to view subject details"
-                  >
-                    <td className="p-4">
-                      <span className="font-mono text-xs font-black text-[#1A73E8] bg-[#E8F0FE] px-2 py-1 rounded-md">{row.code}</span>
-                    </td>
-                    <td className="p-4 font-bold text-[#202124] group-hover:text-[#1A73E8] transition-colors"><MathText text={row.subjectName} /></td>
-                    <td className="p-4 text-sm font-bold text-[#5F6368] hidden sm:table-cell"><MathText text={row.section} /></td>
-                    <td className="p-4 text-sm font-bold text-[#5F6368] hidden lg:table-cell">{row.teacher}</td>
-                    <td className={`p-4 text-right font-black text-[15px] ${getScoreColor(row.terms["Term 1"], 100)}`}>
-                      {row.terms["Term 1"] ?? "—"}
-                    </td>
-                    <td className={`p-4 text-right font-black text-[15px] ${getScoreColor(row.terms["Term 2"], 100)}`}>
-                      {row.terms["Term 2"] ?? "—"}
-                    </td>
-                    <td className={`p-4 text-right font-black text-[15px] ${getScoreColor(row.terms["Term 3"], 100)}`}>
-                      {row.terms["Term 3"] ?? "—"}
-                    </td>
-                    <td className={`p-4 text-right font-black text-lg bg-[#E8F0FE]/10 ${getScoreColor(row.finalGrade, 100)}`}>
-                      {row.finalGrade ? row.finalGrade.toFixed(2) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        groupedGrades.map(syGroup => (
+          <div key={syGroup.schoolYear} className="space-y-6">
+            <h2 className="text-xl font-black text-[#202124] border-b border-[#E0E0E0] pb-2">
+              S.Y. {syGroup.schoolYear}
+            </h2>
+            
+            {syGroup.terms.map(termGroup => (
+              <Card key={termGroup.term} className="p-0 overflow-hidden">
+                <div className="p-5 border-b border-[#E0E0E0] bg-[#F8F9FA] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-lg font-black text-[#202124]">{termGroup.term} <span className="text-sm font-bold text-[#5F6368] ml-2">(S.Y. {syGroup.schoolYear})</span></h3>
+                    <p className="text-sm text-[#5F6368] font-bold mt-1">
+                      {termGroup.subjectCount} {termGroup.subjectCount === 1 ? 'subject' : 'subjects'} &bull; {termGroup.entryCount} grade {termGroup.entryCount === 1 ? 'entry' : 'entries'}
+                    </p>
+                  </div>
+                  {termGroup.average !== null && (
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-[#E0E0E0] shadow-sm">
+                      <span className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide">Average</span>
+                      <span className={`text-xl font-black ${getScoreColor(termGroup.average, 100)}`}>
+                        {termGroup.average.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-          {/* GWA Footer */}
-          <div className="bg-[#F8F9FA] p-5 flex items-center justify-end border-t border-[#E0E0E0]">
-            <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-2xl border border-[#E0E0E0] shadow-sm">
-              <div className="flex flex-col text-right">
-                <span className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide">General Weighted Average</span>
-                <span className="text-sm font-bold text-[#5F6368]">Current S.Y.</span>
-              </div>
-              <div className={`text-3xl font-black ${getScoreColor(gwa, 100)}`}>
-                {gwa ? gwa.toFixed(2) : "N/A"}
-              </div>
-            </div>
+                {termGroup.subjects.length === 0 ? (
+                  <div className="p-8 text-center text-[#5F6368] font-bold text-sm">
+                    No grades for this term.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="dn-table">
+                      <thead>
+                        <tr>
+                          <th>Subject</th>
+                          <th>Component</th>
+                          <th className="text-right">Score</th>
+                          <th className="text-right hidden sm:table-cell">Max</th>
+                          <th className="text-right hidden lg:table-cell">Weight</th>
+                          <th className="text-right">Percentage</th>
+                          <th className="hidden md:table-cell">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {termGroup.subjects.map(subj => (
+                          (subj.components && subj.components.length > 0) ? (
+                            subj.components.map((comp, idx) => (
+                              <tr 
+                                key={`${subj.courseId}-${comp.id || idx}`}
+                                onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
+                                className="cursor-pointer group"
+                              >
+                                <td>
+                                  {idx === 0 && (
+                                    <div>
+                                      <div className="font-bold group-hover:text-[#1A73E8] transition-colors"><MathText text={subj.subject} /></div>
+                                      <div className="text-xs font-black text-[#5F6368] mt-1">{subj.courseCode}</div>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="text-sm font-bold text-[#202124]"><MathText text={comp.component} /></td>
+                                <td className={`text-sm font-black text-right ${getScoreColor(comp.score, comp.maxScore)}`}>{comp.score}</td>
+                                <td className="text-sm font-bold text-[#5F6368] text-right hidden sm:table-cell">{comp.maxScore}</td>
+                                <td className="text-sm font-bold text-[#5F6368] text-right hidden lg:table-cell">{comp.weight ? (comp.weight * 100).toFixed(0) + '%' : '—'}</td>
+                                <td className="text-sm font-black text-right">
+                                  {comp.percentage !== undefined ? `${comp.percentage.toFixed(1)}%` : '—'}
+                                </td>
+                                <td className="text-xs text-[#5F6368] hidden md:table-cell max-w-[200px] truncate" title={comp.remarks}>
+                                  {comp.remarks || "—"}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr 
+                              key={`${subj.courseId}-empty`}
+                              onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
+                              className="cursor-pointer group"
+                            >
+                              <td>
+                                <div>
+                                  <div className="font-bold group-hover:text-[#1A73E8] transition-colors"><MathText text={subj.subject} /></div>
+                                  <div className="text-xs font-black text-[#5F6368] mt-1">{subj.courseCode}</div>
+                                </div>
+                              </td>
+                              <td colSpan={6} className="text-sm font-bold text-[#9AA0A6] italic text-center">
+                                No grades recorded yet
+                              </td>
+                            </tr>
+                          )
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            ))}
           </div>
-        </Card>
+        ))
       )}
     </div>
   );
 }
+

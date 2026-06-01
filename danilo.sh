@@ -30,29 +30,40 @@ show_help() {
 Usage: sudo bash danilo.sh [mode] [--clean-build]
 
 Modes:
-  --install            Install or repair Project DANILO. This is the default.
-  --clean-install      Reinstall with DANILO data volumes reset and Docker cache bypassed.
-  --update             Regenerate app files, rebuild images, and restart the stack without resetting data.
-  --rebuild-frontend   Regenerate and rebuild only the frontend/gateway image, then restart gateway.
+  --install            Fast install or repair (skips heavy AI models by default). This is the default.
+  --quick-install      Alias for --install. Fast, minimal core LMS install.
+  --full-install       Install including full AI model preload.
+  --clean-install      Destructive reinstall (resets data and cache).
+  --update             Fast, safe update. Regenerates files and rebuilds only what changed.
+  --rebuild-frontend   Regenerate and rebuild only the frontend/gateway image.
   --sync               Mirror local lessons into ${CONTENT_ROOT} and restart gateway when available.
   --verify             Run post-install health checks.
-  --uninstall          Stop DANILO services and remove generated system/app files. Data volumes are kept unless DANILO_RESET_DATA=1.
+  --uninstall          Stop services and remove app files. Data kept unless DANILO_RESET_DATA=1.
   --help               Show this help.
 
 Options:
-  --clean-build        Build Docker images without cache. Preserved for compatibility.
+  --clean-build        Force full Docker/frontend rebuild without cache.
 
 Environment:
-  DANILO_RESET_DATA=1  Remove compose volumes during clean/uninstall paths.
+  DANILO_RESET_DATA=1      Remove compose volumes during clean/uninstall paths.
+  DANILO_AI_ENABLE=1       Force AI model pull during --install (implied by --full-install).
+  DANILO_AI_REQUIRE_READY=1 Fail installation if AI fails to start or model is missing.
 EOF
 }
 
 parse_args() {
   local mode_set=0
+  export DANILO_AI_ENABLE="${DANILO_AI_ENABLE:-0}"
+  export DANILO_AI_REQUIRE_READY="${DANILO_AI_REQUIRE_READY:-0}"
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --install)
+      --install|--quick-install)
         INSTALL_MODE="install"
+        mode_set=1
+        ;;
+      --full-install)
+        INSTALL_MODE="install"
+        DANILO_AI_ENABLE=1
         mode_set=1
         ;;
       --clean-install)
@@ -188,6 +199,20 @@ run_update_mode() {
 
   step 4 5 "Rebuild and restart"
   run_logged_function "build_stack" build_stack
+  local pre_ap_hash=""
+  if [[ -f /etc/hostapd/hostapd.conf ]]; then
+    pre_ap_hash="$(md5sum /etc/hostapd/hostapd.conf /etc/dnsmasq.d/danilo.conf 2>/dev/null || true)"
+  fi
+  run_logged_function "configure_access_point" configure_access_point
+  local post_ap_hash=""
+  if [[ -f /etc/hostapd/hostapd.conf ]]; then
+    post_ap_hash="$(md5sum /etc/hostapd/hostapd.conf /etc/dnsmasq.d/danilo.conf 2>/dev/null || true)"
+  fi
+  if [[ "${pre_ap_hash}" != "${post_ap_hash}" ]]; then
+    run_step_command "Restarting DANILO access point (config changed)" systemctl restart danilo-ap.service
+  else
+    note "Skipping DANILO access point restart (config unchanged)"
+  fi
   run_step_command "Restarting DANILO application stack" systemctl restart danilo-stack.service
   run_logged_function "wait_for_stack_readiness" wait_for_stack_readiness
 
@@ -224,6 +249,7 @@ run_rebuild_frontend_mode() {
   step 4 4 "Verification"
   verify_command "Frontend reachable" curl -fsS -H "Host: ${PORTAL_DOMAIN}" "http://127.0.0.1/"
   verify_frontend_html "Frontend static bundle reachable" "http://127.0.0.1/"
+  verify_captive_redirects
   verify_frontend_served_build_marker
   if [[ "${VERIFY_FAILED}" -ne 0 ]]; then
     fail "Frontend rebuild completed, but verification failed"

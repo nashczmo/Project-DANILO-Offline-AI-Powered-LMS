@@ -168,10 +168,14 @@ build_frontend_static() {
 }
 
 clear_frontend_build_cache() {
-  note "Removing old frontend dist, Vite cache, and previously served gateway assets"
-  rm -rf "${APP_ROOT}/frontend/dist"
-  rm -rf "${APP_ROOT}/frontend/node_modules"
-  rm -rf "${APP_ROOT}/frontend/.vite"
-  rm -rf "${APP_ROOT}/gateway/dist"
-  ok "Old frontend build artifacts and local cache were removed"
+  if [[ "${CLEAN_BUILD:-0}" -eq 1 ]]; then
+    note "Removing old frontend dist, Vite cache, and previously served gateway assets"
+    rm -rf "${APP_ROOT}/frontend/dist"
+    rm -rf "${APP_ROOT}/frontend/node_modules"
+    rm -rf "${APP_ROOT}/frontend/.vite"
+    rm -rf "${APP_ROOT}/gateway/dist"
+    ok "Old frontend build artifacts and local cache were removed"
+  else
+    note "Preserving frontend build caches for faster updates (use --clean-build to override)"
+  fi
 }
