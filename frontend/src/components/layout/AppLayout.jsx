@@ -61,7 +61,6 @@ export default function AppLayout({ children, role }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const navItems = NAV_CONFIG[role] || [];
   const portalLabel = {
