@@ -265,7 +265,7 @@ services:
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
     environment:
       PORTAL_DOMAIN: ${PORTAL_DOMAIN}
     ports:
@@ -276,7 +276,7 @@ services:
       - /var/run
       - /tmp
     healthcheck:
-      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && wget -q -O /dev/null http://127.0.0.1/api/health"]
+      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && wget -q -O /dev/null http://127.0.0.1/index.html"]
       interval: 30s
       timeout: 20s
       retries: 30
@@ -361,7 +361,7 @@ DANILO_TOKENS_NORMAL=280
 DANILO_TOKENS_DETAILED=520
 SSID=PROJECT-DANILO
 PORTAL_DOMAIN=danilo.local
-DANILO_SEED_DEMO=0
+DANILO_SEED_DEMO=1
 EOF
 
   cat > "${APP_ROOT}/README.md" <<'EOF'

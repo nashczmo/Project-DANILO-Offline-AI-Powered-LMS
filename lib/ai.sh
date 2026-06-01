@@ -124,71 +124,128 @@ detect_ai_hardware_profile() {
 
   DANILO_AI_RUNTIME="ollama"
 
-  local ram_high="${DANILO_RAM_HIGH_THRESHOLD:-65536}"
-  local ram_mid="${DANILO_RAM_MID_THRESHOLD:-32768}"
-
-  if (( mem_mb >= ram_high && dedicated_gpu == 1 )); then
-    profile="high"
-  elif (( mem_mb < ram_mid && dedicated_gpu == 0 && integrated_gpu == 0 )); then
-    profile="low"
+  if (( mem_mb >= 120000 && gpu_vram_mb >= 22000 && dedicated_gpu == 1 )); then
+    profile="G"
+    selected_model="llama3.1:70b"
+    selected_fallback="phi3:mini"
+    selected_optional="llama3.1:8b"
+    model_class="enterprise"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=999
+    num_batch=512
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
+    scheduler="gpu-throughput"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=100
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=8
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=20m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
+  elif (( mem_mb >= 60000 && gpu_vram_mb >= 15000 && dedicated_gpu == 1 )); then
+    profile="F"
+    selected_model="llama3.1:8b"
+    selected_fallback="phi3:mini"
+    selected_optional="llama3:70b"
+    model_class="high-end"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=999
+    num_batch=512
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
+    scheduler="gpu-throughput"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=40
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=6
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=20m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
+  elif (( mem_mb >= 30000 && gpu_vram_mb >= 7000 && dedicated_gpu == 1 )); then
+    profile="E"
+    selected_model="llama3.1:8b"
+    selected_fallback="phi3:mini"
+    selected_optional="llama3:8b"
+    model_class="mid-gpu"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=999
+    num_batch=512
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
+    scheduler="gpu-throughput"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=20
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=4
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=15m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
+  elif (( mem_mb >= 30000 )); then
+    profile="D"
+    selected_model="llama3:8b-instruct"
+    selected_fallback="phi3:mini"
+    selected_optional=""
+    model_class="mid-cpu"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
+    num_batch=256
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+    scheduler="fair-queue"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=15
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=3
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=10m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
+  elif (( mem_mb >= 15000 && gpu_vram_mb >= 5000 && dedicated_gpu == 1 )); then
+    profile="C"
+    selected_model="llama3:8b-instruct"
+    selected_fallback="phi3:mini"
+    selected_optional=""
+    model_class="low-gpu"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=999
+    num_batch=256
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+    scheduler="gpu-throughput"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=10
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=10m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
+  elif (( mem_mb >= 15000 )); then
+    profile="B"
+    selected_model="phi3:medium"
+    selected_fallback="phi3:mini"
+    selected_optional=""
+    model_class="low-cpu"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
+    num_batch=128
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+    scheduler="fair-queue"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=5
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=5m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
   else
-    profile="mid"
+    profile="A"
+    selected_model="phi3:mini"
+    selected_fallback=""
+    selected_optional=""
+    model_class="very-low"
+    quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
+    num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
+    num_batch=128
+    kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
+    scheduler="compatibility-cpu"
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=1
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=4096
+    [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=2m
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=1800
+    warn "Detected tier A low-end hardware (${mem_mb} MB RAM, ${cpu_count} CPU threads). DANILO will favor Phi-3 Mini."
   fi
-
-  case "${profile}" in
-    high)
-      selected_model="${DANILO_AI_MODEL_HIGH}"
-      selected_fallback="${DANILO_AI_MODEL_MID}"
-      selected_optional=""
-      model_class="large"
-      quantization="${DANILO_AI_QUANTIZATION:-q5_K_M}"
-      num_gpu=999
-      num_batch=512
-      kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
-      scheduler="gpu-throughput"
-      [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=3
-      [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=3
-      [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=4096
-      [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=20m
-      [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
-      [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
-      ;;
-    mid)
-      selected_model="${DANILO_AI_MODEL_MID}"
-      selected_fallback="${DANILO_AI_MODEL_LOW}"
-      selected_optional=""
-      model_class="mid-cpu"
-      quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
-      num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
-      num_batch=256
-      kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
-      scheduler="fair-queue"
-      [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
-      [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
-      [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=2048
-      [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=10m
-      [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
-      [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
-      ;;
-    low|*)
-      selected_model="${DANILO_AI_MODEL_LOW}"
-      selected_fallback=""
-      selected_optional=""
-      model_class="lightweight"
-      quantization="${DANILO_AI_QUANTIZATION:-q4_0}"
-      num_gpu=0
-      num_batch=128
-      kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
-      scheduler="low-memory-fair-queue"
-      [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=1
-      [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=1
-      [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=1024
-      [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=2m
-      [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
-      [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=1800
-      warn "Detected constrained hardware (${mem_mb} MB RAM, ${cpu_count} CPU threads). DANILO will favor queue stability and shorter AI contexts."
-      ;;
-  esac
+  DANILO_AI_EMBEDDING_MODEL="nomic-embed-text"
 
   if (( avx2_supported == 0 && cuda_supported == 0 && rocm_supported == 0 )); then
     selected_model="${DANILO_AI_MODEL_LOW}"
