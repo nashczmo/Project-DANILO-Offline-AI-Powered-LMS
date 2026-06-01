@@ -49,6 +49,22 @@ function MarkdownPreview({ content }) {
   );
 }
 
+const thinkingMessages = [
+  "DANILO is thinking",
+  "DANILO is checking the lesson",
+  "DANILO is putting ideas together",
+  "DANILO is solving this step by step",
+  "DANILO is preparing your answer",
+  "DANILO is making it clearer",
+];
+
+function getThinkingEta(elapsedSeconds) {
+  if (elapsedSeconds < 4) return "ETA: a few seconds";
+  if (elapsedSeconds < 10) return "ETA: under 10 seconds";
+  if (elapsedSeconds < 20) return "ETA: around 15-30 seconds";
+  return "Still working — longer questions can take a bit";
+}
+
 export default function StudentTutor() {
   const token = useAppStore((s) => s.token);
   const [messages, setMessages] = useState([
@@ -61,6 +77,7 @@ export default function StudentTutor() {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [thinkingElapsed, setThinkingElapsed] = useState(0);
   const [copiedId, setCopiedId] = useState(null);
   const [files, setFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -75,6 +92,18 @@ export default function StudentTutor() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    if (!isTyping) {
+      setThinkingElapsed(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      setThinkingElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [isTyping]);
 
   useEffect(() => {
     fetchFiles();
@@ -220,9 +249,6 @@ export default function StudentTutor() {
     setIsTyping(true);
 
     try {
-      const assistantMessageId = Date.now() + 1;
-      setMessages((prev) => [...prev, { id: assistantMessageId, role: "assistant", content: "" }]);
-
       const response = await fetch(apiUrl("/ai/tutor/stream"), {
         method: "POST",
         headers: {
@@ -238,8 +264,8 @@ export default function StudentTutor() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
-      setIsTyping(false);
       let buffer = "";
+      let responseText = "";
 
       while (!done) {
         const { value, done: readerDone } = await reader.read();
@@ -278,17 +304,19 @@ export default function StudentTutor() {
           }
           if (appendedText) {
             appendedText = appendedText.replace(/\\n/g, "\n");
-            setMessages((prev) =>
-              prev.map((msg) => {
-                if (msg.id === assistantMessageId) {
-                  return { ...msg, content: msg.content + appendedText };
-                }
-                return msg;
-              })
-            );
+            responseText += appendedText;
           }
         }
       }
+      setIsTyping(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: responseText.trim() || "DANILO did not return a response. Please try again.",
+        },
+      ]);
       await fetchSessions();
     } catch (error) {
       console.error(error);
@@ -462,8 +490,20 @@ export default function StudentTutor() {
                       className="w-1.5 h-1.5 rounded-full bg-[#1A73E8]"
                     />
                   </div>
-                  <span className="text-[10px] font-bold text-[#1A73E8] tracking-widest uppercase opacity-70">
-                    DANILO is thinking
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={Math.floor(thinkingElapsed / 3)}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 0.75, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-[10px] font-bold text-[#1A73E8] tracking-widest uppercase"
+                    >
+                      {thinkingMessages[Math.floor(thinkingElapsed / 3) % thinkingMessages.length]}
+                    </motion.span>
+                  </AnimatePresence>
+                  <span className="text-[10px] font-semibold text-[#5F6368]">
+                    {getThinkingEta(thinkingElapsed)}
                   </span>
                 </div>
               </motion.div>
