@@ -354,9 +354,12 @@ security = HTTPBearer()
 async def lifespan(_: FastAPI):
     global _AI_SEMAPHORE
     _AI_SEMAPHORE = asyncio.Semaphore(_AI_MAX_CONCURRENT)
+    logger.info('Backend startup: waiting for database')
     wait_for_database()
 
+    logger.info('Backend startup: creating missing tables')
     Base.metadata.create_all(bind=engine)
+    logger.info('Backend startup: applying migrations')
     from alembic.config import Config
     from alembic import command
     alembic_cfg = Config("alembic.ini")
@@ -364,10 +367,13 @@ async def lifespan(_: FastAPI):
 
     db = SessionLocal()
     try:
+        logger.info('Backend startup: seeding required defaults')
         seed_defaults(db, admin_username=ADMIN_USERNAME, admin_password=ADMIN_PASSWORD, portal_domain=PORTAL_DOMAIN)
+        logger.info('Backend startup: preparing RAG index')
         rebuild_rag_index(db)
     finally:
         db.close()
+    logger.info('Backend startup complete')
     yield
 
 app = FastAPI(title='Project DANILO API', version='1.1.0-beta', description='Offline-first DepEd school portal API — authentication, LMS, AI tutor, and system health.', lifespan=lifespan, openapi_tags=[{'name': 'health', 'description': 'Service and AI health checks'}, {'name': 'auth', 'description': 'Authentication and password management'}, {'name': 'dashboard', 'description': 'Role-aware dashboard data'}, {'name': 'content', 'description': 'Lesson modules and content tree'}, {'name': 'grades', 'description': 'Student grade records'}, {'name': 'ai', 'description': 'AI tutor (DANILO) — chat, sessions, streaming'}, {'name': 'admin', 'description': 'School admin — users, courses, sections, system'}, {'name': 'teacher', 'description': 'Faculty — courses, gradebook, insights, quizzes'}, {'name': 'student', 'description': 'Learner — courses, assignments, quiz attempts'}, {'name': 'classes', 'description': 'Shared classroom endpoints (teacher + student)'}])

@@ -45,20 +45,34 @@ def wipe_old_mock_data(session: Session):
     session.execute(delete(User).where(User.id.notin_(keep_ids)))
     session.commit()
 
+def ensure_admin_user(session: Session, *, admin_username: str, admin_password: str, portal_domain: str) -> User:
+    clean_username = clean_seed_text(admin_username) or "admin"
+    clean_password = clean_seed_text(admin_password)
+    clean_portal_domain = clean_seed_text(portal_domain) or "local"
+    admin = session.scalar(select(User).where(func.lower(User.username) == clean_username.lower()))
+    if admin:
+        if clean_password and not verify_password(clean_password, admin.password_hash):
+            reset_password(admin, clean_password)
+        if admin.role != "admin":
+            admin.role = "admin"
+        admin.is_active = True
+    else:
+        admin = get_or_create_user(session, role="admin", username=clean_username, email=f"admin@{clean_portal_domain}", full_name="Danilo Network Administrator", password=clean_password)
+    session.commit()
+    return admin
+
 def seed_defaults(session: Session, *, admin_username: str, admin_password: str, portal_domain: str) -> None:
+    if os.getenv("DANILO_SEED_DEMO", "0").strip().lower() not in {"1", "true", "yes"}:
+        ensure_admin_user(session, admin_username=admin_username, admin_password=admin_password, portal_domain=portal_domain)
+        return
+
     wipe_old_mock_data(session)
 
     clean_username = clean_seed_text(admin_username) or "admin"
     clean_password = clean_seed_text(admin_password)
     clean_portal_domain = clean_seed_text(portal_domain) or "local"
 
-    admin = session.scalar(select(User).where(func.lower(User.username) == clean_username.lower()))
-    if admin:
-        if not verify_password(clean_password, admin.password_hash):
-            reset_password(admin, clean_password)
-    else:
-        get_or_create_user(session, role="admin", username=clean_username, email=f"admin@{clean_portal_domain}", full_name="Danilo Network Administrator", password=clean_password)
-    session.commit()
+    ensure_admin_user(session, admin_username=clean_username, admin_password=clean_password, portal_domain=clean_portal_domain)
 
     # Create Sections
     sec_11a = Section(name="STEM 11A", grade_level="Grade 11", education_level="Senior High School", strand="STEM", school_year="2026-2027", is_active=True)
