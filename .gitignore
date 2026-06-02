@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build output
+frontend/dist/
+*.log
+
+# Environment secrets & Generated Credentials
+.env
+*.env.local
+*credentials*.txt
+danilo-credentials.txt
+
+# Generated Runtime Configuration
+docker-compose.yml
+danilo-stack.service
+danilo-ap.service
+
+# AI Models (Ignore large binaries unless tracked via LFS)
+models/*.gguf
+models/*.bin
+
+# IDE
+.idea/
+.vscode/
+.devin/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.tar
