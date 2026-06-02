@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select, delete
 from sqlalchemy.orm import Session
 
-from .models import User, Course, Module, StreamPost, Enrollment, GradeEntry, Assignment, AssignmentQuestion, Submission, Section, Quiz, QuizQuestion, QuizAttempt, AIConversation, StudentAIProfile
+from .models import User, Course, Module, StreamPost, Enrollment, GradeEntry, Assignment, AssignmentQuestion, Submission, Section, Quiz, QuizQuestion, QuizAttempt, AIConversation, StudentAIProfile, ChatSession, ChatMessage
 from app.core.security import hash_password, verify_password
 
 def clean_seed_text(value: str | None) -> str | None:
@@ -37,6 +37,8 @@ def wipe_old_mock_data(session: Session):
     session.execute(delete(Module))
     session.execute(delete(Course))
     session.execute(delete(Section))
+    session.execute(delete(ChatMessage))
+    session.execute(delete(ChatSession))
     session.execute(delete(AIConversation))
     session.execute(delete(StudentAIProfile))
     
