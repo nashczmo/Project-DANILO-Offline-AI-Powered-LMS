@@ -177,7 +177,7 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
   elif (( mem_mb >= 30000 )); then
     profile="D"
-    selected_model="llama3:8b-instruct"
+    selected_model="llama3:instruct"
     selected_fallback="phi3:mini"
     selected_optional=""
     model_class="mid-cpu"
@@ -194,7 +194,7 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
   elif (( mem_mb >= 15000 && gpu_vram_mb >= 5000 && dedicated_gpu == 1 )); then
     profile="C"
-    selected_model="llama3:8b-instruct"
+    selected_model="llama3:instruct"
     selected_fallback="phi3:mini"
     selected_optional=""
     model_class="low-gpu"
@@ -406,23 +406,34 @@ preload_ollama_model() {
     OLLAMA_MODEL="${custom_model_name}"
     DANILO_OLLAMA_MODEL="${custom_model_name}"
   fi
-
   if ollama_model_exists_in_container "${container}" "${OLLAMA_MODEL}"; then
     note "Ollama model ${OLLAMA_MODEL} is already cached; skipping pull"
-  elif ! run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"; then
-    warn "Primary Ollama model ${OLLAMA_MODEL} could not be loaded; the core LMS will continue with degraded AI."
+  elif internet_reachable_now; then
+    if ! run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"; then
+      warn "Primary Ollama model ${OLLAMA_MODEL} could not be loaded; the core LMS will continue with degraded AI."
+    fi
+  else
+    warn "Internet is unreachable; skipping pull for Ollama model ${OLLAMA_MODEL}"
   fi
+  
   if [[ -n "${DANILO_FALLBACK_OLLAMA_MODEL}" && "${DANILO_FALLBACK_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" ]]; then
     if ollama_model_exists_in_container "${container}" "${DANILO_FALLBACK_OLLAMA_MODEL}"; then
       note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} is already cached; skipping pull"
-    else
+    elif internet_reachable_now; then
       timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}" || note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled; primary model remains available"
+    else
+      warn "Internet is unreachable; skipping pull for fallback model ${DANILO_FALLBACK_OLLAMA_MODEL}"
     fi
   fi
+  
   if ollama_model_exists_in_container "${container}" "${embed_model}"; then
     note "Embeddings model ${embed_model} is already cached; skipping pull"
-  elif ! run_step_command "Pulling Embeddings model ${embed_model}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${embed_model}"; then
-    warn "Embeddings model ${embed_model} could not be loaded; retrieval-enhanced AI will be degraded."
+  elif internet_reachable_now; then
+    if ! run_step_command "Pulling Embeddings model ${embed_model}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${embed_model}"; then
+      warn "Embeddings model ${embed_model} could not be loaded; retrieval-enhanced AI will be degraded."
+    fi
+  else
+    warn "Internet is unreachable; skipping pull for embeddings model ${embed_model}"
   fi
 }
 
