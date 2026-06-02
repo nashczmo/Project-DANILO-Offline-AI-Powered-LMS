@@ -154,7 +154,7 @@ docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama ba
 #### 4. Slow Hardware
 If responses are too slow, consider downgrading the model class in `/opt/danilo/app/.env` and restarting the stack:
 ```bash
-# Edit OLLAMA_MODEL to a smaller model like qwen2.5:1.5b
+# Edit OLLAMA_MODEL to a smaller tutoring model like qwen2.5:3b
 sudo nano /opt/danilo/app/.env
 docker compose -f /opt/danilo/app/docker-compose.yml -p danilo up -d
 ```

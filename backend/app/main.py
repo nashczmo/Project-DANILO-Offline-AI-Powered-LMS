@@ -162,15 +162,15 @@ def _profile_defaults() -> dict:
     profile = _HARDWARE['profile']
     cpu_count = int(_HARDWARE['cpuCount'])
     dedicated_gpu = _HARDWARE['dedicatedGpu']
-    defaults = {'model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'queue_timeout': 45.0, 'timeout': 180.0, 'ctx': 1024, 'context_chars': 1800, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 0, 'batch': 128, 'kv_cache': 'q8_0', 'scheduler': 'low-memory-fair-queue', 'cache_size': 120, 'cooldown': 5.0}
+    defaults = {'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'queue_timeout': 45.0, 'timeout': 180.0, 'ctx': 1024, 'context_chars': 1800, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 0, 'batch': 128, 'kv_cache': 'q8_0', 'scheduler': 'low-memory-fair-queue', 'cache_size': 120, 'cooldown': 5.0}
     if profile == 'mid':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_MID', 'llama3:8b-instruct-q4_K_M'), 'fallback_model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'model_class': 'mid-cpu', 'quantization': 'q4_K_M', 'timeout': 150.0, 'ctx': 2048, 'context_chars': 3000, 'threads': max(1, min(cpu_count, 6)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 256, 'scheduler': 'fair-queue', 'cache_size': 200, 'cooldown': 4.0})
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_MID', os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:7b')), 'fallback_model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'model_class': 'mid-cpu', 'quantization': 'q4_K_M', 'timeout': 150.0, 'ctx': 2048, 'context_chars': 3000, 'threads': max(1, min(cpu_count, 6)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 256, 'scheduler': 'fair-queue', 'cache_size': 200, 'cooldown': 4.0})
     elif profile == 'high':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_HIGH', 'llama3.1:70b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_MID', 'llama3:8b-instruct-q4_K_M'), 'model_class': 'large', 'quantization': 'q5_K_M', 'concurrency': 3, 'timeout': 120.0, 'ctx': 4096, 'context_chars': 5600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 600, 'cooldown': 1.5})
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_HIGH', 'qwen2.5:32b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_GPU', os.getenv('DANILO_AI_MODEL_MID', os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:14b'))), 'model_class': 'large', 'quantization': 'q5_K_M', 'concurrency': 3, 'timeout': 120.0, 'ctx': 4096, 'context_chars': 5600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 600, 'cooldown': 1.5})
     if not _HARDWARE['avx2'] and (not _HARDWARE['cuda']) and (not _HARDWARE['rocm']):
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128, 'scheduler': 'compatibility-cpu'})
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128, 'scheduler': 'compatibility-cpu'})
     if 0 < int(_HARDWARE['storageAvailableMb']) < 8192:
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'phi3:mini'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128})
+        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128})
     return defaults
 
 _PROFILE_DEFAULTS = _profile_defaults()
@@ -204,6 +204,27 @@ _AI_MODEL_CLASS = os.getenv('DANILO_AI_MODEL_CLASS', _PROFILE_DEFAULTS['model_cl
 _AI_QUANTIZATION = os.getenv('DANILO_AI_QUANTIZATION', _PROFILE_DEFAULTS['quantization'])
 
 _AI_SCHEDULER = os.getenv('DANILO_AI_SCHEDULER', _PROFILE_DEFAULTS['scheduler'])
+
+def _configured_ollama_models() -> list[str]:
+    models: list[str] = []
+    for model in (OLLAMA_MODEL, DANILO_AI_FALLBACK_MODEL, DANILO_AI_OPTIONAL_MODEL):
+        model = (model or '').strip()
+        if model and model not in models:
+            models.append(model)
+    return models
+
+def _ollama_model_matches(available_name: str, configured_model: str) -> bool:
+    available = (available_name or '').strip()
+    configured = (configured_model or '').strip()
+    if not available or not configured:
+        return False
+    return available == configured or available == f'{configured}:latest'
+
+def _find_available_ollama_model(available_models: list[str]) -> str | None:
+    for configured_model in _configured_ollama_models():
+        if any(_ollama_model_matches(name, configured_model) for name in available_models):
+            return configured_model
+    return None
 
 AI_TIMEOUT_SECONDS = _env_float('DANILO_AI_TIMEOUT_SECONDS', _env_float('OLLAMA_TIMEOUT_SECONDS', _PROFILE_DEFAULTS['timeout'], minimum=30.0), minimum=30.0, maximum=600.0)
 
@@ -1343,7 +1364,7 @@ def _inference_attempts() -> list[tuple[str, int, str]]:
             models = models[1:]
             
     if not models:
-        models = [DANILO_AI_FALLBACK_MODEL or "phi3:mini"]
+        models = [DANILO_AI_FALLBACK_MODEL or os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b')]
 
     for model_name in models:
         if primary_gpu > 0 and model_name == OLLAMA_MODEL:

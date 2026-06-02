@@ -50,19 +50,25 @@ server {
   add_header Referrer-Policy         "no-referrer"    always;
   add_header X-XSS-Protection        "1; mode=block"  always;
 
-  location = /hotspot-detect.html             { return 302 http://${PORTAL_DOMAIN}/; }
-  location = /library/test/success.html       { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /captive-login {
+    default_type text/html;
+    add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+    return 200 '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="1; url=http://${PORTAL_DOMAIN}/"><title>DANILO Portal</title><style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;color:#fff}.card{max-width:420px;padding:28px;border-radius:18px;background:#111827;box-shadow:0 20px 60px #0008;text-align:center}a{display:inline-block;margin-top:18px;padding:12px 18px;border-radius:999px;background:#38bdf8;color:#082f49;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Welcome to DANILO</h1><p>Opening the local learning portal at <strong>danilo.local</strong>.</p><a href="http://${PORTAL_DOMAIN}/">Open DANILO</a></main></body></html>';
+  }
 
-  location = /generate_204                    { return 302 http://${PORTAL_DOMAIN}/; }
-  location = /gen_204                         { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /hotspot-detect.html             { return 302 http://${PORTAL_DOMAIN}/captive-login; }
+  location = /library/test/success.html       { return 302 http://${PORTAL_DOMAIN}/captive-login; }
 
-  location = /ncsi.txt                        { return 302 http://${PORTAL_DOMAIN}/; }
-  location = /connecttest.txt                 { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /generate_204                    { return 302 http://${PORTAL_DOMAIN}/captive-login; }
+  location = /gen_204                         { return 302 http://${PORTAL_DOMAIN}/captive-login; }
 
-  location = /success.txt                     { return 302 http://${PORTAL_DOMAIN}/; }
-  location = /canonical.html                  { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /ncsi.txt                        { return 302 http://${PORTAL_DOMAIN}/captive-login; }
+  location = /connecttest.txt                 { return 302 http://${PORTAL_DOMAIN}/captive-login; }
 
-  location = /kindle-wifi/wifistub.html       { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /success.txt                     { return 302 http://${PORTAL_DOMAIN}/captive-login; }
+  location = /canonical.html                  { return 302 http://${PORTAL_DOMAIN}/captive-login; }
+
+  location = /kindle-wifi/wifistub.html       { return 302 http://${PORTAL_DOMAIN}/captive-login; }
 
   # SSE streaming endpoint: disable all buffering so tokens reach the browser immediately
   location = /api/ai/tutor/stream {
@@ -140,7 +146,7 @@ server {
 server {
   listen ${FRONTEND_PORT:-80};
   server_name _;
-  return 302 http://${PORTAL_DOMAIN}/;
+  return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
 server {
@@ -152,7 +158,7 @@ server {
               www.airport.us
               www.ibook.info
               www.thinkdifferent.us;
-  return 302 http://${PORTAL_DOMAIN}/;
+  return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
 server {
@@ -167,21 +173,21 @@ server {
               www.googleapis.com
               play.googleapis.com
               connectivity-check.ubuntu.com;
-  return 302 http://${PORTAL_DOMAIN}/;
+  return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
 server {
   listen ${FRONTEND_PORT:-80};
   server_name connect.rom.miui.com
               captive.v2.rom.miui.com;
-  return 302 http://${PORTAL_DOMAIN}/;
+  return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
 server {
   listen ${FRONTEND_PORT:-80};
   server_name connectivitycheck.platform.hicloud.com
               connectivitycheck.cloud.huawei.com;
-  return 302 http://${PORTAL_DOMAIN}/;
+  return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
 server {
@@ -189,7 +195,7 @@ server {
   server_name www.msftncsi.com
               msftncsi.com
               dns.msftncsi.com;
-  return 302 http://${PORTAL_DOMAIN}/;
+  return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 EOF
 
@@ -225,6 +231,7 @@ services:
     volumes:
       - ai_index:/var/lib/danilo
       - ./models:/models:ro
+      - ./data/uploads:/app/data/uploads
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=20)\""]
       interval: 30s
@@ -309,13 +316,13 @@ DANILO_AI_RUNTIME=ollama
 OLLAMA_URL=http://${OLLAMA_HOST:-ollama}:${OLLAMA_PORT:-11434}
 DANILO_OLLAMA_MODEL=auto
 OLLAMA_MODEL=auto
-DANILO_AI_PRIMARY_MODEL=microsoft_Phi-4-mini-instruct-Q4_K_M.gguf
+DANILO_AI_PRIMARY_MODEL=
 DANILO_AI_FALLBACK_MODEL=
 DANILO_AI_OPTIONAL_MODEL=
-DANILO_AI_MODEL_LOW=qwen2.5:1.5b
-DANILO_AI_MODEL_BALANCED=qwen2.5:3b
-DANILO_AI_MODEL_GPU=llama3.1:8b
-DANILO_AI_MODEL_HIGH=qwen2.5:14b
+DANILO_AI_MODEL_LOW=qwen2.5:3b
+DANILO_AI_MODEL_BALANCED=qwen2.5:7b
+DANILO_AI_MODEL_GPU=qwen2.5:14b
+DANILO_AI_MODEL_HIGH=qwen2.5:32b
 DANILO_AI_MODEL_CLASS=auto
 DANILO_AI_QUANTIZATION=auto
 DANILO_AI_GPU_LAYERS=0
@@ -439,10 +446,10 @@ sudo bash danilo.sh --install
 |---|---|---|
 | `DANILO_AI_HARDWARE_PROFILE` | `auto` | Installer records the detected profile: constrained, balanced, high-memory, or GPU-accelerated |
 | `DANILO_OLLAMA_MODEL` / `OLLAMA_MODEL` | hardware-derived | Active local model; override without code changes |
-| `DANILO_AI_MODEL_LOW` | `qwen2.5:1.5b` | Lightweight model target for constrained CPU or limited storage hosts |
-| `DANILO_AI_MODEL_BALANCED` | `qwen2.5:3b` | Mid-range CPU model target |
-| `DANILO_AI_MODEL_GPU` | `llama3.1:8b` | Dedicated GPU model target |
-| `DANILO_AI_MODEL_HIGH` | `qwen2.5:14b` | High-VRAM future-ready model target |
+| `DANILO_AI_MODEL_LOW` | `qwen2.5:3b` | Lightweight tutoring model target for constrained CPU or limited storage hosts |
+| `DANILO_AI_MODEL_BALANCED` | `qwen2.5:7b` | Recommended tutoring model for stronger explanations on mid-range hosts |
+| `DANILO_AI_MODEL_GPU` | `qwen2.5:14b` | Stronger tutoring model target for dedicated GPU hosts |
+| `DANILO_AI_MODEL_HIGH` | `qwen2.5:32b` | High-VRAM tutoring model target for best local explanation quality |
 | `DANILO_AI_QUANTIZATION` | hardware-derived | Planner preference used for custom GGUF selection and status reporting |
 | `DANILO_AI_GPU_LAYERS` / `OLLAMA_NUM_GPU` | hardware-derived | GPU layer offload; falls back to CPU on accelerator failure |
 | `OLLAMA_NUM_BATCH` | hardware-derived | Batch size tuned for latency and memory headroom |
@@ -518,7 +525,7 @@ docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama ba
 ### 4. Slow Hardware
 If responses are too slow, consider downgrading the model class in `/opt/danilo/app/.env` and restarting the stack:
 ```bash
-# Edit OLLAMA_MODEL to a smaller model like qwen2.5:1.5b
+# Edit OLLAMA_MODEL to a smaller tutoring model like qwen2.5:3b
 sudo nano /opt/danilo/app/.env
 docker compose -f /opt/danilo/app/docker-compose.yml -p danilo up -d
 ```

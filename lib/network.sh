@@ -124,10 +124,13 @@ bind-dynamic
 listen-address=${LAN_IP}
 domain-needed
 bogus-priv
+local=/${PORTAL_DOMAIN}/
+domain=${PORTAL_DOMAIN}
 dhcp-range=10.10.0.10,10.10.0.200,255.255.255.0,12h
 dhcp-option=3,${LAN_IP}
 dhcp-option=6,${LAN_IP}
-dhcp-option=114,"http://${PORTAL_DOMAIN}/"
+dhcp-option=15,${PORTAL_DOMAIN}
+dhcp-option=114,"http://${PORTAL_DOMAIN}/captive-login"
 address=/#/${LAN_IP}
 address=/${PORTAL_DOMAIN}/${LAN_IP}
 address=/captive.apple.com/${LAN_IP}

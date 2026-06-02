@@ -1,9 +1,9 @@
 # Project DANILO installer module: ai.sh
 
-DANILO_AI_MODEL_LOW="${DANILO_AI_MODEL_LOW:-}"
-DANILO_AI_MODEL_BALANCED="${DANILO_AI_MODEL_BALANCED:-}"
-DANILO_AI_MODEL_GPU="${DANILO_AI_MODEL_GPU:-}"
-DANILO_AI_MODEL_HIGH="${DANILO_AI_MODEL_HIGH:-}"
+DANILO_AI_MODEL_LOW="${DANILO_AI_MODEL_LOW:-qwen2.5:3b}"
+DANILO_AI_MODEL_BALANCED="${DANILO_AI_MODEL_BALANCED:-${DANILO_AI_MODEL_MID:-qwen2.5:7b}}"
+DANILO_AI_MODEL_GPU="${DANILO_AI_MODEL_GPU:-qwen2.5:14b}"
+DANILO_AI_MODEL_HIGH="${DANILO_AI_MODEL_HIGH:-qwen2.5:32b}"
 DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-${DANILO_AI_MODEL_BALANCED}}}"
 DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-}"
 DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-}"
@@ -13,6 +13,60 @@ DANILO_AI_FALLBACK_MODEL="${DANILO_AI_FALLBACK_MODEL:-}"
 DANILO_CUSTOM_OLLAMA_MODEL="${DANILO_CUSTOM_OLLAMA_MODEL:-}"
 DANILO_CUSTOM_GGUF_PATH="${DANILO_CUSTOM_GGUF_PATH:-}"
 DANILO_CUSTOM_MODELFILE="${DANILO_CUSTOM_MODELFILE:-}"
+
+_danilo_known_good_ollama_model() {
+  case "$1" in
+    qwen2.5:0.5b|qwen2.5:1.5b|qwen2.5:3b|qwen2.5:7b|qwen2.5:14b|qwen2.5:32b|\
+    llama3.2:1b|llama3.2:3b|llama3.1:8b|llama3.1:70b|llama3:8b|llama3:70b|\
+    phi3:mini|phi3:medium|gemma2:2b|gemma2:9b|mistral:7b)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+_danilo_normalize_ollama_model() {
+  local model="${1:-}"
+  model="$(printf '%s' "${model}" | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | sed -E 's/[[:space:]]+.*$//')"
+  model="${model//\"/}"
+  model="${model//\'/}"
+  model="$(printf '%s' "${model}" | sed -E 's/\.gguf$//I')"
+  case "${model,,}" in
+    llama3:8b-instruct-q4_k_m|llama3:instruct|llama3-8b*|llama-3-8b*)
+      printf 'llama3.1:8b'
+      ;;
+    phi-3-mini*|phi3-mini*|microsoft/phi-3-mini*)
+      printf 'phi3:mini'
+      ;;
+    qwen2.5-1.5b*|qwen2_5-1.5b*)
+      printf 'qwen2.5:1.5b'
+      ;;
+    qwen2.5-3b*|qwen2_5-3b*)
+      printf 'qwen2.5:3b'
+      ;;
+    qwen2.5-7b*|qwen2_5-7b*)
+      printf 'qwen2.5:7b'
+      ;;
+    qwen2.5-14b*|qwen2_5-14b*)
+      printf 'qwen2.5:14b'
+      ;;
+    *)
+      printf '%s' "${model}"
+      ;;
+  esac
+}
+
+_danilo_accept_dynamic_model() {
+  local model
+  model="$(_danilo_normalize_ollama_model "$1")"
+  [[ -n "${model}" ]] || return 1
+  [[ "${model}" != *"/"* ]] || return 1
+  [[ "${model}" != http* ]] || return 1
+  [[ "${model}" == *":"* ]] || return 1
+  _danilo_known_good_ollama_model "${model}"
+}
 
 _danilo_first_line() {
   awk 'NF {print; exit}' 2>/dev/null || true
@@ -126,9 +180,9 @@ detect_ai_hardware_profile() {
 
   if (( mem_mb >= 120000 && gpu_vram_mb >= 22000 && dedicated_gpu == 1 )); then
     profile="G"
-    selected_model="llama3.1:70b"
-    selected_fallback="phi3:mini"
-    selected_optional="llama3.1:8b"
+    selected_model="${DANILO_AI_MODEL_ENTERPRISE:-qwen2.5:32b}"
+    selected_fallback="${DANILO_AI_MODEL_HIGH}"
+    selected_optional="${DANILO_AI_MODEL_GPU}"
     model_class="enterprise"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=999
@@ -143,9 +197,9 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
   elif (( mem_mb >= 60000 && gpu_vram_mb >= 15000 && dedicated_gpu == 1 )); then
     profile="F"
-    selected_model="llama3.1:8b"
-    selected_fallback="phi3:mini"
-    selected_optional="llama3:70b"
+    selected_model="${DANILO_AI_MODEL_HIGH}"
+    selected_fallback="${DANILO_AI_MODEL_GPU}"
+    selected_optional="${DANILO_AI_MODEL_BALANCED}"
     model_class="high-end"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=999
@@ -160,9 +214,9 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
   elif (( mem_mb >= 30000 && gpu_vram_mb >= 7000 && dedicated_gpu == 1 )); then
     profile="E"
-    selected_model="llama3.1:8b"
-    selected_fallback="phi3:mini"
-    selected_optional="llama3:8b"
+    selected_model="${DANILO_AI_MODEL_GPU}"
+    selected_fallback="${DANILO_AI_MODEL_BALANCED}"
+    selected_optional="${DANILO_AI_MODEL_LOW}"
     model_class="mid-gpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=999
@@ -177,8 +231,8 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
   elif (( mem_mb >= 30000 )); then
     profile="D"
-    selected_model="llama3:instruct"
-    selected_fallback="phi3:mini"
+    selected_model="${DANILO_AI_MODEL_BALANCED}"
+    selected_fallback="${DANILO_AI_MODEL_LOW}"
     selected_optional=""
     model_class="mid-cpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
@@ -194,8 +248,8 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
   elif (( mem_mb >= 15000 && gpu_vram_mb >= 5000 && dedicated_gpu == 1 )); then
     profile="C"
-    selected_model="llama3:instruct"
-    selected_fallback="phi3:mini"
+    selected_model="${DANILO_AI_MODEL_BALANCED}"
+    selected_fallback="${DANILO_AI_MODEL_LOW}"
     selected_optional=""
     model_class="low-gpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
@@ -211,8 +265,8 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
   elif (( mem_mb >= 15000 )); then
     profile="B"
-    selected_model="phi3:medium"
-    selected_fallback="phi3:mini"
+    selected_model="${DANILO_AI_MODEL_BALANCED}"
+    selected_fallback="${DANILO_AI_MODEL_LOW}"
     selected_optional=""
     model_class="low-cpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
@@ -228,7 +282,7 @@ detect_ai_hardware_profile() {
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
   else
     profile="A"
-    selected_model="phi3:mini"
+    selected_model="${DANILO_AI_MODEL_LOW}"
     selected_fallback=""
     selected_optional=""
     model_class="very-low"
@@ -243,7 +297,7 @@ detect_ai_hardware_profile() {
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=2m
     [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
     [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=1800
-    warn "Detected tier A low-end hardware (${mem_mb} MB RAM, ${cpu_count} CPU threads). DANILO will favor Phi-3 Mini."
+    warn "Detected tier A low-end hardware (${mem_mb} MB RAM, ${cpu_count} CPU threads). DANILO will favor ${DANILO_AI_MODEL_LOW}."
   fi
   DANILO_AI_EMBEDDING_MODEL="nomic-embed-text"
 
@@ -280,6 +334,17 @@ detect_ai_hardware_profile() {
     DANILO_OLLAMA_MODEL="${selected_model}"
   else
     OLLAMA_MODEL="${DANILO_OLLAMA_MODEL:-${OLLAMA_MODEL:-${selected_model}}}"
+  fi
+  local normalized_model
+  normalized_model="$(_danilo_normalize_ollama_model "${OLLAMA_MODEL}")"
+  if [[ -n "${normalized_model}" && "${normalized_model}" != "${OLLAMA_MODEL}" && "${normalized_model}" == *":"* ]]; then
+    warn "Normalized unsupported Ollama model tag (${OLLAMA_MODEL}) to ${normalized_model}"
+    OLLAMA_MODEL="${normalized_model}"
+    DANILO_OLLAMA_MODEL="${normalized_model}"
+  elif [[ "${OLLAMA_MODEL}" == *".gguf"* || "${OLLAMA_MODEL}" == *"/"* || "${OLLAMA_MODEL}" == http* || "${OLLAMA_MODEL}" == *" "* ]]; then
+    warn "Unsupported Ollama model override (${OLLAMA_MODEL}); falling back to ${selected_model}"
+    OLLAMA_MODEL="${selected_model}"
+    DANILO_OLLAMA_MODEL="${selected_model}"
   fi
   DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-${selected_fallback}}"
   DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-${selected_optional}}"
@@ -347,13 +412,14 @@ configure_ollama_model() {
       
       best_model="$(${whichllm_cmd} --json 2>/dev/null | jq -r '.[0] | .ollama_model // .model // .name // .id // .repo_id' 2>/dev/null | sed 's/ gguf//gi' | sed 's/ .*//g' || true)"
       
-      if [[ -n "${best_model}" && "${best_model}" != "null" ]]; then
+      if _danilo_accept_dynamic_model "${best_model}"; then
+        best_model="$(_danilo_normalize_ollama_model "${best_model}")"
         ok "WhichLLM dynamically selected the optimal model: ${best_model}"
         DANILO_DEFAULT_OLLAMA_MODEL="${best_model}"
         OLLAMA_MODEL="${best_model}"
         DANILO_OLLAMA_MODEL="${best_model}"
       else
-        warn "WhichLLM did not return a valid model name; falling back to conservative static plan (${DANILO_DEFAULT_OLLAMA_MODEL})"
+        warn "WhichLLM returned an unsupported model (${best_model:-empty}); falling back to conservative static plan (${DANILO_DEFAULT_OLLAMA_MODEL})"
       fi
     fi
   else

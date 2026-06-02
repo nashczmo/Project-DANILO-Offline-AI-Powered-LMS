@@ -21,12 +21,7 @@ def ai_status() -> dict:
         if response.status_code == 200:
             runtime_ok = True
             available_models = [m.get('name', '') for m in response.json().get('models') or []]
-            expected_models = {OLLAMA_MODEL, f'{OLLAMA_MODEL}:latest'}
-            if DANILO_AI_FALLBACK_MODEL:
-                expected_models.update({DANILO_AI_FALLBACK_MODEL, f'{DANILO_AI_FALLBACK_MODEL}:latest'})
-            if DANILO_AI_OPTIONAL_MODEL:
-                expected_models.update({DANILO_AI_OPTIONAL_MODEL, f'{DANILO_AI_OPTIONAL_MODEL}:latest'})
-            model_loaded = any((name in expected_models for name in available_models))
+            model_loaded = _find_available_ollama_model(available_models) is not None
     except Exception as exc:
         error_message = str(exc)[:120]
     ram_available_mb: float | None = None
