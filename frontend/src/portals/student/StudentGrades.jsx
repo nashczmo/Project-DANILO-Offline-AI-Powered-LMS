@@ -1,27 +1,31 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useApi } from "../../hooks/useApi";
-import { Card, PageHeader, Skeleton, EmptyState, MathText, Badge } from "../../components/ui";
-import { TrendingUp, GraduationCap } from "lucide-react";
+import { Card, PageHeader, Skeleton, EmptyState, MathText } from "../../components/ui";
+import { TrendingUp, GraduationCap, Calendar, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-function getScoreColor(score, maxScore) {
-  if (score === null || score === undefined || !maxScore) return "text-[#202124]";
-  const pct = (score / maxScore) * 100;
-  if (pct >= 85) return "text-[#188038]";
-  if (pct >= 70) return "text-[#1A73E8]";
-  if (pct >= 60) return "text-[#E37400]";
-  return "text-[#D93025]";
-}
+import { useAppStore } from "../../store/useAppStore";
 
 function getTermOrder(term) {
   const match = String(term || "").match(/term\s*(\d+)/i);
   return match ? Number(match[1]) : 999;
 }
 
+function formatTerm(term) {
+  const lower = String(term || "").toLowerCase();
+  if (lower.includes("term 1")) return "1st Term";
+  if (lower.includes("term 2")) return "2nd Term";
+  if (lower.includes("term 3")) return "3rd Term";
+  if (lower.includes("term 4")) return "4th Term";
+  return term;
+}
+
 export default function StudentGrades() {
   const { data, loading, error, refresh } = useApi("/student/grades", { immediate: true });
+  const user = useAppStore((state) => state.user);
   const grades = data || [];
   const navigate = useNavigate();
+  
+  const [expandedTerms, setExpandedTerms] = useState({});
 
   const groupedGrades = useMemo(() => {
     const bySy = {};
@@ -36,49 +40,50 @@ export default function StudentGrades() {
     // Sort school years descending
     const sortedSy = Object.keys(bySy).sort((a, b) => b.localeCompare(a));
     
-    return sortedSy.map(sy => {
+    let allTerms = [];
+    sortedSy.forEach(sy => {
       const terms = bySy[sy];
       const sortedTerms = Object.keys(terms).sort((a, b) => getTermOrder(a) - getTermOrder(b));
       
-      return {
-        schoolYear: sy,
-        terms: sortedTerms.map(t => {
-          const termGrades = terms[t];
-          let totalScore = 0;
-          let totalPossible = 0;
-          let validFinalGrades = 0;
-          let sumFinalGrades = 0;
-          let entryCount = 0;
+      sortedTerms.forEach(t => {
+        const termGrades = terms[t];
+        let totalGradePoints = 0;
+        let subjectsWithFinalGrade = 0;
 
-          termGrades.forEach(subj => {
-            if (subj.finalGrade !== undefined && subj.finalGrade !== null) {
-              validFinalGrades++;
-              sumFinalGrades += subj.finalGrade;
-            }
-            if (subj.components) {
-              entryCount += subj.components.length;
-              subj.components.forEach(comp => {
-                if (comp.score !== null && comp.maxScore) {
-                   totalScore += comp.score;
-                   totalPossible += comp.maxScore;
-                }
-              });
-            }
-          });
+        termGrades.forEach(subj => {
+          if (subj.finalGrade !== undefined && subj.finalGrade !== null) {
+            totalGradePoints += subj.finalGrade;
+            subjectsWithFinalGrade += 1;
+          }
+        });
 
-          return {
-            term: t,
-            subjects: termGrades,
-            subjectCount: termGrades.length,
-            entryCount,
-            average: validFinalGrades ? (sumFinalGrades / validFinalGrades) : null,
-            totalScore,
-            totalPossible
-          };
-        })
-      };
+        allTerms.push({
+          id: `${sy}-${t}`,
+          schoolYear: sy,
+          term: t,
+          formattedTerm: formatTerm(t),
+          subjects: termGrades,
+          gwa: subjectsWithFinalGrade > 0 ? (totalGradePoints / subjectsWithFinalGrade).toFixed(2) : null
+        });
+      });
     });
+    
+    return allTerms;
   }, [grades]);
+
+  // Open the first term by default
+  useEffect(() => {
+    if (groupedGrades.length > 0 && Object.keys(expandedTerms).length === 0) {
+      setExpandedTerms({ [groupedGrades[0].id]: true });
+    }
+  }, [groupedGrades]);
+
+  const toggleTerm = (termId) => {
+    setExpandedTerms(prev => ({
+      ...prev,
+      [termId]: !prev[termId]
+    }));
+  };
 
   if (loading) {
     return (
@@ -108,11 +113,13 @@ export default function StudentGrades() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      <PageHeader
-        title="My Grades"
-        description="View your grades organized by school year and term."
-      />
+    <div className="space-y-4 animate-fade-in pb-10">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="w-5 h-5 flex items-center justify-center text-[#1A73E8]">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+        </div>
+        <h1 className="text-xl font-bold text-[#202124]">My Grades</h1>
+      </div>
 
       {groupedGrades.length === 0 ? (
         <EmptyState
@@ -121,106 +128,93 @@ export default function StudentGrades() {
           description="Your grades will appear here once your teachers record them."
         />
       ) : (
-        groupedGrades.map(syGroup => (
-          <div key={syGroup.schoolYear} className="space-y-6">
-            <h2 className="text-xl font-black text-[#202124] border-b border-[#E0E0E0] pb-2">
-              S.Y. {syGroup.schoolYear}
-            </h2>
+        <div className="space-y-2">
+          {groupedGrades.map((group) => {
+            const isExpanded = !!expandedTerms[group.id];
             
-            {syGroup.terms.map(termGroup => (
-              <Card key={termGroup.term} className="p-0 overflow-hidden">
-                <div className="p-5 border-b border-[#E0E0E0] bg-[#F8F9FA] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg font-black text-[#202124]">{termGroup.term} <span className="text-sm font-bold text-[#5F6368] ml-2">(S.Y. {syGroup.schoolYear})</span></h3>
-                    <p className="text-sm text-[#5F6368] font-bold mt-1">
-                      {termGroup.subjectCount} {termGroup.subjectCount === 1 ? 'subject' : 'subjects'} &bull; {termGroup.entryCount} grade {termGroup.entryCount === 1 ? 'entry' : 'entries'}
-                    </p>
+            return (
+              <div key={group.id} className="border border-[#E0E0E0] rounded bg-white overflow-hidden shadow-sm">
+                <button
+                  onClick={() => toggleTerm(group.id)}
+                  className="w-full py-4 px-6 flex items-center justify-center bg-white hover:bg-[#F8F9FA] transition-colors focus:outline-none"
+                >
+                  <div className="flex items-center gap-2 text-[#495057] font-medium">
+                    <span className="text-lg">🗓️</span> 
+                    AY {group.schoolYear}, {group.formattedTerm}
                   </div>
-                  {termGroup.average !== null && (
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-[#E0E0E0] shadow-sm">
-                      <span className="text-xs font-black text-[#9AA0A6] uppercase tracking-wide">Average</span>
-                      <span className={`text-xl font-black ${getScoreColor(termGroup.average, 100)}`}>
-                        {termGroup.average.toFixed(2)}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {termGroup.subjects.length === 0 ? (
-                  <div className="p-8 text-center text-[#5F6368] font-bold text-sm">
-                    No grades for this term.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="dn-table">
+                </button>
+                
+                {isExpanded && (
+                  <div className="border-t border-[#E0E0E0] overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
                       <thead>
-                        <tr>
-                          <th>Subject</th>
-                          <th>Component</th>
-                          <th className="text-right">Score</th>
-                          <th className="text-right hidden sm:table-cell">Max</th>
-                          <th className="text-right hidden lg:table-cell">Weight</th>
-                          <th className="text-right">Percentage</th>
-                          <th className="hidden md:table-cell">Remarks</th>
+                        <tr className="bg-[#E9ECEF] border-b border-[#DDE2E5]">
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Subject<br/>Code</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Subject Name</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Section</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Instructor</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">Midterm Grade</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">End Term Grade</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center bg-[#CCE5FF]">Final Grade</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {termGroup.subjects.map(subj => (
-                          (subj.components && subj.components.length > 0) ? (
-                            subj.components.map((comp, idx) => (
+                        {group.subjects.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-[#5F6368] font-medium text-sm">
+                              No grades recorded for this term.
+                            </td>
+                          </tr>
+                        ) : (
+                          group.subjects.map((subj, idx) => {
+                            // Extract actual components from backend data without guessing/approximating
+                            const midtermComp = subj.components?.find(c => c.component.toLowerCase().includes('midterm'));
+                            const endtermComp = subj.components?.find(c => c.component.toLowerCase().includes('end term') || c.component.toLowerCase().includes('final'));
+                            
+                            const midtermScore = midtermComp && midtermComp.maxScore ? Math.round((midtermComp.score / midtermComp.maxScore) * 100) : null;
+                            const endtermScore = endtermComp && endtermComp.maxScore ? Math.round((endtermComp.score / endtermComp.maxScore) * 100) : null;
+                            
+                            const finalScore = subj.finalGrade !== undefined && subj.finalGrade !== null ? subj.finalGrade : null;
+                            
+                            return (
                               <tr 
-                                key={`${subj.courseId}-${comp.id || idx}`}
+                                key={subj.courseId || idx}
                                 onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
-                                className="cursor-pointer group"
+                                className="border-b border-[#E0E0E0] hover:bg-[#F8F9FA] transition-colors cursor-pointer"
                               >
-                                <td>
-                                  {idx === 0 && (
-                                    <div>
-                                      <div className="font-bold group-hover:text-[#1A73E8] transition-colors"><MathText text={subj.subject} /></div>
-                                      <div className="text-xs font-black text-[#5F6368] mt-1">{subj.courseCode}</div>
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="text-sm font-bold text-[#202124]"><MathText text={comp.component} /></td>
-                                <td className={`text-sm font-black text-right ${getScoreColor(comp.score, comp.maxScore)}`}>{comp.score}</td>
-                                <td className="text-sm font-bold text-[#5F6368] text-right hidden sm:table-cell">{comp.maxScore}</td>
-                                <td className="text-sm font-bold text-[#5F6368] text-right hidden lg:table-cell">{comp.weight ? (comp.weight * 100).toFixed(0) + '%' : '—'}</td>
-                                <td className="text-sm font-black text-right">
-                                  {comp.percentage !== undefined ? `${comp.percentage.toFixed(1)}%` : '—'}
-                                </td>
-                                <td className="text-xs text-[#5F6368] hidden md:table-cell max-w-[200px] truncate" title={comp.remarks}>
-                                  {comp.remarks || "—"}
+                                <td className="py-3 px-4 text-sm text-[#495057] whitespace-nowrap">{subj.courseCode}</td>
+                                <td className="py-3 px-4 text-sm text-[#202124]"><MathText text={subj.subject} /></td>
+                                <td className="py-3 px-4 text-sm text-[#495057] whitespace-nowrap">{user?.sectionName || '—'}</td>
+                                <td className="py-3 px-4 text-sm text-[#495057] truncate max-w-[200px]">{subj.teacher || '—'}</td>
+                                <td className="py-3 px-4 text-sm font-bold text-center text-[#202124]">{midtermScore !== null ? midtermScore : '—'}</td>
+                                <td className="py-3 px-4 text-sm font-bold text-center text-[#202124]">{endtermScore !== null ? endtermScore : '—'}</td>
+                                <td className="py-3 px-4 text-sm font-bold text-center bg-[#CCE5FF] text-[#004085]">
+                                  {finalScore !== null ? finalScore.toFixed(1) : '—'}
                                 </td>
                               </tr>
-                            ))
-                          ) : (
-                            <tr 
-                              key={`${subj.courseId}-empty`}
-                              onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
-                              className="cursor-pointer group"
-                            >
-                              <td>
-                                <div>
-                                  <div className="font-bold group-hover:text-[#1A73E8] transition-colors"><MathText text={subj.subject} /></div>
-                                  <div className="text-xs font-black text-[#5F6368] mt-1">{subj.courseCode}</div>
-                                </div>
-                              </td>
-                              <td colSpan={6} className="text-sm font-bold text-[#9AA0A6] italic text-center">
-                                No grades recorded yet
-                              </td>
-                            </tr>
-                          )
-                        ))}
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
+                    
+                    {group.gwa !== null && (
+                      <div className="flex justify-end items-center p-4 bg-white border-t border-[#E0E0E0]">
+                        <span className="font-bold text-[#202124] mr-2">GWA :</span>
+                        <span className="bg-[#28A745] text-white font-bold px-6 py-1 rounded">
+                          {group.gwa}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </Card>
-            ))}
-          </div>
-        ))
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
 }
+
 
