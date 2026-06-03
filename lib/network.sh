@@ -218,6 +218,8 @@ iptables -t nat -C PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 53 -j REDIRECT 
   iptables -t nat -A PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 53 -j REDIRECT --to-ports 53
 iptables -t nat -C PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 80 >/dev/null 2>&1 || \
   iptables -t nat -A PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 80
+iptables -t nat -C PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 443 -j REDIRECT --to-ports 443 >/dev/null 2>&1 || \
+  iptables -t nat -A PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 443 -j REDIRECT --to-ports 443
 iptables -C INPUT -i "\${WIFI_IFACE}" -p udp -m multiport --dports 53,67,68 -j ACCEPT >/dev/null 2>&1 || \
   iptables -A INPUT -i "\${WIFI_IFACE}" -p udp -m multiport --dports 53,67,68 -j ACCEPT
 iptables -C OUTPUT -o "\${WIFI_IFACE}" -p udp -m multiport --sports 53,67,68 -j ACCEPT >/dev/null 2>&1 || \
@@ -230,6 +232,10 @@ iptables -C INPUT -i "\${WIFI_IFACE}" -p tcp --dport 80 -j ACCEPT >/dev/null 2>&
   iptables -A INPUT -i "\${WIFI_IFACE}" -p tcp --dport 80 -j ACCEPT
 iptables -C OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 80 -j ACCEPT >/dev/null 2>&1 || \
   iptables -A OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 80 -j ACCEPT
+iptables -C INPUT -i "\${WIFI_IFACE}" -p tcp --dport 443 -j ACCEPT >/dev/null 2>&1 || \
+  iptables -A INPUT -i "\${WIFI_IFACE}" -p tcp --dport 443 -j ACCEPT
+iptables -C OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 443 -j ACCEPT >/dev/null 2>&1 || \
+  iptables -A OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 443 -j ACCEPT
 
 netfilter-persistent save >/dev/null 2>&1 || true
 
@@ -253,12 +259,15 @@ systemctl stop dnsmasq >/dev/null 2>&1 || true
 iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p udp --dport 53 -j REDIRECT --to-ports 53 >/dev/null 2>&1 || true
 iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 53 -j REDIRECT --to-ports 53 >/dev/null 2>&1 || true
 iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 80 >/dev/null 2>&1 || true
+iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 443 -j REDIRECT --to-ports 443 >/dev/null 2>&1 || true
 iptables -D INPUT -i "\${WIFI_IFACE}" -p udp -m multiport --dports 53,67,68 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D OUTPUT -o "\${WIFI_IFACE}" -p udp -m multiport --sports 53,67,68 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D INPUT -i "\${WIFI_IFACE}" -p tcp --dport 53 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 53 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D INPUT -i "\${WIFI_IFACE}" -p tcp --dport 80 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 80 -j ACCEPT >/dev/null 2>&1 || true
+iptables -D INPUT -i "\${WIFI_IFACE}" -p tcp --dport 443 -j ACCEPT >/dev/null 2>&1 || true
+iptables -D OUTPUT -o "\${WIFI_IFACE}" -p tcp --sport 443 -j ACCEPT >/dev/null 2>&1 || true
 
 ip addr flush dev "\${WIFI_IFACE}" >/dev/null 2>&1 || true
 ip link set "\${WIFI_IFACE}" down >/dev/null 2>&1 || true

@@ -16,7 +16,13 @@ COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /opt/danilo/app/frontend/dist
 RUN chown -R nginx:nginx /opt/danilo/app/frontend/dist
 
-EXPOSE 80
+RUN apk add --no-cache openssl && \
+    mkdir -p /etc/nginx/ssl && \
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt \
+    -subj "/C=PH/ST=Metro Manila/L=Manila/O=Project DANILO/CN=danilo.local"
+
+EXPOSE 80 443
 CMD ["nginx", "-g", "daemon off;"]
 EOF
 
@@ -30,7 +36,10 @@ upstream danilo_backend {
 
 server {
   listen 80 default_server;
+  listen 443 ssl default_server;
   server_name ${PORTAL_DOMAIN};
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   root  /opt/danilo/app/frontend/dist;
   index index.html;
 
@@ -145,12 +154,18 @@ server {
 # Covers any unrecognized hostname that arrives on port 80 (captive portal trap)
 server {
   listen ${FRONTEND_PORT:-80};
+  listen 443 ssl;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name _;
   return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
 server {
   listen ${FRONTEND_PORT:-80};
+  listen 443 ssl;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name captive.apple.com
               www.apple.com
               www.appleiphonecell.com
@@ -163,6 +178,9 @@ server {
 
 server {
   listen ${FRONTEND_PORT:-80};
+  listen 443 ssl;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name connectivitycheck.gstatic.com
               www.gstatic.com
               clients3.google.com
@@ -178,6 +196,9 @@ server {
 
 server {
   listen ${FRONTEND_PORT:-80};
+  listen 443 ssl;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name connect.rom.miui.com
               captive.v2.rom.miui.com;
   return 302 http://${PORTAL_DOMAIN}/captive-login;
@@ -185,6 +206,9 @@ server {
 
 server {
   listen ${FRONTEND_PORT:-80};
+  listen 443 ssl;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name connectivitycheck.platform.hicloud.com
               connectivitycheck.cloud.huawei.com;
   return 302 http://${PORTAL_DOMAIN}/captive-login;
@@ -192,6 +216,9 @@ server {
 
 server {
   listen ${FRONTEND_PORT:-80};
+  listen 443 ssl;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name www.msftncsi.com
               msftncsi.com
               dns.msftncsi.com;
@@ -277,6 +304,7 @@ services:
       PORTAL_DOMAIN: ${PORTAL_DOMAIN}
     ports:
       - "${FRONTEND_PORT:-80}:80"
+      - "443:443"
     read_only: true
     tmpfs:
       - /var/cache/nginx
