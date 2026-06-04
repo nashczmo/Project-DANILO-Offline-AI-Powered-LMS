@@ -248,11 +248,15 @@ PORTAL_DOMAIN = os.getenv('PORTAL_DOMAIN', '')
 
 SSID = os.getenv('SSID', '')
 
+DANILO_EMAIL_DOMAIN = os.getenv('DANILO_EMAIL_DOMAIN', PORTAL_DOMAIN or 'danilo.edu').strip() or (PORTAL_DOMAIN or 'danilo.edu')
+
+DANILO_STUDENT_EMAIL_DOMAIN = os.getenv('DANILO_STUDENT_EMAIL_DOMAIN', f'student.{DANILO_EMAIL_DOMAIN}').strip() or f'student.{DANILO_EMAIL_DOMAIN}'
+
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin').strip() or 'admin'
 
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', '')
 
-CORS_ORIGINS = [origin.strip() for origin in os.getenv('CORS_ORIGINS', os.getenv('DANILO_DEFAULT_CORS_DOMAINS', 'http://danilo.local')).split(',') if origin.strip()]
+CORS_ORIGINS = [origin.strip() for origin in os.getenv('CORS_ORIGINS', os.getenv('DANILO_DEFAULT_CORS_DOMAINS', 'http://danilo.edu')).split(',') if origin.strip()]
 
 DANILO_ROLES = set((role.strip().lower() for role in os.getenv('DANILO_ROLES', 'admin,teacher,student').split(',') if role.strip()))
 
@@ -562,9 +566,9 @@ def generated_username_from_name(full_name: str, role: str='student', section_na
         base = first_initial + middle_initial + last_name
     base = ''.join((c for c in base if c.isalnum()))
     if role == 'student':
-        domain = 'student.danilo.edu'
+        domain = DANILO_STUDENT_EMAIL_DOMAIN
     else:
-        domain = 'danilo.edu'
+        domain = DANILO_EMAIL_DOMAIN
     return f'{base}@{domain}'
 
 def unique_local_username(db: Session, base_username: str, user_id: str | None=None) -> str:

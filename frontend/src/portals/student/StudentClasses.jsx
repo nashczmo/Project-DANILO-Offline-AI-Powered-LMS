@@ -35,41 +35,105 @@ function colorForIdx(idx) {
 /* ── Grade Trend Chart ────────────────────────────────────── */
 function GradeTrendChart({ dataPoints }) {
   if (!dataPoints || dataPoints.length === 0) return null;
-  const w = 400;
-  const h = 120;
-  const padX = 30;
-  const padY = 20;
+  const w = 600;
+  const h = 220;
+  const padX = 40;
+  const padY = 40;
   
-  const minVal = Math.min(60, ...dataPoints.map(d => d.value)) - 5;
+  const minVal = Math.max(0, Math.min(60, ...dataPoints.map(d => d.value)) - 5);
   const maxVal = 100;
   
   const getX = (i) => padX + (i * ((w - padX * 2) / Math.max(1, dataPoints.length - 1)));
   const getY = (val) => h - padY - ((val - minVal) / (maxVal - minVal)) * (h - padY * 2);
   
   const pathData = dataPoints.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.value)}`).join(' ');
+  const areaData = `${pathData} L ${getX(dataPoints.length - 1)} ${h - padY} L ${getX(0)} ${h - padY} Z`;
 
   return (
-    <div className="w-full overflow-x-auto bg-[#F8F9FA] rounded-2xl p-4 border border-[#E0E0E0]">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-4 h-4 text-[#1A73E8]" />
-        <h4 className="text-sm font-black text-[#202124]">Performance Trend</h4>
+    <div className="w-full bg-white rounded-2xl p-6 border border-[#E0E0E0] shadow-sm mb-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-full bg-[#E8F0FE] flex items-center justify-center flex-shrink-0">
+          <TrendingUp className="w-5 h-5 text-[#1A73E8]" />
+        </div>
+        <h4 className="text-lg font-black text-[#202124]">Performance Trend</h4>
       </div>
-      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="overflow-visible">
-        {[75, 85, 95].map(tick => (
-          <g key={tick}>
-            <line x1={padX} y1={getY(tick)} x2={w - padX} y2={getY(tick)} stroke="#E0E0E0" strokeDasharray="4 4" />
-            <text x={padX - 5} y={getY(tick) + 3} fontSize="10" fill="#9AA0A6" textAnchor="end" fontWeight="bold">{tick}</text>
-          </g>
-        ))}
-        <motion.path d={pathData} fill="none" stroke="#1A73E8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.5, ease: "easeInOut" }} />
-        {dataPoints.map((d, i) => (
-          <g key={i}>
-            <motion.circle cx={getX(i)} cy={getY(d.value)} r="4" fill="#fff" stroke="#1A73E8" strokeWidth="2" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1 + i * 0.1 }} />
-            <text x={getX(i)} y={h} fontSize="10" fill="#5F6368" textAnchor="middle" fontWeight="bold">{d.label}</text>
-            <text x={getX(i)} y={getY(d.value) - 10} fontSize="10" fill="#1A73E8" textAnchor="middle" fontWeight="black">{d.value.toFixed(1)}</text>
-          </g>
-        ))}
-      </svg>
+      <div className="w-full overflow-x-auto hide-scrollbar">
+        <div className="min-w-[500px]">
+          <svg width="100%" viewBox={`0 0 ${w} ${h}`} className="overflow-visible font-sans">
+            <defs>
+              <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#1A73E8" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#1A73E8" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            
+            {/* Grid Lines */}
+            {[70, 80, 90, 100].map(tick => (
+              <g key={tick}>
+                <line x1={padX} y1={getY(tick)} x2={w - padX} y2={getY(tick)} stroke="#F1F3F4" strokeWidth="1.5" />
+                <text x={padX - 12} y={getY(tick) + 4} fontSize="12" fill="#9AA0A6" textAnchor="end" fontWeight="bold">{tick}</text>
+              </g>
+            ))}
+            
+            {/* Area and Line */}
+            <motion.path 
+              d={areaData} 
+              fill="url(#trendGradient)" 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              transition={{ duration: 1.2, delay: 0.3 }} 
+            />
+            <motion.path 
+              d={pathData} 
+              fill="none" 
+              stroke="#1A73E8" 
+              strokeWidth="4" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              initial={{ pathLength: 0 }} 
+              animate={{ pathLength: 1 }} 
+              transition={{ duration: 1.5, ease: "easeOut" }} 
+            />
+            
+            {/* Data Points */}
+            {dataPoints.map((d, i) => (
+              <g key={i}>
+                <motion.circle 
+                  cx={getX(i)} 
+                  cy={getY(d.value)} 
+                  r="6" 
+                  fill="#fff" 
+                  stroke="#1A73E8" 
+                  strokeWidth="3" 
+                  initial={{ scale: 0 }} 
+                  animate={{ scale: 1 }} 
+                  transition={{ delay: 1 + i * 0.15, type: "spring", stiffness: 300, damping: 15 }} 
+                />
+                <text 
+                  x={getX(i)} 
+                  y={h - 15} 
+                  fontSize="12" 
+                  fill="#5F6368" 
+                  textAnchor="middle" 
+                  fontWeight="black"
+                >
+                  {d.label}
+                </text>
+                <text 
+                  x={getX(i)} 
+                  y={getY(d.value) - 16} 
+                  fontSize="14" 
+                  fill="#202124" 
+                  textAnchor="middle" 
+                  fontWeight="black"
+                >
+                  {d.value.toFixed(1)}
+                </text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }

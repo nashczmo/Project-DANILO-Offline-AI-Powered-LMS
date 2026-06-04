@@ -145,8 +145,8 @@ export default function TeacherDashboard() {
             View all <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="overflow-x-auto -mx-6 px-6">
-          <table className="dn-table">
+        <div className="dn-table-responsive">
+          <table className="dn-table dn-table-sticky-col">
             <thead>
               <tr>
                 <th>Class</th>

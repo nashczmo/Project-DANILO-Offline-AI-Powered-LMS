@@ -2,6 +2,7 @@ const CACHE_NAME = "danilo-static-v6";
 const STATIC_FILES = [
   "/", "/offline.html", "/manifest.webmanifest",
   "/icons/icon-192.svg", "/icons/icon-512.svg",
+  "/fonts/GoogleSans-Regular.woff2",
   "/fonts/Nunito-Regular.woff2", "/fonts/Nunito-Medium.woff2",
   "/fonts/Nunito-SemiBold.woff2", "/fonts/Nunito-Bold.woff2",
   "/fonts/Nunito-ExtraBold.woff2",

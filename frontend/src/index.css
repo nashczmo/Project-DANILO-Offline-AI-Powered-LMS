@@ -64,7 +64,7 @@ body {
   min-height: 100dvh;
   background: #F8F9FA;
   color: #202124;
-  font-family: "Inter", "Google Sans", Arial, sans-serif;
+  font-family: "Google Sans", "Nunito", Arial, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   letter-spacing: 0.01em;
@@ -100,6 +100,7 @@ input, select, textarea, button {
   /* ── Cards ── */
   .dn-card {
     @apply rounded-2xl border border-danilo-border bg-white;
+    @apply p-4 sm:p-5 md:p-6; /* Scalable padding */
     box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
     transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
   }
@@ -144,6 +145,8 @@ input, select, textarea, button {
   /* ── Form Inputs ── */
   .dn-input {
     @apply w-full bg-white border border-danilo-border rounded-lg px-4 py-3 text-base text-danilo-text outline-none;
+    min-height: 44px; /* Mobile touch target size */
+    font-size: 16px; /* Prevent iOS zoom */
     font-weight: 400;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
@@ -165,6 +168,7 @@ input, select, textarea, button {
   .dn-btn {
     @apply inline-flex items-center justify-center gap-2 rounded-full font-bold text-base transition-all duration-150;
     @apply px-5 py-2.5 leading-none;
+    min-height: 44px; /* Mobile touch target size */
     letter-spacing: 0.01em;
     white-space: nowrap;
     user-select: none;
@@ -212,8 +216,8 @@ input, select, textarea, button {
     box-shadow: 0 3px 8px rgba(217,48,37,0.3);
   }
 
-  .dn-btn-sm { @apply px-3 py-1.5 text-xs rounded-md gap-1.5; }
-  .dn-btn-lg { @apply px-6 py-3 text-base rounded-xl; }
+  .dn-btn-sm { @apply px-3 py-1.5 text-sm rounded-md gap-1.5; min-height: 36px; }
+  .dn-btn-lg { @apply px-6 py-3 text-base rounded-xl; min-height: 48px; }
 
   /* ── Skeleton Loading ── */
   .dn-shimmer {
@@ -272,8 +276,12 @@ input, select, textarea, button {
   }
 
   /* ── Table Styles ── */
+  .dn-table-responsive {
+    @apply w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 hide-scrollbar;
+  }
+  
   .dn-table {
-    @apply w-full text-base;
+    @apply w-full text-base min-w-[600px] sm:min-w-full;
     border-collapse: separate;
     border-spacing: 0;
   }
@@ -283,6 +291,7 @@ input, select, textarea, button {
   .dn-table th {
     @apply py-3 px-4 text-left text-sm font-black uppercase tracking-wide text-danilo-text-muted;
     @apply border-b border-danilo-border;
+    white-space: nowrap;
   }
   .dn-table th:first-child { border-radius: 8px 0 0 0; }
   .dn-table th:last-child { border-radius: 0 8px 0 0; }
@@ -295,6 +304,16 @@ input, select, textarea, button {
   }
   .dn-table tbody tr:last-child td {
     @apply border-b-0;
+  }
+  
+  /* Sticky first column for tables on mobile */
+  .dn-table-sticky-col th:first-child,
+  .dn-table-sticky-col td:first-child {
+    @apply sticky left-0 z-10 bg-white sm:static;
+    box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
+  }
+  .dn-table-sticky-col th:first-child {
+    @apply bg-danilo-bg-tertiary;
   }
 
   /* ── Section Divider ── */

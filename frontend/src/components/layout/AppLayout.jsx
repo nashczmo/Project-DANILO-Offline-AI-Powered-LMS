@@ -28,7 +28,6 @@ const NAV_CONFIG = {
     { to: "/student/grades", icon: GraduationCap, label: "Grades" },
     { to: "/student/assignments", icon: ClipboardList, label: "Assignments" },
     { to: "/student/tutor", icon: Bot, label: "AI Tutor", highlight: true },
-    { to: "/student/profile", icon: User, label: "Profile" },
   ],
   teacher: [
     { to: "/teacher/overview", icon: LayoutDashboard, label: "Overview" },
@@ -36,7 +35,6 @@ const NAV_CONFIG = {
     { to: "/teacher/grades", icon: GraduationCap, label: "Grades" },
     { to: "/teacher/announcements", icon: Bell, label: "Announcements" },
     { to: "/teacher/insights", icon: Sparkles, label: "AI Insights", highlight: true },
-    { to: "/teacher/profile", icon: User, label: "Profile" },
   ],
   admin: [
     { to: "/admin/overview", icon: LayoutDashboard, label: "Overview" },
@@ -44,7 +42,6 @@ const NAV_CONFIG = {
     { to: "/admin/enrollments", icon: BookOpen, label: "Enrollments" },
     { to: "/admin/reports", icon: Shield, label: "Reports" },
     { to: "/admin/system", icon: Settings, label: "System" },
-    { to: "/admin/profile", icon: User, label: "Profile" },
   ],
 };
 
@@ -206,23 +203,15 @@ export default function AppLayout({ children, role }) {
       </aside>
 
       {/* ── Main Content ───────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#F8F9FA] relative">
         {/* ── Top Header Bar ─────────────────────────────── */}
         <header className="h-16 bg-white flex items-center justify-between px-4 sm:px-6 flex-shrink-0 z-10 sticky top-0 shadow-sm border-b border-[#E0E0E0]">
-          {/* Mobile: Hamburger + Logo */}
-          <div className="flex items-center gap-3 md:hidden">
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="p-2 -ml-2 text-[#5F6368] hover:text-[#202124] rounded-full hover:bg-[#F1F3F4] transition-colors"
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#1A73E8] flex items-center justify-center">
-                <span className="text-white font-black text-xs">D</span>
-              </div>
-              <span className="text-sm font-black text-[#202124]">DANILO</span>
+          {/* Mobile: Logo */}
+          <div className="flex items-center gap-2 md:hidden">
+            <div className="w-7 h-7 rounded-lg bg-[#1A73E8] flex items-center justify-center">
+              <span className="text-white font-black text-xs">D</span>
             </div>
+            <span className="text-sm font-black text-[#202124]">DANILO</span>
           </div>
 
           <div className="hidden md:flex items-center gap-4 flex-1">
@@ -230,34 +219,23 @@ export default function AppLayout({ children, role }) {
               Welcome back, <span className="font-bold text-[#202124]">{user?.fullName || user?.name || "User"}</span>
             </p>
           </div>
+          
+          {/* Mobile: Profile & Menu */}
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="w-8 h-8 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm"
+              aria-label="Toggle user menu"
+            >
+              {initials}
+            </button>
+          </div>
         </header>
 
-        {/* ── Mobile Nav Drawer ──────────────────────────── */}
+        {/* ── Mobile User Menu Drawer ──────────────────────── */}
         {mobileOpen && (
-          <div className="md:hidden bg-white border-b border-[#E0E0E0] animate-slide-down shadow-md z-10">
-            <nav className="px-3 py-3 space-y-1">
-              {navItems.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-full px-5 py-3 text-[15px] transition-all duration-150 ${
-                      isActive
-                        ? "bg-[#E8F0FE] text-[#1A73E8] font-bold"
-                        : "text-[#5F6368] font-medium hover:bg-[#F1F3F4]"
-                    }`
-                  }
-                >
-                  <link.icon className="w-[18px] h-[18px] flex-shrink-0" />
-                  <span className="flex-1">{link.label}</span>
-                  {link.highlight && (
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${roleColors.dot}`} />
-                  )}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="px-4 py-4 border-t border-[#E0E0E0] flex flex-col gap-4">
+          <div className="md:hidden bg-white border-b border-[#E0E0E0] animate-slide-down shadow-md z-20 absolute top-16 w-full">
+            <div className="px-4 py-4 flex flex-col gap-4">
               <div
                 className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold self-start ${
                   isOffline
@@ -297,11 +275,42 @@ export default function AppLayout({ children, role }) {
         )}
 
         {/* ── Page Content ──────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="max-w-[1200px] mx-auto w-full">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
+          <div className="max-w-[1200px] mx-auto w-full h-full">
             {children}
           </div>
         </main>
+        
+        {/* ── Mobile Bottom Navigation ────────────────────── */}
+        <nav className="md:hidden fixed bottom-0 w-full bg-white border-t border-[#E0E0E0] shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-30 pb-safe">
+          <div className="flex items-center justify-around px-2 py-2">
+            {navItems.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `flex flex-col items-center justify-center w-16 h-14 rounded-xl transition-all duration-150 relative ${
+                    isActive
+                      ? "text-[#1A73E8]"
+                      : "text-[#5F6368] hover:text-[#202124]"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full mb-1 transition-colors ${isActive ? 'bg-[#E8F0FE]' : ''}`}>
+                      <link.icon className={`w-5 h-5 ${isActive ? 'fill-[#1A73E8]/10' : ''}`} />
+                    </div>
+                    <span className={`text-[10px] text-center w-full truncate ${isActive ? 'font-bold' : 'font-medium'}`}>{link.label}</span>
+                    {link.highlight && (
+                      <span className={`absolute top-1 right-3 w-2 h-2 rounded-full ${roleColors.dot} shadow-sm border border-white`} />
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
       </div>
     </div>
   );

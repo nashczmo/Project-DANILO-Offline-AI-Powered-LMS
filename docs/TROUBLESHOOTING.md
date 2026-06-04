@@ -26,7 +26,7 @@ If the Captive Portal is not behaving as expected:
    - Try disabling "Private DNS" in Android settings.
    - Disable any active VPNs.
    - Forget the WiFi network and rejoin.
-   - **Manual Fallback URL:** Open a browser and explicitly visit `http://10.10.0.1` or `http://danilo.local`.
+   - **Hostname URL:** Open a browser and explicitly visit `http://danilo.edu`; use `http://10.10.0.1` only to isolate DNS issues.
 
 ## AI / Ollama Issues
 

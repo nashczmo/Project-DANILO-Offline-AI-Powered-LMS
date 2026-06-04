@@ -55,7 +55,7 @@ After install:
 
 ```bash
 sudo bash danilo.sh --verify
-curl http://danilo.local/api/ai/status
+curl http://danilo.edu/api/ai/status
 ```
 
 Confirm `ollamaOnline` is true and the configured Ollama model is present.

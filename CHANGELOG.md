@@ -28,7 +28,7 @@ Project DANILO v1.0 Alpha is the first public alpha release of the offline-first
 - N/A (Initial alpha release).
 
 ### Known Limitations & Issues
-- **Captive Portal Popup:** Automatic captive portal popup behavior is OS-dependent (iOS/Android). Users may need to manually navigate to `http://10.10.0.1` or disable "Private DNS"/VPNs.
+- **Captive Portal Popup:** Automatic captive portal popup behavior is OS-dependent (iOS/Android). Users should use `http://danilo.edu`; `http://10.10.0.1` is only a diagnostic fallback when DNS is being bypassed.
 - **Local AI Performance:** AI generation speed depends on host hardware and model quantization.
 - **Alpha Stability:** This is an alpha release. It is not yet recommended for production deployments containing sensitive student data without strict manual review of backups, security, and data persistence.
 

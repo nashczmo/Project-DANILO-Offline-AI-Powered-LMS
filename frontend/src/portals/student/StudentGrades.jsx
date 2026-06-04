@@ -145,17 +145,17 @@ export default function StudentGrades() {
                 </button>
                 
                 {isExpanded && (
-                  <div className="border-t border-[#E0E0E0] overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
+                  <div className="border-t border-[#E0E0E0] dn-table-responsive">
+                    <table className="dn-table dn-table-sticky-col">
                       <thead>
-                        <tr className="bg-[#E9ECEF] border-b border-[#DDE2E5]">
+                        <tr>
                           <th className="py-3 px-4 text-sm font-bold text-[#495057]">Subject<br/>Code</th>
                           <th className="py-3 px-4 text-sm font-bold text-[#495057]">Subject Name</th>
                           <th className="py-3 px-4 text-sm font-bold text-[#495057]">Section</th>
                           <th className="py-3 px-4 text-sm font-bold text-[#495057]">Instructor</th>
                           <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">Midterm Grade</th>
                           <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">End Term Grade</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center bg-[#CCE5FF]">Final Grade</th>
+                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">Final Grade</th>
                         </tr>
                       </thead>
                       <tbody>

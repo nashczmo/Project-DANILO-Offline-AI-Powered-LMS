@@ -253,32 +253,85 @@ export default function AdminSystem() {
             <Activity className="w-5 h-5 text-[#1A73E8]" />
             <h3 className="text-base font-black text-[#202124]">Server Analytics</h3>
           </div>
-          <div className="space-y-2">
-            {[
-              { label: "CPU Usage", icon: Cpu, value: systemStatus?.hardware?.cpuPercent != null ? `${systemStatus.hardware.cpuPercent}%` : "N/A", badge: null },
-              { label: "Memory", icon: MemoryStick, value: systemStatus?.hardware?.ramUsedMb != null ? `${systemStatus.hardware.ramUsedMb} MB / ${systemStatus.hardware.ramTotalMb} MB (${systemStatus.hardware.ramPercent}%)` : "N/A", badge: null },
-              { label: "Storage", icon: HardDrive, value: systemStatus?.hardware?.diskUsedGb != null ? `${systemStatus.hardware.diskUsedGb} GB / ${systemStatus.hardware.diskTotalGb} GB (${systemStatus.hardware.diskPercent}%)` : "N/A", badge: null },
-              { label: "GPU", icon: Server, value: systemStatus?.hardware?.gpuName && systemStatus.hardware.gpuName !== "none" ? `${systemStatus.hardware.gpuName} (${systemStatus.hardware.gpuVramMb}MB)` : "No dedicated GPU", badge: null },
-              { label: "Temperature", icon: Thermometer, value: systemStatus?.hardware?.temperatureCelsius != null ? `${systemStatus.hardware.temperatureCelsius}°C` : "N/A", badge: null },
-              { label: "Uptime", icon: Clock, value: systemStatus?.uptime || "N/A", badge: null },
-            ].map((row) => (
-              <div
-                key={row.label}
-                className="flex items-center justify-between py-3 px-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]"
-              >
-                <div className="flex items-center gap-3">
-                  <row.icon className="w-4 h-4 text-[#9AA0A6]" />
-                  <span className="text-sm font-bold text-[#202124]">{row.label}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CPU */}
+            <div className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-[#9AA0A6]" />
+                  <span className="text-sm font-bold text-[#202124]">CPU Usage</span>
                 </div>
-                {row.badge ? (
-                  <Badge color={row.badge}>{row.value}</Badge>
-                ) : (
-                  <span className="text-sm font-mono font-bold text-[#5F6368] text-right max-w-[200px] truncate" title={row.value}>
-                    {row.value}
-                  </span>
-                )}
+                <span className="text-sm font-black text-[#1A73E8]">{systemStatus?.hardware?.cpuPercent ?? 0}%</span>
               </div>
-            ))}
+              <div className="h-2.5 w-full bg-[#E8F0FE] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[#1A73E8] rounded-full transition-all duration-1000"
+                  style={{ width: `${Math.min(100, Math.max(0, systemStatus?.hardware?.cpuPercent || 0))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-[#5F6368] font-bold text-right flex items-center justify-end gap-1">
+                <Thermometer className="w-3.5 h-3.5" />
+                {systemStatus?.hardware?.temperatureCelsius != null ? `${systemStatus.hardware.temperatureCelsius}°C` : "N/A"}
+              </div>
+            </div>
+
+            {/* RAM */}
+            <div className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <MemoryStick className="w-4 h-4 text-[#9AA0A6]" />
+                  <span className="text-sm font-bold text-[#202124]">Memory</span>
+                </div>
+                <span className="text-sm font-black text-[#188038]">{systemStatus?.hardware?.ramPercent ?? 0}%</span>
+              </div>
+              <div className="h-2.5 w-full bg-[#E6F4EA] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[#188038] rounded-full transition-all duration-1000"
+                  style={{ width: `${Math.min(100, Math.max(0, systemStatus?.hardware?.ramPercent || 0))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-[#5F6368] font-bold text-right">
+                {systemStatus?.hardware?.ramUsedMb != null ? `${systemStatus.hardware.ramUsedMb} MB / ${systemStatus.hardware.ramTotalMb} MB` : "N/A"}
+              </div>
+            </div>
+
+            {/* Disk */}
+            <div className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-[#9AA0A6]" />
+                  <span className="text-sm font-bold text-[#202124]">Storage</span>
+                </div>
+                <span className="text-sm font-black text-[#E37400]">{systemStatus?.hardware?.diskPercent ?? 0}%</span>
+              </div>
+              <div className="h-2.5 w-full bg-[#FEF7E0] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[#E37400] rounded-full transition-all duration-1000"
+                  style={{ width: `${Math.min(100, Math.max(0, systemStatus?.hardware?.diskPercent || 0))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-xs text-[#5F6368] font-bold text-right">
+                {systemStatus?.hardware?.diskUsedGb != null ? `${systemStatus.hardware.diskUsedGb} GB / ${systemStatus.hardware.diskTotalGb} GB` : "N/A"}
+              </div>
+            </div>
+
+            {/* GPU / Extra info */}
+            <div className="p-4 bg-[#F8F9FA] rounded-xl border border-[#E0E0E0] flex flex-col justify-center">
+              <div className="flex items-center gap-2 mb-3">
+                <Server className="w-4 h-4 text-[#9AA0A6]" />
+                <span className="text-sm font-bold text-[#202124]">GPU & Uptime</span>
+              </div>
+              <div className="text-xs text-[#5F6368] space-y-2">
+                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-[#E0E0E0]">
+                  <span className="font-bold">GPU</span>
+                  <span className="font-mono text-right">{systemStatus?.hardware?.gpuName && systemStatus.hardware.gpuName !== "none" ? `${systemStatus.hardware.gpuName} (${systemStatus.hardware.gpuVramMb}MB)` : "None"}</span>
+                </div>
+                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-[#E0E0E0]">
+                  <span className="font-bold flex items-center gap-1"><Clock className="w-3.5 h-3.5"/>Uptime</span>
+                  <span className="font-mono">{systemStatus?.uptime || "N/A"}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -421,8 +474,8 @@ export default function AdminSystem() {
             description="Logins and classroom changes will appear here."
           />
         ) : (
-          <div className="overflow-x-auto -mx-6 px-6">
-            <table className="dn-table">
+          <div className="dn-table-responsive">
+            <table className="dn-table dn-table-sticky-col">
               <thead>
                 <tr>
                   <th>Action</th>

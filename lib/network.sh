@@ -78,7 +78,12 @@ reset_dnsmasq_master_config() {
 }
 
 write_network_scripts() {
-  if ! grep -q "${PORTAL_DOMAIN}" /etc/hosts 2>/dev/null; then
+  if grep -Eq '(^|[[:space:]])[d]anilo[.]local([[:space:]]|$)' /etc/hosts 2>/dev/null; then
+    note "Removing stale legacy portal mapping from /etc/hosts"
+    sed -i '/[d]anilo[.]local/d' /etc/hosts
+  fi
+
+  if ! grep -Fq "${PORTAL_DOMAIN}" /etc/hosts 2>/dev/null; then
     note "Adding local hostname mapping for ${PORTAL_DOMAIN} to /etc/hosts"
     echo "127.0.0.1 ${PORTAL_DOMAIN}" >> /etc/hosts
   fi
@@ -122,20 +127,25 @@ EOF
 interface=${WIFI_IFACE}
 bind-dynamic
 listen-address=${LAN_IP}
+dhcp-authoritative
+no-resolv
 domain-needed
 bogus-priv
 local=/${PORTAL_DOMAIN}/
 domain=${PORTAL_DOMAIN}
-dhcp-range=10.10.0.10,10.10.0.200,255.255.255.0,12h
+dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},255.255.255.0,12h
 dhcp-option=3,${LAN_IP}
 dhcp-option=6,${LAN_IP}
 dhcp-option=15,${PORTAL_DOMAIN}
 dhcp-option=114,"http://${PORTAL_DOMAIN}/captive-login"
+dhcp-option=160,"http://${PORTAL_DOMAIN}/captive-login"
 address=/#/${LAN_IP}
 address=/${PORTAL_DOMAIN}/${LAN_IP}
+address=/student.${PORTAL_DOMAIN}/${LAN_IP}
 address=/captive.apple.com/${LAN_IP}
 address=/www.apple.com/${LAN_IP}
 address=/www.appleiphonecell.com/${LAN_IP}
+address=/www.airport.us/${LAN_IP}
 address=/www.itools.info/${LAN_IP}
 address=/www.ibook.info/${LAN_IP}
 address=/www.thinkdifferent.us/${LAN_IP}
@@ -148,6 +158,20 @@ address=/android.clients.google.com/${LAN_IP}
 address=/connectivitycheck.android.com/${LAN_IP}
 address=/play.googleapis.com/${LAN_IP}
 address=/www.googleapis.com/${LAN_IP}
+address=/connectivity-check.ubuntu.com/${LAN_IP}
+address=/nmcheck.gnome.org/${LAN_IP}
+address=/network-test.debian.org/${LAN_IP}
+address=/detectportal.firefox.com/${LAN_IP}
+address=/connect.rom.miui.com/${LAN_IP}
+address=/captive.v2.rom.miui.com/${LAN_IP}
+address=/connectivitycheck.platform.hicloud.com/${LAN_IP}
+address=/connectivitycheck.cloud.huawei.com/${LAN_IP}
+address=/www.msftncsi.com/${LAN_IP}
+address=/msftncsi.com/${LAN_IP}
+address=/dns.msftncsi.com/${LAN_IP}
+address=/www.msftconnecttest.com/${LAN_IP}
+address=/msftconnecttest.com/${LAN_IP}
+address=/ipv6.msftconnecttest.com/${LAN_IP}
 log-queries
 log-dhcp
 EOF
@@ -220,6 +244,8 @@ iptables -t nat -C PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 80 -j REDIRECT 
   iptables -t nat -A PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 80
 iptables -t nat -C PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 443 -j REDIRECT --to-ports 443 >/dev/null 2>&1 || \
   iptables -t nat -A PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 443 -j REDIRECT --to-ports 443
+iptables -C INPUT -i "\${WIFI_IFACE}" -p tcp --dport 853 -j REJECT >/dev/null 2>&1 || \
+  iptables -A INPUT -i "\${WIFI_IFACE}" -p tcp --dport 853 -j REJECT
 iptables -C INPUT -i "\${WIFI_IFACE}" -p udp -m multiport --dports 53,67,68 -j ACCEPT >/dev/null 2>&1 || \
   iptables -A INPUT -i "\${WIFI_IFACE}" -p udp -m multiport --dports 53,67,68 -j ACCEPT
 iptables -C OUTPUT -o "\${WIFI_IFACE}" -p udp -m multiport --sports 53,67,68 -j ACCEPT >/dev/null 2>&1 || \
@@ -260,6 +286,7 @@ iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p udp --dport 53 -j REDIRECT 
 iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 53 -j REDIRECT --to-ports 53 >/dev/null 2>&1 || true
 iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 80 -j REDIRECT --to-ports 80 >/dev/null 2>&1 || true
 iptables -t nat -D PREROUTING -i "\${WIFI_IFACE}" -p tcp --dport 443 -j REDIRECT --to-ports 443 >/dev/null 2>&1 || true
+iptables -D INPUT -i "\${WIFI_IFACE}" -p tcp --dport 853 -j REJECT >/dev/null 2>&1 || true
 iptables -D INPUT -i "\${WIFI_IFACE}" -p udp -m multiport --dports 53,67,68 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D OUTPUT -o "\${WIFI_IFACE}" -p udp -m multiport --sports 53,67,68 -j ACCEPT >/dev/null 2>&1 || true
 iptables -D INPUT -i "\${WIFI_IFACE}" -p tcp --dport 53 -j ACCEPT >/dev/null 2>&1 || true

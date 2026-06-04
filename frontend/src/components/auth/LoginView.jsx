@@ -47,7 +47,7 @@ export default function LoginView({ sessionError }) {
         <div className="h-1.5 bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#FBBC05]" />
 
         {/* Header */}
-        <div className="px-8 pt-8 pb-6 text-center">
+        <div className="px-6 sm:px-8 pt-8 pb-6 text-center">
           {/* Product icon */}
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#E8F0FE] mb-5">
             <BookOpen className="w-8 h-8 text-[#1A73E8]" aria-hidden="true" />
@@ -59,7 +59,7 @@ export default function LoginView({ sessionError }) {
         </div>
 
         {/* Form */}
-        <div className="px-8 pb-8">
+        <div className="px-6 sm:px-8 pb-8">
           {/* Error alert */}
           {error && (
             <div

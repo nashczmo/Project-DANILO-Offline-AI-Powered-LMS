@@ -106,6 +106,59 @@ verify_captive_redirects() {
   verify_captive_redirect "Android clients check redirects to portal domain" "clients3.google.com" "/generate_204"
   verify_captive_redirect "Android Google check redirects to portal domain" "www.google.com" "/generate_204"
   verify_captive_redirect "Windows captive check redirects to portal domain" "www.msftncsi.com" "/ncsi.txt"
+  verify_captive_redirect "Windows connecttest redirects to portal domain" "www.msftconnecttest.com" "/connecttest.txt"
+  verify_captive_redirect "Linux captive check redirects to portal domain" "connectivity-check.ubuntu.com" "/success.txt"
+  verify_captive_redirect "Firefox captive check redirects to portal domain" "detectportal.firefox.com" "/success.txt"
+}
+
+verify_dnsmasq_captive_config() {
+  local dnsmasq_config="/etc/dnsmasq.d/danilo.conf"
+  if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]] || [[ -f "${RUNTIME_ROOT}/local_mode" ]]; then
+    verify_pass "LAPTOP/LOCAL-ONLY mode active: dnsmasq DHCP/DNS checks bypassed"
+    return 0
+  fi
+
+  if [[ ! -f "${dnsmasq_config}" ]]; then
+    verify_fail "dnsmasq DANILO config exists (${dnsmasq_config})"
+    return 0
+  fi
+
+  grep -Fq "dhcp-option=3,${LAN_IP}" "${dnsmasq_config}" \
+    && verify_pass "DHCP advertises gateway ${LAN_IP}" \
+    || verify_fail "DHCP advertises gateway ${LAN_IP}"
+  grep -Fq "dhcp-option=6,${LAN_IP}" "${dnsmasq_config}" \
+    && verify_pass "DHCP advertises DNS server ${LAN_IP}" \
+    || verify_fail "DHCP advertises DNS server ${LAN_IP}"
+  grep -Fq "dhcp-option=114,\"http://${PORTAL_DOMAIN}/captive-login\"" "${dnsmasq_config}" \
+    && verify_pass "DHCP advertises captive portal URL" \
+    || verify_fail "DHCP advertises captive portal URL"
+  grep -Fq "address=/${PORTAL_DOMAIN}/${LAN_IP}" "${dnsmasq_config}" \
+    && verify_pass "dnsmasq maps ${PORTAL_DOMAIN} to ${LAN_IP}" \
+    || verify_fail "dnsmasq maps ${PORTAL_DOMAIN} to ${LAN_IP}"
+  grep -Fq "address=/#/${LAN_IP}" "${dnsmasq_config}" \
+    && verify_pass "dnsmasq captive wildcard maps unknown domains to ${LAN_IP}" \
+    || verify_fail "dnsmasq captive wildcard maps unknown domains to ${LAN_IP}"
+}
+
+verify_portal_dns_query() {
+  local answer=""
+
+  if [[ "${LAPTOP_LOCAL_MODE}" -eq 1 ]] || [[ -f "${RUNTIME_ROOT}/local_mode" ]]; then
+    verify_pass "LAPTOP/LOCAL-ONLY mode active: live AP DNS query bypassed"
+    return 0
+  fi
+
+  if ! command -v dig >/dev/null 2>&1; then
+    verify_warn "dig unavailable; live AP DNS query skipped"
+    return 0
+  fi
+
+  answer="$(dig +short +time=2 +tries=1 @"${LAN_IP}" "${PORTAL_DOMAIN}" A 2>/dev/null | tail -n1 || true)"
+  if [[ "${answer}" == "${LAN_IP}" ]]; then
+    verify_pass "${PORTAL_DOMAIN} resolves to ${LAN_IP} via DANILO DNS"
+  else
+    verify_fail "${PORTAL_DOMAIN} resolves to ${LAN_IP} via DANILO DNS (got ${answer:-no answer})"
+  fi
 }
 
 active_ai_runtime() {
@@ -409,6 +462,8 @@ verify_mode() {
   verify_http_status "Frontend reachable" "http://127.0.0.1/"
   verify_frontend_html "Frontend static bundle reachable" "http://127.0.0.1/"
   verify_captive_redirects
+  verify_dnsmasq_captive_config
+  verify_portal_dns_query
   verify_frontend_served_build_marker
   verify_compose_command "Database connection works" exec -T postgres pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"
   verify_database_schema

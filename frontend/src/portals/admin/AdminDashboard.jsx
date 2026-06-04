@@ -184,8 +184,8 @@ export default function AdminDashboard() {
           <h3 className="text-base font-black text-[#202124]">Active Classes</h3>
         </div>
         {courses.length > 0 ? (
-          <div className="overflow-x-auto -mx-6 px-6">
-            <table className="dn-table">
+          <div className="dn-table-responsive">
+            <table className="dn-table dn-table-sticky-col">
               <thead>
                 <tr>
                   <th>Code</th>

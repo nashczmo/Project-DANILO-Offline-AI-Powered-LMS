@@ -241,8 +241,8 @@ export default function TeacherGrades() {
                 </span>
               </div>
               
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="dn-table">
+              <div className="dn-table-responsive">
+                <table className="dn-table dn-table-sticky-col">
                   <thead>
                     <tr>
                       <th>Student</th>

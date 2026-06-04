@@ -75,8 +75,8 @@ sudo bash danilo.sh --verify
 
 ## Accessing the Portal
 Depending on your hardware capability and network setup:
-- **Captive Portal / AP Mode:** `http://danilo.local`
-- **Manual Fallback / AP Mode:** `http://10.10.0.1`
+- **Captive Portal / AP Mode:** `http://danilo.edu`
+- **Diagnostic IP / AP Mode:** `http://10.10.0.1`
 - **Local Mode:** `http://localhost` or `http://<machine-ip>`
 
 ## Admin Setup
@@ -160,10 +160,10 @@ docker compose -f /opt/danilo/app/docker-compose.yml -p danilo up -d
 ```
 
 ## Captive Portal Notes for Android/iOS
-The Wi-Fi captive portal popup behavior is OS-dependent. If the popup does not appear:
+The DANILO AP advertises DNS, gateway, and captive portal DHCP options so devices should open or offer the portal automatically. If the popup does not appear:
 - Disable "Private DNS" (Android) or VPNs.
 - Forget and rejoin the Wi-Fi network.
-- Manually open `http://10.10.0.1` or `http://danilo.local`.
+- Open `http://danilo.edu`; use `http://10.10.0.1` only as a diagnostic fallback.
 - Check if `danilo-ap.service` is running.
 
 See [docs/CAPTIVE_PORTAL.md](docs/CAPTIVE_PORTAL.md) for more troubleshooting.

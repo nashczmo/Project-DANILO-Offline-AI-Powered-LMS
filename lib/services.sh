@@ -12,6 +12,8 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM nginx:1.27-alpine
+ARG PORTAL_DOMAIN=danilo.edu
+ARG LAN_IP=10.10.0.1
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /opt/danilo/app/frontend/dist
 RUN chown -R nginx:nginx /opt/danilo/app/frontend/dist
@@ -20,7 +22,8 @@ RUN apk add --no-cache openssl && \
     mkdir -p /etc/nginx/ssl && \
     openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt \
-    -subj "/C=PH/ST=Metro Manila/L=Manila/O=Project DANILO/CN=danilo.local"
+    -subj "/C=PH/ST=Metro Manila/L=Manila/O=Project DANILO/CN=${PORTAL_DOMAIN}" \
+    -addext "subjectAltName=DNS:${PORTAL_DOMAIN},DNS:student.${PORTAL_DOMAIN},IP:${LAN_IP}"
 
 EXPOSE 80 443
 CMD ["nginx", "-g", "daemon off;"]
@@ -62,7 +65,7 @@ server {
   location = /captive-login {
     default_type text/html;
     add_header Cache-Control "no-store, no-cache, must-revalidate" always;
-    return 200 '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="1; url=http://${PORTAL_DOMAIN}/"><title>DANILO Portal</title><style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;color:#fff}.card{max-width:420px;padding:28px;border-radius:18px;background:#111827;box-shadow:0 20px 60px #0008;text-align:center}a{display:inline-block;margin-top:18px;padding:12px 18px;border-radius:999px;background:#38bdf8;color:#082f49;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Welcome to DANILO</h1><p>Opening the local learning portal at <strong>danilo.local</strong>.</p><a href="http://${PORTAL_DOMAIN}/">Open DANILO</a></main></body></html>';
+    return 200 '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="1; url=http://${PORTAL_DOMAIN}/"><title>DANILO Portal</title><style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;color:#fff}.card{max-width:420px;padding:28px;border-radius:18px;background:#111827;box-shadow:0 20px 60px #0008;text-align:center}a{display:inline-block;margin-top:18px;padding:12px 18px;border-radius:999px;background:#38bdf8;color:#082f49;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Welcome to DANILO</h1><p>Opening the local learning portal at <strong>danilo.edu</strong>.</p><a href="http://${PORTAL_DOMAIN}/">Open DANILO</a></main></body></html>';
   }
 
   location = /hotspot-detect.html             { return 302 http://${PORTAL_DOMAIN}/captive-login; }
@@ -190,7 +193,10 @@ server {
               connectivitycheck.android.com
               www.googleapis.com
               play.googleapis.com
-              connectivity-check.ubuntu.com;
+              connectivity-check.ubuntu.com
+              nmcheck.gnome.org
+              network-test.debian.org
+              detectportal.firefox.com;
   return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 
@@ -221,7 +227,10 @@ server {
   ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name www.msftncsi.com
               msftncsi.com
-              dns.msftncsi.com;
+              dns.msftncsi.com
+              www.msftconnecttest.com
+              msftconnecttest.com
+              ipv6.msftconnecttest.com;
   return 302 http://${PORTAL_DOMAIN}/captive-login;
 }
 EOF
@@ -296,6 +305,8 @@ services:
       dockerfile: ./gateway/Dockerfile
       args:
         API_BASE_URL: ${API_BASE_URL:-/api}
+        PORTAL_DOMAIN: ${PORTAL_DOMAIN:-danilo.edu}
+        LAN_IP: ${LAN_IP:-10.10.0.1}
     restart: unless-stopped
     depends_on:
       backend:
@@ -334,7 +345,7 @@ JWT_SECRET=
 DATABASE_URL=
 FRONTEND_URL=
 API_BASE_URL=
-CORS_ORIGINS=http://danilo.local
+CORS_ORIGINS=http://danilo.edu
 POSTGRES_DB=danilo
 POSTGRES_USER=danilo
 POSTGRES_PASSWORD=
@@ -395,7 +406,13 @@ DANILO_TOKENS_SHORT=140
 DANILO_TOKENS_NORMAL=280
 DANILO_TOKENS_DETAILED=520
 SSID=PROJECT-DANILO
-PORTAL_DOMAIN=danilo.local
+PORTAL_DOMAIN=danilo.edu
+LAN_IP=10.10.0.1
+LAN_PREFIX=24
+DHCP_RANGE_START=10.10.0.10
+DHCP_RANGE_END=10.10.0.200
+DANILO_EMAIL_DOMAIN=danilo.edu
+DANILO_STUDENT_EMAIL_DOMAIN=student.danilo.edu
 DANILO_SEED_DEMO=1
 EOF
 

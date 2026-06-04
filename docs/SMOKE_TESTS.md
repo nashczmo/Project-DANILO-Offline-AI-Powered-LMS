@@ -7,15 +7,15 @@ Run after install, update, frontend rebuild, and reboot.
 ```bash
 sudo bash danilo.sh --verify
 sudo docker compose -f /opt/danilo/app/docker-compose.yml -p danilo ps
-curl -fsS -H "Host: danilo.local" http://127.0.0.1/api/health
-curl -fsS -H "Host: danilo.local" http://127.0.0.1/
+curl -fsS -H "Host: danilo.edu" http://127.0.0.1/api/health
+curl -fsS -H "Host: danilo.edu" http://127.0.0.1/
 ```
 
 ## Login Check
 
 ```bash
 curl -fsS \
-  -H "Host: danilo.local" \
+  -H "Host: danilo.edu" \
   -H "Content-Type: application/json" \
   -X POST http://127.0.0.1/api/auth/login \
   -d '{"username":"admin","password":"ProjectDANILO2026!"}'

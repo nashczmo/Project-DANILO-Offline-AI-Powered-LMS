@@ -67,7 +67,7 @@ curl -fsS http://127.0.0.1:8000/api/health
 
 **Frontend Health Check (Through Gateway):**
 ```bash
-curl -fsS -H "Host: danilo.local" http://127.0.0.1/
+curl -fsS -H "Host: danilo.edu" http://127.0.0.1/
 ```
 
 **Check Admin Login Configuration:**
