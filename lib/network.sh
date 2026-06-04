@@ -77,6 +77,29 @@ reset_dnsmasq_master_config() {
   rm -f /etc/dnsmasq.d/danilo.conf
 }
 
+configure_access_point() {
+  if [[ -z "${WIFI_IFACE:-}" ]]; then
+    if [[ -f "${RUNTIME_ROOT}/wifi_iface" ]]; then
+      WIFI_IFACE="$(cat "${RUNTIME_ROOT}/wifi_iface")"
+    else
+      WIFI_IFACE="lo"
+    fi
+  fi
+  if [[ -z "${WIFI_MAC:-}" ]]; then
+    if [[ -f "${RUNTIME_ROOT}/wifi_mac" ]]; then
+      WIFI_MAC="$(cat "${RUNTIME_ROOT}/wifi_mac")"
+    else
+      WIFI_MAC="00:00:00:00:00:00"
+    fi
+  fi
+  if [[ -f "${RUNTIME_ROOT}/local_mode" ]]; then
+    LAPTOP_LOCAL_MODE=1
+  fi
+
+  write_network_scripts
+  write_systemd_units
+}
+
 write_network_scripts() {
   if grep -Eq '(^|[[:space:]])[d]anilo[.]local([[:space:]]|$)' /etc/hosts 2>/dev/null; then
     note "Removing stale legacy portal mapping from /etc/hosts"
