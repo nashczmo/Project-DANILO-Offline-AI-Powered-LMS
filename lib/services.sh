@@ -38,8 +38,8 @@ upstream danilo_backend {
 }
 
 server {
-  listen 80 default_server;
-  listen 443 ssl default_server;
+  listen 80;
+  listen 443 ssl;
   server_name ${PORTAL_DOMAIN};
   ssl_certificate /etc/nginx/ssl/nginx.crt;
   ssl_certificate_key /etc/nginx/ssl/nginx.key;
@@ -156,8 +156,8 @@ server {
 
 # Covers any unrecognized hostname that arrives on port 80 (captive portal trap)
 server {
-  listen ${FRONTEND_PORT:-80};
-  listen 443 ssl;
+  listen ${FRONTEND_PORT:-80} default_server;
+  listen 443 ssl default_server;
   ssl_certificate /etc/nginx/ssl/nginx.crt;
   ssl_certificate_key /etc/nginx/ssl/nginx.key;
   server_name _;

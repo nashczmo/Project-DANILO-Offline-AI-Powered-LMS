@@ -209,8 +209,3 @@ prepare_wifi_hardware() {
 # Runtime configuration and generated application files
 # -----------------------------------------------------------------------------
 
-configure_access_point() {
-  write_network_scripts
-  write_systemd_units
-}
-
