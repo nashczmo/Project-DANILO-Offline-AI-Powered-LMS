@@ -14,7 +14,7 @@ export default function StudentAssignments() {
   const [submittingId, setSubmittingId] = useState(null);
   const [responseText, setResponseText] = useState({});
   const [answersJson, setAnswersJson] = useState({});
-  const [attachmentsJson, setAttachmentsJson] = useState({});
+  const [submissionAttachmentsJson, setSubmissionAttachmentsJson] = useState({});
   const [submitError, setSubmitError] = useState("");
   const fileInputRef = useRef({});
 
@@ -46,7 +46,7 @@ export default function StudentAssignments() {
       const resData = await res.json();
       if (!res.ok) throw new Error(resData.detail || "Upload failed");
       
-      setAttachmentsJson(prev => {
+      setSubmissionAttachmentsJson(prev => {
         const arr = prev[assignmentId] || [];
         return { ...prev, [assignmentId]: [...arr, { filename: resData.filename, url: resData.url }] };
       });
@@ -67,7 +67,7 @@ export default function StudentAssignments() {
         body: { 
           responseText: responseText[assignmentId] || "",
           answersJson: answersJson[assignmentId] || {},
-          attachmentsJson: attachmentsJson[assignmentId] || []
+          attachmentsJson: submissionAttachmentsJson[assignmentId] || []
         },
       });
       refresh();
@@ -247,8 +247,8 @@ export default function StudentAssignments() {
     let submittedAnswers = {};
     try { submittedAnswers = typeof a.answersJson === 'string' ? JSON.parse(a.answersJson) : a.answersJson; } catch(e){}
     let attachments = [];
-    try { attachments = typeof a.attachmentsJson === 'string' ? JSON.parse(a.attachmentsJson) : a.attachmentsJson; } catch(e){}
-    const myAttachments = attachmentsJson[a.id] || [];
+    try { attachments = typeof a.assignmentAttachmentsJson === 'string' ? JSON.parse(a.assignmentAttachmentsJson) : a.assignmentAttachmentsJson; } catch(e){}
+    const myAttachments = typeof a.submissionAttachmentsJson === 'string' ? JSON.parse(a.submissionAttachmentsJson) : a.submissionAttachmentsJson || [];
 
     return (
       <div className="space-y-6 animate-fade-in pb-10">
@@ -330,7 +330,7 @@ export default function StudentAssignments() {
                     {myAttachments.map((att, i) => (
                       <Badge key={i} color="secondary" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E0E0E0] text-[#202124]">
                         {att.filename}
-                        <button type="button" onClick={() => setAttachmentsJson(prev => ({ ...prev, [a.id]: prev[a.id].filter((_, idx) => idx !== i)}))} className="hover:text-[#D93025]"><XIcon className="w-3.5 h-3.5" /></button>
+                        <button type="button" onClick={() => setSubmissionAttachmentsJson(prev => ({ ...prev, [a.id]: prev[a.id].filter((_, idx) => idx !== i)}))} className="hover:text-[#D93025]"><XIcon className="w-3.5 h-3.5" /></button>
                       </Badge>
                     ))}
                   </div>

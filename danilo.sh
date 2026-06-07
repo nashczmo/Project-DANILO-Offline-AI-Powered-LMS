@@ -175,6 +175,7 @@ run_update_mode() {
   run_logged_function "preflight_checks" preflight_checks
   run_logged_function "install_docker" install_docker
   run_logged_function "install_node" install_node
+  run_logged_function "prepare_wifi_hardware" prepare_wifi_hardware
 
   step 2 5 "Runtime configuration"
   mkdir -p "${APP_ROOT}" "${CONTENT_ROOT}"

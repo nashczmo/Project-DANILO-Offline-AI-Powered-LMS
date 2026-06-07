@@ -145,63 +145,110 @@ export default function StudentGrades() {
                 </button>
                 
                 {isExpanded && (
-                  <div className="border-t border-[#E0E0E0] dn-table-responsive">
-                    <table className="dn-table dn-table-sticky-col">
-                      <thead>
-                        <tr>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Subject<br/>Code</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Subject Name</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Section</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057]">Instructor</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">Midterm Grade</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">End Term Grade</th>
-                          <th className="py-3 px-4 text-sm font-bold text-[#495057] text-center">Final Grade</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.subjects.length === 0 ? (
+                  <div className="border-t border-danilo-border bg-danilo-bg-secondary/30">
+                    <div className="dn-table-responsive hidden md:block">
+                      <table className="dn-table">
+                        <thead>
                           <tr>
-                            <td colSpan={7} className="py-8 text-center text-[#5F6368] font-medium text-sm">
-                              No grades recorded for this term.
-                            </td>
+                            <th>Subject</th>
+                            <th>Section</th>
+                            <th>Instructor</th>
+                            <th className="text-center">Midterm</th>
+                            <th className="text-center">End Term</th>
+                            <th className="text-center">Final</th>
                           </tr>
-                        ) : (
-                          group.subjects.map((subj, idx) => {
-                            // Extract actual components from backend data without guessing/approximating
-                            const midtermComp = subj.components?.find(c => c.component.toLowerCase().includes('midterm'));
-                            const endtermComp = subj.components?.find(c => c.component.toLowerCase().includes('end term') || c.component.toLowerCase().includes('final'));
-                            
-                            const midtermScore = midtermComp && midtermComp.maxScore ? Math.round((midtermComp.score / midtermComp.maxScore) * 100) : null;
-                            const endtermScore = endtermComp && endtermComp.maxScore ? Math.round((endtermComp.score / endtermComp.maxScore) * 100) : null;
-                            
-                            const finalScore = subj.finalGrade !== undefined && subj.finalGrade !== null ? subj.finalGrade : null;
-                            
-                            return (
-                              <tr 
-                                key={subj.courseId || idx}
-                                onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
-                                className="border-b border-[#E0E0E0] hover:bg-[#F8F9FA] transition-colors cursor-pointer"
-                              >
-                                <td className="py-3 px-4 text-sm text-[#495057] whitespace-nowrap">{subj.courseCode}</td>
-                                <td className="py-3 px-4 text-sm text-[#202124]"><MathText text={subj.subject} /></td>
-                                <td className="py-3 px-4 text-sm text-[#495057] whitespace-nowrap">{user?.sectionName || '—'}</td>
-                                <td className="py-3 px-4 text-sm text-[#495057] truncate max-w-[200px]">{subj.teacher || '—'}</td>
-                                <td className="py-3 px-4 text-sm font-bold text-center text-[#202124]">{midtermScore !== null ? midtermScore : '—'}</td>
-                                <td className="py-3 px-4 text-sm font-bold text-center text-[#202124]">{endtermScore !== null ? endtermScore : '—'}</td>
-                                <td className="py-3 px-4 text-sm font-bold text-center bg-[#CCE5FF] text-[#004085]">
-                                  {finalScore !== null ? finalScore.toFixed(1) : '—'}
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {group.subjects.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-8 text-center text-danilo-text-muted font-medium">
+                                No grades recorded for this term.
+                              </td>
+                            </tr>
+                          ) : (
+                            group.subjects.map((subj, idx) => {
+                              const midtermScore = subj.midtermGrade !== undefined && subj.midtermGrade !== null ? subj.midtermGrade : null;
+                              const endtermScore = subj.endtermGrade !== undefined && subj.endtermGrade !== null ? subj.endtermGrade : null;
+                              const finalScore = subj.finalGrade !== undefined && subj.finalGrade !== null ? subj.finalGrade : null;
+                              
+                              return (
+                                <tr 
+                                  key={subj.courseId || idx}
+                                  onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
+                                  className="cursor-pointer"
+                                >
+                                  <td>
+                                    <div className="font-bold text-danilo-text">{subj.courseCode}</div>
+                                    <div className="text-sm text-danilo-text-secondary"><MathText text={subj.subject} /></div>
+                                  </td>
+                                  <td>{user?.sectionName || '—'}</td>
+                                  <td>{subj.teacher || '—'}</td>
+                                  <td className="text-center font-bold text-danilo-text-secondary">{midtermScore !== null ? midtermScore : '—'}</td>
+                                  <td className="text-center font-bold text-danilo-text-secondary">{endtermScore !== null ? endtermScore : '—'}</td>
+                                  <td className="text-center font-black text-danilo-primary bg-danilo-blue-light/30">
+                                    {finalScore !== null ? finalScore.toFixed(1) : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="md:hidden flex flex-col p-4 gap-4">
+                      {group.subjects.length === 0 ? (
+                        <div className="py-8 text-center text-danilo-text-muted font-medium text-sm">
+                          No grades recorded for this term.
+                        </div>
+                      ) : (
+                        group.subjects.map((subj, idx) => {
+                          const midtermScore = subj.midtermGrade !== undefined && subj.midtermGrade !== null ? subj.midtermGrade : null;
+                          const endtermScore = subj.endtermGrade !== undefined && subj.endtermGrade !== null ? subj.endtermGrade : null;
+                          const finalScore = subj.finalGrade !== undefined && subj.finalGrade !== null ? subj.finalGrade : null;
+                          
+                          return (
+                            <div 
+                              key={subj.courseId || idx}
+                              onClick={() => navigate(`/student/classes/${subj.courseId}?tab=grades`)}
+                              className="bg-white border border-danilo-border rounded-xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer flex flex-col gap-3"
+                            >
+                              <div>
+                                <div className="font-black text-danilo-text text-lg leading-tight">{subj.courseCode}</div>
+                                <div className="text-sm text-danilo-text-secondary font-medium mt-0.5"><MathText text={subj.subject} /></div>
+                              </div>
+                              
+                              <div className="flex items-center text-xs text-danilo-text-muted gap-2">
+                                <span>{user?.sectionName || '—'}</span>
+                                <span>•</span>
+                                <span>{subj.teacher || '—'}</span>
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-2 mt-1">
+                                <div className="bg-danilo-bg-tertiary rounded-lg p-2 text-center flex flex-col justify-center">
+                                  <div className="text-[10px] uppercase font-bold text-danilo-text-muted mb-0.5">Midterm</div>
+                                  <div className="font-bold text-danilo-text">{midtermScore !== null ? midtermScore : '—'}</div>
+                                </div>
+                                <div className="bg-danilo-bg-tertiary rounded-lg p-2 text-center flex flex-col justify-center">
+                                  <div className="text-[10px] uppercase font-bold text-danilo-text-muted mb-0.5">End Term</div>
+                                  <div className="font-bold text-danilo-text">{endtermScore !== null ? endtermScore : '—'}</div>
+                                </div>
+                                <div className="bg-danilo-blue-light/50 border border-danilo-primary/20 rounded-lg p-2 text-center flex flex-col justify-center">
+                                  <div className="text-[10px] uppercase font-bold text-danilo-primary mb-0.5">Final</div>
+                                  <div className="font-black text-danilo-primary text-lg leading-none mt-1">{finalScore !== null ? finalScore.toFixed(1) : '—'}</div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                     
                     {group.gwa !== null && (
-                      <div className="flex justify-end items-center p-4 bg-white border-t border-[#E0E0E0]">
-                        <span className="font-bold text-[#202124] mr-2">GWA :</span>
-                        <span className="bg-[#28A745] text-white font-bold px-6 py-1 rounded">
+                      <div className="flex justify-between items-center p-4 bg-white border-t border-danilo-border mx-0 md:justify-end md:gap-4">
+                        <span className="font-bold text-danilo-text-secondary uppercase tracking-wider text-sm">Gen. Weighted Average</span>
+                        <span className="bg-danilo-primary text-white font-black px-4 py-1.5 rounded-lg text-lg shadow-sm">
                           {group.gwa}
                         </span>
                       </div>

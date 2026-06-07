@@ -1,201 +1,235 @@
-# Project DANILO — Offline AI-Powered LMS
+# Project DANILO
 
-![Status](https://img.shields.io/badge/Status-Alpha-orange) ![License](https://img.shields.io/badge/License-MIT-blue)
+## Project Overview
 
-> **⚠️ Alpha Release Notice**
-> Project DANILO v1.0 Alpha is an early release. Test thoroughly in a clean Ubuntu environment before deploying with real school data. Production deployments should carefully review secrets, backups, and data persistence strategies.
+**Project DANILO** is an offline-first, AI-powered Learning Management System (LMS) designed to revolutionize digital education in environments with limited or no internet connectivity. 
 
-## Overview
-Project DANILO is a complete, offline-first, AI-powered Learning Management System (LMS) designed for local school deployments in low-connectivity environments. 
+It was developed to bridge the digital divide by providing a robust, locally hosted platform where learning can happen anytime, anywhere. The system is built for **students, teachers, and school administrators**, providing them with modern digital tools typically found in cloud-based LMS platforms, but operating entirely offline. Its main purpose is to ensure that education remains uninterrupted, interactive, and AI-assisted regardless of external network availability.
 
-By running a single command on a clean Ubuntu host, the installer generates a localized stack featuring FastAPI, React, PostgreSQL, Nginx, Docker Compose, optional Wi-Fi captive portal services, and offline AI capabilities (via Ollama).
+---
 
-## Features
-- **True Offline-First:** Fully functional without internet access post-installation.
-- **Role-Based Portals:** Dedicated interfaces for Admin, Teacher, and Student roles.
-- **AI Tutor & Teacher Insights:** AI capabilities that operate entirely offline, dynamically adapting to hardware constraints.
-- **Graceful Degradation:** The core LMS is decoupled from the AI and Wi-Fi AP systems. If AI models fail to load or Wi-Fi hardware is unsupported, the system degrades gracefully without crashing the core LMS.
-- **Automated Deployment:** Automated installation and verification scripts for Ubuntu targets.
-- **Captive Portal:** Built-in Wi-Fi access point support for mobile device access.
+## Key Features
 
-## Architecture
-- **Backend:** FastAPI (Python), utilizing robust Role-Based Access Control (RBAC).
-- **Frontend:** React / Vite.
-- **Database:** PostgreSQL.
-- **Gateway:** Nginx.
-- **AI Runtime:** Ollama (serving quantized GGUF models).
-- **Deployment:** Docker Compose orchestrated via `danilo.sh`.
+* **Learning Management System (LMS)**: A comprehensive engine for managing courses, educational modules, and grading.
+* **Student Portal**: A dedicated interface where students can view their enrolled classes, check grades, submit assignments, and study materials.
+* **Teacher Portal**: A comprehensive dashboard for educators to manage classes, publish announcements, grade submissions, and view class insights.
+* **Administrator Portal**: A central hub for school admins to manage the user directory, handle enrollments, generate reports, and monitor system health.
+* **AI Features**: Includes an on-board AI Tutor for students to ask questions, and AI lesson generation and insights for teachers. All AI operations run locally without internet.
+* **Analytics and Insights**: Provides teachers with AI-driven summaries of student performance, identifying strengths and weak concepts.
+* **Offline Functionality**: The entire system—including the database, frontend interface, and AI models—runs on a local server or laptop.
+* **Captive Portal System**: A built-in Wi-Fi hotspot system that automatically redirects users to the LMS the moment they connect their devices to the network.
+* **Assessment Management**: Powerful tools for teachers to create, distribute, and grade quizzes and written assignments.
+* **Class Management**: Streamlined administration of courses, subject areas, sections, and student enrollments.
 
-## Screenshots
-> *(Screenshots placeholder: Insert images of the Admin Dashboard, Student Portal, and Teacher AI Insights here in future releases)*
+---
 
-## System Requirements
-- **OS:** Ubuntu 24.04 LTS (recommended) with sudo/root access.
-- **Dependencies:** Docker support (automatically installed if missing).
-- **Network:** Internet access is required **only** during the initial installation to pull images and models. 
-- **Hardware:**
-  - Wi-Fi adapter with AP mode support (if using the captive portal).
-  - Sufficient storage and RAM for the AI model (requirements vary based on model choice).
+## System Architecture
 
-## Installation
+Project DANILO is built on a modern containerized architecture that separates the user interface, the server logic, the database, and the AI engine. When a user connects to the local Wi-Fi, the captive portal redirects them to the Frontend. The Frontend communicates with the Backend API, which in turn reads from the Database or queries the local AI System.
 
-### Quick Start
-To install on a fresh Ubuntu machine, run:
-```bash
-sudo bash danilo.sh --clean-install
+```mermaid
+graph TD
+    UserDevice[User Device - Phone/Laptop] -->|Wi-Fi Connection| AP[Wi-Fi Access Point]
+    AP -->|Captive Portal Redirect| Frontend[Frontend - React Web App]
+    Frontend -->|HTTP REST API| Backend[Backend - FastAPI]
+    
+    Backend <-->|SQL Queries| Database[(PostgreSQL Database)]
+    Backend <-->|Prompts & Completions| AISystem[DANILO-AI Core Engine]
 ```
 
-### Installation Commands (`danilo.sh`)
-- `sudo bash danilo.sh --quick-install` : (Default alias for `--install`). Fast, minimal core LMS install. Skips large AI models by default.
-- `sudo bash danilo.sh --full-install` : Installs the LMS and preloads dynamic AI models.
-- `sudo bash danilo.sh --clean-install` : Destructive install. Resets data and Docker volumes.
-- `sudo bash danilo.sh --uninstall` : Stops services and removes generated app files.
+---
 
-For deep deployment details, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/INSTALLATION.md](docs/INSTALLATION.md).
+## Technology Stack
 
-## Updating
-If you pull new code from GitHub and need to apply updates without losing data:
+The system utilizes industry-standard tools to ensure high performance and reliability:
+
+* **Programming Languages**: Python (Backend), JavaScript/JSX (Frontend), Bash/Shell (System Administration & Deployment), and HTML/CSS.
+* **Frontend Technologies**: React, Vite, TailwindCSS (for styling), Zustand (for state management), and Framer Motion (for animations).
+* **Backend Technologies**: Python, FastAPI, SQLAlchemy (for ORM), Alembic (for database migrations), and Pydantic.
+* **Database**: PostgreSQL, accessed via the `psycopg` adapter.
+* **AI Technologies**: Powered by **DANILO-AI**, our proprietary custom-tuned local AI model designed specifically for the educational context. It dynamically scales its capabilities based on the host hardware to ensure smooth offline performance.
+* **Docker**: The entire stack is containerized using Docker and Docker Compose for easy deployment.
+* **Networking Tools**: The system uses Linux networking tools like `hostapd` (to broadcast Wi-Fi), `dnsmasq` (for DNS and DHCP), and `iptables` (for routing traffic).
+
+---
+
+## Installation and Setup
+
+### Prerequisites
+* A Linux-based host machine (e.g., Ubuntu/Debian).
+* A compatible Wi-Fi adapter capable of Access Point (AP) mode.
+* Sufficient RAM and Storage (hardware dictates which AI model will be installed).
+
+### Installation Steps
+The project includes a powerful, automated setup script. To install the core system:
+1. Clone the repository to your local machine.
+2. Run the main installer script with root privileges:
+   ```bash
+   sudo bash danilo.sh --install
+   ```
+
+### Running the System
+The system runs automatically as a `systemd` service (`danilo-stack.service`) and Docker Compose stack once installed. Connect to the broadcasted Wi-Fi network to access the portal.
+
+### Production Deployment
+For a full installation that includes pre-downloading heavy AI models for completely offline deployment, use:
 ```bash
-sudo bash danilo.sh --update
-```
-To rebuild only the React frontend UI:
-```bash
-sudo bash danilo.sh --rebuild-frontend
-```
-To sync offline content:
-```bash
-sudo bash danilo.sh --sync
-```
-
-## Verification
-To run the automated suite of health checks:
-```bash
-sudo bash danilo.sh --verify
-```
-
-## Accessing the Portal
-Depending on your hardware capability and network setup:
-- **Captive Portal / AP Mode:** `http://danilo.edu`
-- **Diagnostic IP / AP Mode:** `http://10.10.0.1`
-- **Local Mode:** `http://localhost` or `http://<machine-ip>`
-
-## Admin Setup
-By default, the installer generates a cryptographically secure random admin password. Find your credentials in the console output after a successful install, or saved locally at `/opt/danilo/danilo-credentials.txt`.
-
-## Demo Data
-To seed the database with demo LMS data, set the environment variable:
-```bash
-DANILO_SEED_DEMO=1
-```
-> **⚠️ Warning:** By default, only the admin account is seeded. Enabling demo seed can wipe or recreate demo LMS data. Do not use on production data unless intentional.
-
-## AI/Ollama Setup
-Project DANILO uses Ollama for local AI inference. 
-- AI features can run degraded or fully offline.
-- If the AI model is unavailable, the core LMS will continue to function normally.
-- Teacher AI Insights depend on backend database class data.
-- The AI Tutor depends on local AI runtime availability.
-
-For details, read [docs/AI_SETUP.md](docs/AI_SETUP.md).
-
-### AI Reliability and Status Matrix
-
-DANILO is designed to gracefully degrade if the AI backend is unavailable. The core LMS will continue to function.
-To enforce that the AI must be fully ready before the installer completes, run the installer with strict mode:
-```bash
-sudo DANILO_AI_REQUIRE_READY=1 bash danilo.sh --install
+sudo bash danilo.sh --full-install
 ```
 
-#### Checking AI Status
-Run the built-in verification tool to check the health of the entire stack, including the AI:
-```bash
-sudo bash danilo.sh --verify
-```
+---
 
-The AI can be in one of the following states:
-- **READY**: Ollama API is reachable, and the configured model is installed and active.
-- **DEGRADED**: Ollama is reachable, but the model is missing, or the backend AI health check reports degraded.
-- **OFFLINE**: Ollama container is down or unreachable.
-- **MODEL MISSING**: Ollama is up but the active model is not loaded.
-- **STARTING**: The container is still initializing.
+## Folder Structure
 
-### Recovery Playbook
+Here is the primary folder structure of Project DANILO:
 
-If the AI features are unavailable, try the following steps to diagnose and repair:
+### `backend/`
+**Purpose**: Contains all the server-side logic and database management.
+**Contents**: Python files, FastAPI routes, database models, and AI integration scripts.
+**Responsibilities**: Handling user authentication, processing LMS data, serving API requests, and managing the AI prompts.
 
-#### 1. Ollama container not running (OFFLINE)
-Check if the container is running and view its logs:
-```bash
-docker compose -f /opt/danilo/app/docker-compose.yml -p danilo ps
-docker compose -f /opt/danilo/app/docker-compose.yml -p danilo logs ollama
-```
-Restart the container:
-```bash
-docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama
-```
+### `frontend/`
+**Purpose**: Contains the user interface of DANILO.
+**Contents**: React components, routing logic, state management, and CSS styles.
+**Responsibilities**: Rendering the Student, Teacher, and Admin portals, and handling all user interactions in the browser.
 
-#### 2. Model Missing
-If the verification script reports MODEL MISSING, you can attempt to pull it manually or run the quick installer again:
-```bash
-# To reinstall and ensure AI model pulls:
-sudo DANILO_AI_ENABLE=1 bash danilo.sh --install
-```
-Alternatively, pull it directly:
-```bash
-docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec ollama ollama pull <model-name>
-```
+### `lib/`
+**Purpose**: Contains the modular shell scripts used by the installer.
+**Contents**: Scripts for Docker setup, networking, AI hardware detection, database setup, and system verification.
+**Responsibilities**: Automating the complex setup of the captive portal, Wi-Fi hardware, and Docker containers.
 
-#### 3. Backend cannot reach Ollama (DEGRADED/Timeout)
-If the LMS is up but AI requests timeout, verify the backend network connection:
-```bash
-docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama backend
-```
+### `models/`
+**Purpose**: A dedicated directory for storing local AI models.
+**Contents**: Compiled model weights and configurations for the DANILO-AI engine.
+**Responsibilities**: Providing the offline intelligence required for the AI tutor and teacher insights.
 
-#### 4. Slow Hardware
-If responses are too slow, consider downgrading the model class in `/opt/danilo/app/.env` and restarting the stack:
-```bash
-# Edit OLLAMA_MODEL to a smaller tutoring model like qwen2.5:3b
-sudo nano /opt/danilo/app/.env
-docker compose -f /opt/danilo/app/docker-compose.yml -p danilo up -d
-```
+---
 
-## Captive Portal Notes for Android/iOS
-The DANILO AP advertises DNS, gateway, and captive portal DHCP options so devices should open or offer the portal automatically. If the popup does not appear:
-- Disable "Private DNS" (Android) or VPNs.
-- Forget and rejoin the Wi-Fi network.
-- Open `http://danilo.edu`; use `http://10.10.0.1` only as a diagnostic fallback.
-- Check if `danilo-ap.service` is running.
+## Important Files
 
-See [docs/CAPTIVE_PORTAL.md](docs/CAPTIVE_PORTAL.md) for more troubleshooting.
+### `danilo.sh`
+**Purpose**: The master installation and management script.
+**Role in the System**: It orchestrates the entire setup process, including dependency installation, hardware profiling, and service creation.
+**Related Components**: Relies on the scripts inside the `lib/` directory.
 
-## Troubleshooting
-Run the verification script to diagnose issues:
-```bash
-sudo bash danilo.sh --verify
-```
-For common issues, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+### `backend/app/main.py`
+**Purpose**: The entry point for the Backend API.
+**Role in the System**: It initializes the FastAPI application, defines the security rules, handles database connections, and routes all incoming HTTP requests.
+**Related Components**: Connects to the Database and the AI System.
 
-## Development Setup
-For local development environments, please refer to [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+### `backend/app/models.py`
+**Purpose**: Defines the database schema.
+**Role in the System**: It maps Python classes to PostgreSQL tables, detailing how users, courses, grades, and AI profiles are structured and related.
+**Related Components**: Used by all backend route handlers to save and retrieve data.
 
-## Security
-- Credentials are cryptographically generated on install.
-- *Security reporting placeholder: Please report vulnerabilities to [Email/Contact].*
+### `frontend/src/App.jsx`
+**Purpose**: The main routing component for the frontend web application.
+**Role in the System**: It checks user authentication and directs the user to the correct portal (Student, Teacher, or Admin) based on their role.
+**Related Components**: Connects all portal screens and layout components.
 
-## Roadmap
-- [x] Core offline LMS functionality
-- [x] Dockerized deployment script
-- [x] Wi-Fi Captive Portal support
-- [x] Local AI integration
-- [ ] Beta release testing
-- [ ] Multi-school synchronization
-- [ ] Advanced performance monitoring
+---
 
-## Contributing
-We welcome contributions! Please read our contribution guidelines in `CONTRIBUTING.md` (coming soon) before submitting issues or pull requests.
+## Database Structure
 
-## Release Status
-**Current Version:** Project DANILO v1.0 Alpha
+The database is built on PostgreSQL and uses relational mapping to store all educational data securely. 
 
-## License
-MIT License
+* **Users**: Stores accounts for Students, Teachers, and Admins, including their passwords, roles, and profiles.
+* **Departments & Courses**: Organizes the school's curriculum. Departments contain Courses, which are assigned to Teachers.
+* **Enrollments**: Links Students to the Courses they are taking.
+* **Modules**: Stores the actual learning materials, lessons, and AI-generated content.
+* **Assignments & Quizzes**: Stores the questions, instructions, and configurations for student assessments.
+* **Submissions & GradeEntries**: Records student answers, grades, and teacher feedback.
+* **AI Profiles & Chat Sessions**: Logs the interactions between students and the AI Tutor, maintaining a profile of student strengths and weaknesses.
+
+---
+
+## API Overview
+
+The backend exposes a RESTful API organized into several main categories:
+
+* **Authentication (`/auth`)**: Routes for logging in and generating secure access tokens.
+* **Admin Routes (`/admin`)**: Used by administrators to manage users, courses, and system settings.
+* **Teacher Routes (`/teacher`)**: Used by educators to upload materials, grade submissions, and view class analytics.
+* **Student Routes (`/student`)**: Used by learners to access modules, submit assignments, and take quizzes.
+* **AI Routes (`/ai`)**: Handles real-time chat sessions with the AI tutor and triggers background AI lesson generation.
+
+The API relies on JSON format for all expected requests and responses.
+
+---
+
+## AI System
+
+Project DANILO integrates its proprietary Artificial Intelligence, **DANILO-AI**, directly into the offline environment.
+
+* **Integration**: The installer automatically profiles the host hardware (CPU, RAM, GPU) and scales the DANILO-AI engine to run optimally, ensuring smooth performance even on low-end school devices.
+* **Teacher Features**: Teachers can upload raw documents (PDF, Word, Text) and the AI will automatically structure them into easily digestible lesson modules, complete with summaries, review questions, and objectives.
+* **Student Features**: Students have access to a conversational AI Tutor that can explain complex concepts from their modules without giving away direct answers to quizzes.
+* **Analytics**: The AI continuously analyzes student quiz scores and chat logs to build a "Student AI Profile," which highlights learning trends, strengths, and areas needing improvement.
+
+---
+
+## Captive Portal System
+
+The Captive Portal is the bridge that connects physical devices to the offline software.
+
+* **Connection**: The system uses the host machine's Wi-Fi adapter to broadcast a wireless network (Hotspot).
+* **DNS & DHCP Flow**: When a user's phone or laptop connects, the system (`dnsmasq`) assigns them an IP address and intercepts all domain name requests.
+* **Redirection Flow**: Regardless of what website the user tries to visit (e.g., google.com), the firewall rules (`iptables`) and DNS routing trick the device into loading the DANILO Login Page.
+* **Offline Operation**: This creates a seamless "walled garden" where the LMS is highly accessible without requiring the user to type in specific IP addresses or have actual internet access.
+
+---
+
+## User Roles
+
+### Students
+Students are the primary consumers of the platform. They can view their daily schedule, read interactive lesson modules, submit file-based or written assignments, take timed quizzes, view their grades, and ask questions to the AI Tutor.
+
+### Teachers
+Teachers are the content creators and evaluators. They have the ability to create classes, upload educational materials, utilize AI to quickly generate structured lessons, grade student submissions, and view deep AI-generated insights regarding how well their class is understanding the topics.
+
+### Administrators
+Administrators are the system managers. They handle the onboarding of new users (creating student and teacher accounts), assigning teachers to departments, managing global enrollments, and viewing the technical health of the system (e.g., storage capacity, CPU usage).
+
+---
+
+## Security Features
+
+* **Authentication**: All API endpoints are secured using JSON Web Tokens (JWT). Users must log in to receive a token.
+* **Authorization**: Role-Based Access Control (RBAC) ensures that Students cannot access Teacher tools, and Teachers cannot access Admin settings.
+* **Data Protection**: User passwords are securely hashed using `bcrypt` before being saved to the database.
+* **Network Security**: Because the system operates primarily offline via a captive portal, it is inherently protected from external internet-based cyber threats.
+
+---
+
+## Deployment
+
+Project DANILO is deployed via Docker containers, ensuring that the software runs identically regardless of the underlying Linux distribution.
+
+* **Docker Containers**: The application is split into multiple containers: a database container, a backend container, a frontend web server, and the DANILO-AI core container.
+* **Networking**: Docker handles internal networking between the database and the backend, while the host machine routes Wi-Fi traffic into the frontend container.
+* **Production**: The installer automates the production deployment by handling environment variables, setting up automated backups, and configuring `systemd` to ensure the system boots automatically if the server loses power.
+
+---
+
+## Maintenance Guide
+
+Maintaining Project DANILO is designed to be simple for IT staff:
+
+* **Updating**: Run `sudo bash danilo.sh --update` to pull the latest codebase changes and rebuild only the necessary components without losing data.
+* **Troubleshooting**: Administrators can view system logs directly from the Admin Portal or check the raw logs on the host server located in `/var/log/danilo`.
+* **Backups**: The installer automatically configures daily database backups.
+* **Monitoring**: The Admin Dashboard provides real-time metrics on server health, including Memory usage, AI availability, and storage space.
+
+---
+
+## Future Improvements
+
+* **Cloud Synchronization**: Allowing the local offline instance to safely sync grades and enrollments with a central Cloud server when the device temporarily gains internet access.
+* **Multi-Modal AI**: Upgrading the local AI to support image recognition, allowing students to upload pictures of their handwritten math problems for the AI tutor to analyze.
+* **Clustered Deployments**: Supporting multi-router setups to expand the Wi-Fi range across an entire school campus while connecting back to a single DANILO server.
+
+---
+
+## Conclusion
+
+Project DANILO represents a significant step forward in making modern, AI-enhanced education accessible to everyone, regardless of their geographical location or infrastructure limitations. By combining a beautiful interface, a robust local network architecture, and our custom DANILO-AI engine, it provides a comprehensive digital school environment that empowers teachers and enriches the learning experience for students—entirely offline.

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
-from app.main import get_current_user, _rag_vector, DANILO_AI_INDEX_PATH
+from app.main import get_current_user, _rag_vector, DANILO_AI_INDEX_PATH, init_rag_index
 from app.core.document_parser import extract_text_from_file, chunk_text
 
 ai_files_router = APIRouter(prefix='/api/ai/files', tags=['ai-files'])
@@ -37,6 +37,8 @@ async def upload_file(
         now = datetime.now(timezone.utc).isoformat()
         
         # Insert into SQLite DB
+        if not os.path.exists(DANILO_AI_INDEX_PATH):
+            init_rag_index()
         with sqlite3.connect(DANILO_AI_INDEX_PATH) as conn:
             cursor = conn.cursor()
             # 1. Insert file metadata
@@ -86,7 +88,8 @@ def delete_user_file(file_id: str, current_user: User = Depends(get_current_user
         if not cursor.fetchone():
             raise HTTPException(status_code=404, detail="File not found or unauthorized")
             
-        # Due to ON DELETE CASCADE, deleting the file deletes the chunks
+        # Explicitly delete chunks since SQLite foreign_keys might be OFF by default
+        cursor.execute('DELETE FROM user_file_chunks WHERE file_id = ?', (file_id,))
         cursor.execute('DELETE FROM user_files WHERE id = ?', (file_id,))
         
     return {"status": "success", "message": "File deleted"}

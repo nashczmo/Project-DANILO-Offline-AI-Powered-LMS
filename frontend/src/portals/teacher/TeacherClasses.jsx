@@ -369,13 +369,12 @@ function ClassDetail() {
         points: q.points || 1
       }));
 
-      await apiRequest(`/teacher/courses/${courseId}/assignments`, {
+      await apiRequest(`/teacher/courses/${courseId}/quizzes`, {
         method: "POST",
         body: {
           title: generatedQuiz.title || "AI Generated Quiz",
           instructions: "Please answer all questions based on the uploaded material.",
-          points: questions.reduce((acc, q) => acc + (q.points || 1), 0),
-          assignmentType: "quiz",
+          isPublished: true,
           questions
         }
       });

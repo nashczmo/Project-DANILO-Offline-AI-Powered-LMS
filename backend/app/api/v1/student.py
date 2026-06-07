@@ -38,12 +38,12 @@ def student_assignments(current_user: User=Depends(get_current_user), db: Sessio
         result.append({
             'id': assignment.id, 'courseId': course.id, 'courseCode': course.code, 'courseTitle': course.title, 
             'title': assignment.title, 'instructions': assignment.instructions, 'points': assignment.points, 
-            'assignmentType': assignment.assignment_type, 'attachmentsJson': assignment.attachments_json,
+            'assignmentType': assignment.assignment_type, 'assignmentAttachmentsJson': assignment.attachments_json,
             'questions': questions_data,
             'status': sub.status if sub else 'not_started', 
             'responseText': sub.response_text if sub else '',
             'answersJson': sub.answers_json if sub else None,
-            'attachmentsJson': sub.attachments_json if sub else '[]',
+            'submissionAttachmentsJson': sub.attachments_json if sub else '[]',
             'score': sub.score if sub else None,
             'feedback': sub.feedback if sub else ''
         })

@@ -144,16 +144,22 @@ def _detected_hardware() -> dict:
     dedicated_gpu = _env_int('DANILO_AI_DEDICATED_GPU', 0, minimum=0, maximum=1)
     vulkan = _env_int('DANILO_AI_VULKAN', 0, minimum=0, maximum=1)
     opencl = _env_int('DANILO_AI_OPENCL', 0, minimum=0, maximum=1)
-    profile = os.getenv('DANILO_AI_HARDWARE_PROFILE', 'auto').strip().lower() or 'auto'
-    if profile == 'auto':
-        ram_high = _env_int('DANILO_RAM_HIGH_THRESHOLD', 65536)
-        ram_mid = _env_int('DANILO_RAM_MID_THRESHOLD', 32768)
-        if ram_mb >= ram_high and dedicated_gpu:
-            profile = 'high'
-        elif ram_mb < ram_mid and not dedicated_gpu and not integrated_gpu:
-            profile = 'low'
+    profile = os.getenv('DANILO_AI_HARDWARE_PROFILE', 'auto').strip().upper()
+    if profile == 'AUTO':
+        if ram_mb >= 120000 or (gpu_vram_mb >= 40000 and dedicated_gpu):
+            profile = 'G'
+        elif ram_mb >= 64000 or (gpu_vram_mb >= 20000 and dedicated_gpu):
+            profile = 'F'
+        elif ram_mb >= 48000 or (gpu_vram_mb >= 8000 and dedicated_gpu):
+            profile = 'E'
+        elif ram_mb >= 32000 or cpu_count >= 16:
+            profile = 'D'
+        elif ram_mb >= 16000:
+            profile = 'C'
+        elif ram_mb >= 8000:
+            profile = 'B'
         else:
-            profile = 'mid'
+            profile = 'A'
     return {'profile': profile, 'cpuModel': os.getenv('DANILO_AI_CPU_MODEL', 'unknown'), 'ramMb': ram_mb, 'ramAvailableMb': ram_available_mb, 'cpuCount': cpu_count, 'gpuName': os.getenv('DANILO_AI_GPU_NAME', 'none'), 'gpuVramMb': gpu_vram_mb, 'integratedGpu': bool(integrated_gpu), 'dedicatedGpu': bool(dedicated_gpu), 'cuda': bool(cuda), 'rocm': bool(rocm), 'avx2': bool(avx2), 'avx512': bool(avx512), 'vulkan': bool(vulkan), 'opencl': bool(opencl), 'storageAvailableMb': storage_available_mb}
 
 _HARDWARE = _detected_hardware()
@@ -162,15 +168,48 @@ def _profile_defaults() -> dict:
     profile = _HARDWARE['profile']
     cpu_count = int(_HARDWARE['cpuCount'])
     dedicated_gpu = _HARDWARE['dedicatedGpu']
-    defaults = {'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'queue_timeout': 45.0, 'timeout': 180.0, 'ctx': 1024, 'context_chars': 1800, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 0, 'batch': 128, 'kv_cache': 'q8_0', 'scheduler': 'low-memory-fair-queue', 'cache_size': 120, 'cooldown': 5.0}
-    if profile == 'mid':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_MID', os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:7b')), 'fallback_model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'model_class': 'mid-cpu', 'quantization': 'q4_K_M', 'timeout': 150.0, 'ctx': 2048, 'context_chars': 3000, 'threads': max(1, min(cpu_count, 6)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 256, 'scheduler': 'fair-queue', 'cache_size': 200, 'cooldown': 4.0})
-    elif profile == 'high':
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_HIGH', 'qwen2.5:32b'), 'fallback_model': os.getenv('DANILO_AI_MODEL_GPU', os.getenv('DANILO_AI_MODEL_MID', os.getenv('DANILO_AI_MODEL_BALANCED', 'qwen2.5:14b'))), 'model_class': 'large', 'quantization': 'q5_K_M', 'concurrency': 3, 'timeout': 120.0, 'ctx': 4096, 'context_chars': 5600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 600, 'cooldown': 1.5})
+    tier_a = os.getenv('DANILO_AI_MODEL_TIER_A', 'phi3:mini')
+    tier_b = os.getenv('DANILO_AI_MODEL_TIER_B', 'llama3.2:3b')
+    tier_c = os.getenv('DANILO_AI_MODEL_TIER_C', 'llama3.1:8b')
+    tier_d = os.getenv('DANILO_AI_MODEL_TIER_D', 'mistral-nemo:12b')
+    tier_e = os.getenv('DANILO_AI_MODEL_TIER_E', 'qwen2.5:14b')
+    tier_f = os.getenv('DANILO_AI_MODEL_TIER_F', 'qwen2.5:32b')
+    tier_g = os.getenv('DANILO_AI_MODEL_TIER_G', 'llama3.3:70b')
+
+    fb_a = os.getenv('DANILO_AI_FALLBACK_TIER_A', 'llama3.2:1b')
+    fb_b = os.getenv('DANILO_AI_FALLBACK_TIER_B', 'phi3:mini')
+    fb_c = os.getenv('DANILO_AI_FALLBACK_TIER_C', 'llama3.2:3b')
+    fb_d = os.getenv('DANILO_AI_FALLBACK_TIER_D', 'llama3.1:8b')
+    fb_e = os.getenv('DANILO_AI_FALLBACK_TIER_E', 'mistral-nemo:12b')
+    fb_f = os.getenv('DANILO_AI_FALLBACK_TIER_F', 'qwen2.5:14b')
+    fb_g = os.getenv('DANILO_AI_FALLBACK_TIER_G', 'qwen2.5:32b')
+
+    univ_fb = os.getenv('DANILO_AI_UNIVERSAL_FALLBACK', 'llama3.2:3b')
+
+    defaults = {
+        'model': tier_a, 'fallback_model': fb_a, 'optional_model': univ_fb,
+        'model_class': 'very-low', 'quantization': 'q4_K_M', 'concurrency': 1, 'queue_timeout': 45.0,
+        'timeout': 90.0, 'ctx': 1024, 'context_chars': 1200, 'threads': max(1, min(cpu_count, 2)),
+        'gpu_layers': 0, 'batch': 128, 'kv_cache': 'q8_0', 'scheduler': 'compatibility-cpu',
+        'cache_size': 100, 'cooldown': 5.0
+    }
+    if profile == 'G':
+        defaults.update({'model': tier_g, 'fallback_model': fb_g, 'model_class': 'enterprise', 'concurrency': 3, 'timeout': 300.0, 'ctx': 8192, 'context_chars': 8000, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 800, 'cooldown': 1.0})
+    elif profile == 'F':
+        defaults.update({'model': tier_f, 'fallback_model': fb_f, 'model_class': 'high-end', 'concurrency': 2, 'timeout': 240.0, 'ctx': 6144, 'context_chars': 6000, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 600, 'cooldown': 1.5})
+    elif profile == 'E':
+        defaults.update({'model': tier_e, 'fallback_model': fb_e, 'model_class': 'mid-gpu', 'concurrency': 2, 'timeout': 210.0, 'ctx': 4096, 'context_chars': 4800, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999, 'batch': 512, 'kv_cache': 'f16', 'scheduler': 'gpu-throughput', 'cache_size': 400, 'cooldown': 2.0})
+    elif profile == 'D':
+        defaults.update({'model': tier_d, 'fallback_model': fb_d, 'model_class': 'mid-cpu', 'concurrency': 1, 'timeout': 180.0, 'ctx': 3072, 'context_chars': 3600, 'threads': max(1, min(cpu_count, 8)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 256, 'scheduler': 'fair-queue', 'cache_size': 300, 'cooldown': 3.0})
+    elif profile == 'C':
+        defaults.update({'model': tier_c, 'fallback_model': fb_c, 'model_class': 'low-gpu', 'concurrency': 1, 'timeout': 150.0, 'ctx': 2048, 'context_chars': 2600, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 256, 'scheduler': 'gpu-throughput', 'cache_size': 200, 'cooldown': 4.0})
+    elif profile == 'B':
+        defaults.update({'model': tier_b, 'fallback_model': fb_b, 'model_class': 'low-cpu', 'concurrency': 1, 'timeout': 120.0, 'ctx': 1536, 'context_chars': 1800, 'threads': max(1, min(cpu_count, 4)), 'gpu_layers': 999 if dedicated_gpu else 0, 'batch': 128, 'scheduler': 'fair-queue', 'cache_size': 120, 'cooldown': 5.0})
+
     if not _HARDWARE['avx2'] and (not _HARDWARE['cuda']) and (not _HARDWARE['rocm']):
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128, 'scheduler': 'compatibility-cpu'})
+        defaults.update({'model': tier_a, 'fallback_model': fb_a, 'optional_model': univ_fb, 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128, 'scheduler': 'compatibility-cpu'})
     if 0 < int(_HARDWARE['storageAvailableMb']) < 8192:
-        defaults.update({'model': os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b'), 'fallback_model': '', 'optional_model': '', 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128})
+        defaults.update({'model': tier_a, 'fallback_model': fb_a, 'optional_model': univ_fb, 'model_class': 'lightweight', 'quantization': 'q4_0', 'concurrency': 1, 'ctx': 1024, 'gpu_layers': 0, 'batch': 128})
     return defaults
 
 _PROFILE_DEFAULTS = _profile_defaults()
@@ -781,6 +820,13 @@ def build_grade_summary(db: Session, student_id: str) -> list[dict]:
     for bucket in buckets.values():
         total = bucket['weightedScore'] / bucket['weightTotal'] if bucket['weightTotal'] else 0.0
         bucket['finalGrade'] = round(total, 2)
+        
+        midterm_comp = next((c for c in bucket['components'] if 'midterm' in c['component'].lower()), None)
+        endterm_comp = next((c for c in bucket['components'] if 'end term' in c['component'].lower() or 'final exam' in c['component'].lower()), None)
+        
+        bucket['midtermGrade'] = round(midterm_comp['percentage'], 1) if midterm_comp else None
+        bucket['endtermGrade'] = round(endterm_comp['percentage'], 1) if endterm_comp else None
+        
         bucket.pop('weightedScore')
         bucket.pop('weightTotal')
         summary.append(bucket)
@@ -866,8 +912,12 @@ def build_pdf_document(title: str, lines: list[str]) -> bytes:
 
 
 DEFAULT_SYSTEM_PROMPT = '''You are DANILO, an intelligent, offline educational AI tutor for Filipino students.
-Your goal is to guide students to answers through Socratic dialogue, not spoon-feed them.
-Be clear, short, and step-by-step. Do not act like a robotic textbook.
+Your goal is to guide students to answers through Socratic dialogue and step-by-step explanations, not spoon-feed them.
+Encourage thinking, not answer-copying. Ask guiding questions when appropriate.
+Keep your answers fast, concise, and step-by-step. Avoid writing long essays unless explicitly asked, as your responses are streamed to students with limited hardware.
+Adapt your language and complexity to the student's grade level. Use age-appropriate educational language.
+Support Filipino/Taglish explanations when requested or helpful.
+Avoid unsafe, harmful, or inappropriate content entirely.
 If the user asks a non-academic question, gently pivot back to their curriculum.
 Do not use robotic lists unless explicitly asked.
 
@@ -884,7 +934,8 @@ SYSTEM_PROMPT = os.getenv('DANILO_SYSTEM_PROMPT', DEFAULT_SYSTEM_PROMPT)
 
 SYSTEM_PROMPT_TEACHER = '''You are DANILO, an intelligent AI Instructional Designer and Teaching Assistant for Filipino teachers.
 Your goal is to assist teachers with lesson planning, rubric generation, grading insights, and pedagogical strategies.
-Be structured and professional.
+Help teachers generate lessons, quizzes, and clear explanations.
+Be structured and professional, supporting Taglish if requested.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST base your answers ONLY on the provided <curriculum_context> and <document_context>.
@@ -1368,7 +1419,7 @@ def _inference_attempts() -> list[tuple[str, int, str]]:
             models = models[1:]
             
     if not models:
-        models = [DANILO_AI_FALLBACK_MODEL or os.getenv('DANILO_AI_MODEL_LOW', 'qwen2.5:3b')]
+        models = [DANILO_AI_FALLBACK_MODEL or os.getenv('DANILO_AI_MODEL_LOW', 'gemma3:4b')]
 
     for model_name in models:
         if primary_gpu > 0 and model_name == OLLAMA_MODEL:

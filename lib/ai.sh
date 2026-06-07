@@ -1,9 +1,28 @@
 # Project DANILO installer module: ai.sh
 
-DANILO_AI_MODEL_LOW="${DANILO_AI_MODEL_LOW:-qwen2.5:3b}"
-DANILO_AI_MODEL_BALANCED="${DANILO_AI_MODEL_BALANCED:-${DANILO_AI_MODEL_MID:-qwen2.5:7b}}"
-DANILO_AI_MODEL_GPU="${DANILO_AI_MODEL_GPU:-qwen2.5:14b}"
-DANILO_AI_MODEL_HIGH="${DANILO_AI_MODEL_HIGH:-qwen2.5:32b}"
+DANILO_AI_MODEL_TIER_A="${DANILO_AI_MODEL_TIER_A:-phi3:mini}"
+DANILO_AI_MODEL_TIER_B="${DANILO_AI_MODEL_TIER_B:-llama3.2:3b}"
+DANILO_AI_MODEL_TIER_C="${DANILO_AI_MODEL_TIER_C:-llama3.1:8b}"
+DANILO_AI_MODEL_TIER_D="${DANILO_AI_MODEL_TIER_D:-mistral-nemo:12b}"
+DANILO_AI_MODEL_TIER_E="${DANILO_AI_MODEL_TIER_E:-qwen2.5:14b}"
+DANILO_AI_MODEL_TIER_F="${DANILO_AI_MODEL_TIER_F:-qwen2.5:32b}"
+DANILO_AI_MODEL_TIER_G="${DANILO_AI_MODEL_TIER_G:-llama3.3:70b}"
+
+DANILO_AI_FALLBACK_TIER_A="${DANILO_AI_FALLBACK_TIER_A:-llama3.2:1b}"
+DANILO_AI_FALLBACK_TIER_B="${DANILO_AI_FALLBACK_TIER_B:-phi3:mini}"
+DANILO_AI_FALLBACK_TIER_C="${DANILO_AI_FALLBACK_TIER_C:-llama3.2:3b}"
+DANILO_AI_FALLBACK_TIER_D="${DANILO_AI_FALLBACK_TIER_D:-llama3.1:8b}"
+DANILO_AI_FALLBACK_TIER_E="${DANILO_AI_FALLBACK_TIER_E:-mistral-nemo:12b}"
+DANILO_AI_FALLBACK_TIER_F="${DANILO_AI_FALLBACK_TIER_F:-qwen2.5:14b}"
+DANILO_AI_FALLBACK_TIER_G="${DANILO_AI_FALLBACK_TIER_G:-qwen2.5:32b}"
+
+DANILO_AI_UNIVERSAL_FALLBACK="${DANILO_AI_UNIVERSAL_FALLBACK:-llama3.2:3b}"
+
+DANILO_AI_MODEL_LOW="${DANILO_AI_MODEL_LOW:-${DANILO_AI_MODEL_TIER_B}}"
+DANILO_AI_MODEL_BALANCED="${DANILO_AI_MODEL_BALANCED:-${DANILO_AI_MODEL_MID:-${DANILO_AI_MODEL_TIER_C}}}"
+DANILO_AI_MODEL_GPU="${DANILO_AI_MODEL_GPU:-${DANILO_AI_MODEL_TIER_D}}"
+DANILO_AI_MODEL_HIGH="${DANILO_AI_MODEL_HIGH:-${DANILO_AI_MODEL_TIER_E}}"
+
 DANILO_DEFAULT_OLLAMA_MODEL="${DANILO_DEFAULT_OLLAMA_MODEL:-${DANILO_OLLAMA_MODEL:-${DANILO_AI_MODEL_BALANCED}}}"
 DANILO_FALLBACK_OLLAMA_MODEL="${DANILO_FALLBACK_OLLAMA_MODEL:-}"
 DANILO_OPTIONAL_OLLAMA_MODEL="${DANILO_OPTIONAL_OLLAMA_MODEL:-}"
@@ -16,9 +35,10 @@ DANILO_CUSTOM_MODELFILE="${DANILO_CUSTOM_MODELFILE:-}"
 
 _danilo_known_good_ollama_model() {
   case "$1" in
+    gemma3:1b|gemma3:4b|gemma3:12b|gemma3:27b|gemma2:2b|gemma2:9b|\
     qwen2.5:0.5b|qwen2.5:1.5b|qwen2.5:3b|qwen2.5:7b|qwen2.5:14b|qwen2.5:32b|\
-    llama3.2:1b|llama3.2:3b|llama3.1:8b|llama3.1:70b|llama3:8b|llama3:70b|\
-    phi3:mini|phi3:medium|gemma2:2b|gemma2:9b|mistral:7b)
+    llama3.2:1b|llama3.2:3b|llama3.1:8b|llama3.1:70b|llama3.3:70b|llama3:8b|llama3:70b|\
+    phi3:mini|phi3:medium|mistral:7b|mistral-nemo:12b)
       return 0
       ;;
     *)
@@ -51,6 +71,27 @@ _danilo_normalize_ollama_model() {
       ;;
     qwen2.5-14b*|qwen2_5-14b*)
       printf 'qwen2.5:14b'
+      ;;
+    qwen2.5-32b*|qwen2_5-32b*)
+      printf 'qwen2.5:32b'
+      ;;
+    mistral-nemo*|mistral_nemo*)
+      printf 'mistral-nemo:12b'
+      ;;
+    llama3.3-70b*|llama3_3-70b*)
+      printf 'llama3.3:70b'
+      ;;
+    gemma3-1b*|gemma3_1b*)
+      printf 'gemma3:1b'
+      ;;
+    gemma3-4b*|gemma3_4b*)
+      printf 'gemma3:4b'
+      ;;
+    gemma3-12b*|gemma3_12b*)
+      printf 'gemma3:12b'
+      ;;
+    gemma3-27b*|gemma3_27b*)
+      printf 'gemma3:27b'
       ;;
     *)
       printf '%s' "${model}"
@@ -178,133 +219,133 @@ detect_ai_hardware_profile() {
 
   DANILO_AI_RUNTIME="ollama"
 
-  if (( mem_mb >= 120000 && gpu_vram_mb >= 22000 && dedicated_gpu == 1 )); then
+  if (( mem_mb >= 120000 || (gpu_vram_mb >= 40000 && dedicated_gpu == 1) )); then
     profile="G"
-    selected_model="${DANILO_AI_MODEL_ENTERPRISE:-qwen2.5:32b}"
-    selected_fallback="${DANILO_AI_MODEL_HIGH}"
-    selected_optional="${DANILO_AI_MODEL_GPU}"
+    selected_model="${DANILO_AI_MODEL_TIER_G}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_G}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="enterprise"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=999
     num_batch=512
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
     scheduler="gpu-throughput"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=100
-    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=8
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=3
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=3
     [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=20m
-    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
-  elif (( mem_mb >= 60000 && gpu_vram_mb >= 15000 && dedicated_gpu == 1 )); then
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=300
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=8000
+  elif (( mem_mb >= 64000 || (gpu_vram_mb >= 20000 && dedicated_gpu == 1) )); then
     profile="F"
-    selected_model="${DANILO_AI_MODEL_HIGH}"
-    selected_fallback="${DANILO_AI_MODEL_GPU}"
-    selected_optional="${DANILO_AI_MODEL_BALANCED}"
+    selected_model="${DANILO_AI_MODEL_TIER_F}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_F}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="high-end"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=999
     num_batch=512
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
     scheduler="gpu-throughput"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=40
-    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=6
-    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=6144
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=20m
-    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
-  elif (( mem_mb >= 30000 && gpu_vram_mb >= 7000 && dedicated_gpu == 1 )); then
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=240
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=6000
+  elif (( mem_mb >= 48000 || (gpu_vram_mb >= 8000 && dedicated_gpu == 1) )); then
     profile="E"
-    selected_model="${DANILO_AI_MODEL_GPU}"
-    selected_fallback="${DANILO_AI_MODEL_BALANCED}"
-    selected_optional="${DANILO_AI_MODEL_LOW}"
+    selected_model="${DANILO_AI_MODEL_TIER_E}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_E}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="mid-gpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=999
     num_batch=512
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-f16}"
     scheduler="gpu-throughput"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=20
-    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=4
-    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=4096
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=15m
-    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=5600
-  elif (( mem_mb >= 30000 )); then
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=210
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=4800
+  elif (( mem_mb >= 32000 || cpu_count >= 16 )); then
     profile="D"
-    selected_model="${DANILO_AI_MODEL_BALANCED}"
-    selected_fallback="${DANILO_AI_MODEL_LOW}"
-    selected_optional=""
+    selected_model="${DANILO_AI_MODEL_TIER_D}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_D}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="mid-cpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
     num_batch=256
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
     scheduler="fair-queue"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=15
-    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=3
-    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=1
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=3072
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=10m
-    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
-  elif (( mem_mb >= 15000 && gpu_vram_mb >= 5000 && dedicated_gpu == 1 )); then
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3600
+  elif (( mem_mb >= 16000 )); then
     profile="C"
-    selected_model="${DANILO_AI_MODEL_BALANCED}"
-    selected_fallback="${DANILO_AI_MODEL_LOW}"
-    selected_optional=""
+    selected_model="${DANILO_AI_MODEL_TIER_C}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_C}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="low-gpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
-    num_gpu=999
+    num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
     num_batch=256
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
     scheduler="gpu-throughput"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=10
-    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
-    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=1
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=1
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=2048
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=10m
     [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=150
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
-  elif (( mem_mb >= 15000 )); then
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=2600
+  elif (( mem_mb >= 8000 )); then
     profile="B"
-    selected_model="${DANILO_AI_MODEL_BALANCED}"
-    selected_fallback="${DANILO_AI_MODEL_LOW}"
-    selected_optional=""
+    selected_model="${DANILO_AI_MODEL_TIER_B}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_B}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="low-cpu"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
     num_batch=128
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
     scheduler="fair-queue"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=5
-    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=2
-    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=8192
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=1
+    [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=1
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=1536
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=5m
-    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=3000
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=120
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=1800
   else
     profile="A"
-    selected_model="${DANILO_AI_MODEL_LOW}"
-    selected_fallback=""
-    selected_optional=""
+    selected_model="${DANILO_AI_MODEL_TIER_A}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_A}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="very-low"
     quantization="${DANILO_AI_QUANTIZATION:-q4_K_M}"
     num_gpu=$(( dedicated_gpu == 1 ? 999 : 0 ))
     num_batch=128
     kv_cache="${OLLAMA_KV_CACHE_TYPE:-q8_0}"
     scheduler="compatibility-cpu"
-    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=2
+    [[ "${ai_concurrency_overridden}" -eq 0 ]] && DANILO_AI_MAX_CONCURRENT=1
     [[ "${ollama_parallel_overridden}" -eq 0 ]] && OLLAMA_NUM_PARALLEL=1
-    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=4096
+    [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=1024
     [[ "${keep_alive_overridden}" -eq 0 ]] && OLLAMA_KEEP_ALIVE=2m
-    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=180
-    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=1800
-    warn "Detected tier A low-end hardware (${mem_mb} MB RAM, ${cpu_count} CPU threads). DANILO will favor ${DANILO_AI_MODEL_LOW}."
+    [[ "${timeout_overridden}" -eq 0 ]] && OLLAMA_TIMEOUT_SECONDS=90
+    [[ "${context_chars_overridden}" -eq 0 ]] && OLLAMA_CONTEXT_CHARS=1200
+    warn "Detected tier A low-end hardware (${mem_mb} MB RAM, ${cpu_count} CPU threads). DANILO will favor ${DANILO_AI_MODEL_TIER_A}."
   fi
   DANILO_AI_EMBEDDING_MODEL="nomic-embed-text"
 
   if (( avx2_supported == 0 && cuda_supported == 0 && rocm_supported == 0 )); then
-    selected_model="${DANILO_AI_MODEL_LOW}"
-    selected_fallback=""
-    selected_optional=""
+    selected_model="${DANILO_AI_MODEL_TIER_A}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_A}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="lightweight"
     quantization="${DANILO_AI_QUANTIZATION:-q4_0}"
     [[ "${ctx_overridden}" -eq 0 ]] && OLLAMA_NUM_CTX=1024
@@ -314,9 +355,9 @@ detect_ai_hardware_profile() {
   fi
 
   if (( storage_available_mb > 0 && storage_available_mb < 8192 )); then
-    selected_model="${DANILO_AI_MODEL_LOW}"
-    selected_fallback=""
-    selected_optional=""
+    selected_model="${DANILO_AI_MODEL_TIER_A}"
+    selected_fallback="${DANILO_AI_FALLBACK_TIER_A}"
+    selected_optional="${DANILO_AI_UNIVERSAL_FALLBACK}"
     model_class="lightweight"
     quantization="${DANILO_AI_QUANTIZATION:-q4_0}"
     warn "Detected limited storage (${storage_available_mb} MB free). DANILO will select a lightweight model plan."
@@ -472,24 +513,52 @@ preload_ollama_model() {
     OLLAMA_MODEL="${custom_model_name}"
     DANILO_OLLAMA_MODEL="${custom_model_name}"
   fi
+  local primary_available=0
   if ollama_model_exists_in_container "${container}" "${OLLAMA_MODEL}"; then
     note "Ollama model ${OLLAMA_MODEL} is already cached; skipping pull"
+    primary_available=1
   elif internet_reachable_now; then
-    if ! run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"; then
-      warn "Primary Ollama model ${OLLAMA_MODEL} could not be loaded; the core LMS will continue with degraded AI."
+    if run_step_command "Pulling Ollama model ${OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${OLLAMA_MODEL}"; then
+      primary_available=1
+    else
+      warn "Primary Ollama model ${OLLAMA_MODEL} could not be loaded; falling back to alternatives."
     fi
   else
     warn "Internet is unreachable; skipping pull for Ollama model ${OLLAMA_MODEL}"
   fi
   
-  if [[ -n "${DANILO_FALLBACK_OLLAMA_MODEL}" && "${DANILO_FALLBACK_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" ]]; then
+  local fallback_available=0
+  if [[ "${primary_available}" -eq 0 && -n "${DANILO_FALLBACK_OLLAMA_MODEL}" && "${DANILO_FALLBACK_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" ]]; then
     if ollama_model_exists_in_container "${container}" "${DANILO_FALLBACK_OLLAMA_MODEL}"; then
-      note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} is already cached; skipping pull"
+      note "Tier fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} is already cached; skipping pull"
+      fallback_available=1
     elif internet_reachable_now; then
-      timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}" || note "Fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled; primary model remains available"
+      if run_step_command "Pulling tier fallback model ${DANILO_FALLBACK_OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_FALLBACK_OLLAMA_MODEL}"; then
+        fallback_available=1
+      else
+        warn "Tier fallback model ${DANILO_FALLBACK_OLLAMA_MODEL} could not be pulled either."
+      fi
     else
-      warn "Internet is unreachable; skipping pull for fallback model ${DANILO_FALLBACK_OLLAMA_MODEL}"
+      warn "Internet is unreachable; skipping pull for tier fallback model ${DANILO_FALLBACK_OLLAMA_MODEL}"
     fi
+  fi
+
+  if [[ "${primary_available}" -eq 0 && "${fallback_available}" -eq 0 && -n "${DANILO_OPTIONAL_OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${OLLAMA_MODEL}" && "${DANILO_OPTIONAL_OLLAMA_MODEL}" != "${DANILO_FALLBACK_OLLAMA_MODEL}" ]]; then
+    if ollama_model_exists_in_container "${container}" "${DANILO_OPTIONAL_OLLAMA_MODEL}"; then
+      note "Universal fallback model ${DANILO_OPTIONAL_OLLAMA_MODEL} is already cached; skipping pull"
+    elif internet_reachable_now; then
+      run_step_command "Pulling universal fallback model ${DANILO_OPTIONAL_OLLAMA_MODEL}" timeout "${DANILO_MODEL_PULL_TIMEOUT_SECONDS:-3600}" docker exec "${container}" ollama pull "${DANILO_OPTIONAL_OLLAMA_MODEL}" || warn "Universal fallback model ${DANILO_OPTIONAL_OLLAMA_MODEL} could not be pulled."
+    else
+      warn "Internet is unreachable; skipping pull for universal fallback model ${DANILO_OPTIONAL_OLLAMA_MODEL}"
+    fi
+  fi
+  
+  if [[ "${primary_available}" -eq 1 ]]; then
+    note "Successfully provisioned primary model: ${OLLAMA_MODEL}"
+  elif [[ "${fallback_available}" -eq 1 ]]; then
+    warn "Fell back to tier model: ${DANILO_FALLBACK_OLLAMA_MODEL}"
+  else
+    warn "Fell back to universal model: ${DANILO_OPTIONAL_OLLAMA_MODEL}"
   fi
   
   if ollama_model_exists_in_container "${container}" "${embed_model}"; then

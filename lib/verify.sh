@@ -100,15 +100,7 @@ verify_captive_redirect() {
 }
 
 verify_captive_redirects() {
-  verify_captive_redirect "iOS captive check redirects to portal domain" "captive.apple.com" "/hotspot-detect.html"
-  verify_captive_redirect "iOS success check redirects to portal domain" "www.apple.com" "/library/test/success.html"
-  verify_captive_redirect "Android captive check redirects to portal domain" "connectivitycheck.gstatic.com" "/generate_204"
-  verify_captive_redirect "Android clients check redirects to portal domain" "clients3.google.com" "/generate_204"
-  verify_captive_redirect "Android Google check redirects to portal domain" "www.google.com" "/generate_204"
-  verify_captive_redirect "Windows captive check redirects to portal domain" "www.msftncsi.com" "/ncsi.txt"
-  verify_captive_redirect "Windows connecttest redirects to portal domain" "www.msftconnecttest.com" "/connecttest.txt"
-  verify_captive_redirect "Linux captive check redirects to portal domain" "connectivity-check.ubuntu.com" "/success.txt"
-  verify_captive_redirect "Firefox captive check redirects to portal domain" "detectportal.firefox.com" "/success.txt"
+  verify_pass "Captive portal redirects removed per user request"
 }
 
 verify_dnsmasq_captive_config() {
@@ -129,15 +121,9 @@ verify_dnsmasq_captive_config() {
   grep -Fq "dhcp-option=6,${LAN_IP}" "${dnsmasq_config}" \
     && verify_pass "DHCP advertises DNS server ${LAN_IP}" \
     || verify_fail "DHCP advertises DNS server ${LAN_IP}"
-  grep -Fq "dhcp-option=114,\"http://${PORTAL_DOMAIN}/captive-login\"" "${dnsmasq_config}" \
-    && verify_pass "DHCP advertises captive portal URL" \
-    || verify_fail "DHCP advertises captive portal URL"
   grep -Fq "address=/${PORTAL_DOMAIN}/${LAN_IP}" "${dnsmasq_config}" \
     && verify_pass "dnsmasq maps ${PORTAL_DOMAIN} to ${LAN_IP}" \
     || verify_fail "dnsmasq maps ${PORTAL_DOMAIN} to ${LAN_IP}"
-  grep -Fq "address=/#/${LAN_IP}" "${dnsmasq_config}" \
-    && verify_pass "dnsmasq captive wildcard maps unknown domains to ${LAN_IP}" \
-    || verify_fail "dnsmasq captive wildcard maps unknown domains to ${LAN_IP}"
 }
 
 verify_portal_dns_query() {

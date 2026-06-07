@@ -326,7 +326,11 @@ async def teacher_parse_document(course_id: str, action: str=Form('summary'), fi
         prompt = f'Create a detailed lesson plan based on the following document text. Include Objectives, Subject Matter, Procedure, and Evaluation.\\n\\nDocument text:\\n{text}'
     else:
         prompt = f'Generate 5 key review points and 3 practice questions based on this document.\\n\\nDocument text:\\n{text}'
-    result, metrics = await ask_ollama(prompt, mode='tutor', memory=None)
+    try:
+        result, metrics = await ask_ollama(SYSTEM_PROMPT_TEACHER, prompt, mode='tutor', memory=None)
+    except Exception as e:
+        ai_logger.exception("AI generation failed")
+        raise HTTPException(status_code=500, detail="AI generation failed.")
     return {'ok': True, 'action': action, 'filename': file.filename, 'result': result, 'metrics': metrics}
 
 @teacher_router.post('/teacher/courses/{course_id}/quizzes/generate')
@@ -447,7 +451,7 @@ def teacher_create_quiz(course_id: str, payload: dict=Body(default={}), current_
     db.add(quiz)
     db.flush()
     for item in payload.get('questions') or []:
-        db.add(QuizQuestion(quiz_id=quiz.id, question_text=clean_text(item.get('questionText') or item.get('question'), max_length=2000), choices_json=clean_text(item.get('choicesJson'), required=False, max_length=4000), answer_key=clean_text(item.get('answerKey'), required=False, max_length=1000), points=parse_float(item.get('points') or 1, 'Question points', minimum=1)))
+        db.add(QuizQuestion(quiz_id=quiz.id, question_text=clean_text(item.get('questionText') or item.get('question'), max_length=2000), choices_json=json.dumps(item.get('choices') or []) if 'choices' in item else clean_text(item.get('choicesJson'), required=False, max_length=4000), answer_key=json.dumps(item.get('answerKey')) if isinstance(item.get('answerKey'), (list, dict)) else clean_text(item.get('answerKey'), required=False, max_length=1000), points=parse_float(item.get('points') or 1, 'Question points', minimum=1)))
     db.commit()
     return {'ok': True, 'id': quiz.id}
 
