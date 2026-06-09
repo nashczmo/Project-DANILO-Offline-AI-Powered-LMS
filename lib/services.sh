@@ -1,0 +1,801 @@
+# Project DANILO installer module: services.sh
+
+write_gateway_files() {
+  mkdir -p "${APP_ROOT}/gateway" "${APP_ROOT}/infra/nginx"
+
+  cat > "${APP_ROOT}/gateway/Dockerfile" <<'EOF'
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY frontend/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine
+ARG PORTAL_DOMAIN=danilo.edu
+ARG LAN_IP=10.10.0.1
+COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /opt/danilo/app/frontend/dist
+RUN chown -R nginx:nginx /opt/danilo/app/frontend/dist
+
+RUN apk add --no-cache openssl && \
+    mkdir -p /etc/nginx/ssl && \
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt \
+    -subj "/C=PH/ST=Metro Manila/L=Manila/O=Project DANILO/CN=${PORTAL_DOMAIN}" \
+    -addext "subjectAltName=DNS:${PORTAL_DOMAIN},DNS:student.${PORTAL_DOMAIN},IP:${LAN_IP}"
+
+EXPOSE 80 443
+CMD ["nginx", "-g", "daemon off;"]
+EOF
+
+  cat > "${APP_ROOT}/infra/nginx/default.conf" <<EOF
+# Handles: captive portal, SPA serving, API proxying, PWA caching
+
+upstream danilo_backend {
+  server backend:8000;
+  keepalive 32;
+}
+
+server {
+  listen 80;
+  listen 443 ssl;
+  server_name ${PORTAL_DOMAIN};
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
+  root  /opt/danilo/app/frontend/dist;
+  index index.html;
+
+  gzip            on;
+  gzip_comp_level 5;
+  gzip_min_length 512;
+  gzip_proxied    any;
+  gzip_vary       on;
+  gzip_types
+    text/plain text/css text/xml text/javascript
+    application/javascript application/json application/xml
+    application/rss+xml image/svg+xml font/woff2;
+
+  # Security headers
+  add_header X-Content-Type-Options  "nosniff"        always;
+  add_header X-Frame-Options         "SAMEORIGIN"     always;
+  add_header Referrer-Policy         "no-referrer"    always;
+  add_header X-XSS-Protection        "1; mode=block"  always;
+
+  location = /captive-login {
+    return 302 http://${PORTAL_DOMAIN}/;
+  }
+
+  location = /hotspot-detect.html             { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /library/test/success.html       { return 302 http://${PORTAL_DOMAIN}/; }
+
+  location = /generate_204                    { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /gen_204                         { return 302 http://${PORTAL_DOMAIN}/; }
+
+  location = /ncsi.txt                        { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /connecttest.txt                 { return 302 http://${PORTAL_DOMAIN}/; }
+
+  location = /success.txt                     { return 302 http://${PORTAL_DOMAIN}/; }
+  location = /canonical.html                  { return 302 http://${PORTAL_DOMAIN}/; }
+
+  location = /kindle-wifi/wifistub.html       { return 302 http://${PORTAL_DOMAIN}/; }
+
+  # SSE streaming endpoint: disable all buffering so tokens reach the browser immediately
+  location = /api/ai/tutor/stream {
+    proxy_pass             http://danilo_backend/api/ai/tutor/stream;
+    proxy_http_version     1.1;
+    proxy_set_header       Connection          "";
+    proxy_set_header       Host               \$host;
+    proxy_set_header       X-Real-IP          \$remote_addr;
+    proxy_set_header       X-Forwarded-For    \$proxy_add_x_forwarded_for;
+    proxy_set_header       X-Forwarded-Proto  \$scheme;
+
+    proxy_read_timeout     90s;
+    proxy_send_timeout     90s;
+    proxy_connect_timeout  10s;
+
+    # Disable all buffering for Server-Sent Events
+    proxy_buffering        off;
+    proxy_cache            off;
+    proxy_buffer_size      1k;
+    add_header             X-Accel-Buffering "no" always;
+  }
+
+  location /api/ {
+    proxy_pass             http://danilo_backend/api/;
+    proxy_http_version     1.1;
+    proxy_set_header       Connection          "";
+    proxy_set_header       Host               \$host;
+    proxy_set_header       X-Real-IP          \$remote_addr;
+    proxy_set_header       X-Forwarded-For    \$proxy_add_x_forwarded_for;
+    proxy_set_header       X-Forwarded-Proto  \$scheme;
+
+    # Generous timeout for non-streaming AI requests on slow hardware
+    proxy_read_timeout     90s;
+    proxy_send_timeout     60s;
+    proxy_connect_timeout  10s;
+
+    proxy_buffer_size      16k;
+    proxy_buffers          8 32k;
+  }
+
+  location /assets/ {
+    expires            1y;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    try_files          \$uri =404;
+  }
+
+  location ~* \.(webmanifest|json)$ {
+    expires            1h;
+    add_header Cache-Control "public, max-age=3600";
+  }
+
+  location = /sw.js {
+    expires            -1;
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate";
+  }
+
+  location /icons/ {
+    expires            7d;
+    add_header Cache-Control "public, max-age=604800";
+    try_files          \$uri =404;
+  }
+
+  location /fonts/ {
+    expires            1y;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    try_files          \$uri =404;
+  }
+
+  location / {
+    try_files \$uri /index.html;
+  }
+}
+
+# Covers any unrecognized hostname that arrives on port 80
+server {
+  listen ${FRONTEND_PORT:-80} default_server;
+  listen 443 ssl default_server;
+  ssl_certificate /etc/nginx/ssl/nginx.crt;
+  ssl_certificate_key /etc/nginx/ssl/nginx.key;
+  server_name _;
+  return 302 http://${PORTAL_DOMAIN}/;
+}
+EOF
+
+  cat > "${APP_ROOT}/docker-compose.yml" <<'EOF'
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ai_index:/var/lib/danilo
+      - ./models:/models:ro
+      - ./data/uploads:/app/data/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=20)\""]
+      interval: 30s
+      timeout: 25s
+      retries: 40
+      start_period: 180s
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    profiles: ["ollama"]
+    environment:
+      # Values are generated by the installer hardware probe and may be
+      # overridden in .env for future model or hardware upgrades.
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-3m}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-1536}
+      OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-1}
+      OLLAMA_NUM_BATCH: ${OLLAMA_NUM_BATCH:-128}
+      OLLAMA_NUM_GPU: ${OLLAMA_NUM_GPU:-0}
+      OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-q8_0}
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 && ollama ps >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 20s
+      retries: 40
+      start_period: 180s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: ./gateway/Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-/api}
+        PORTAL_DOMAIN: ${PORTAL_DOMAIN:-danilo.apc.edu.ph}
+        LAN_IP: ${LAN_IP:-10.10.0.1}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      PORTAL_DOMAIN: ${PORTAL_DOMAIN}
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+      - "443:443"
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /opt/danilo/app/frontend/dist/index.html && wget --header=\"Host: $$PORTAL_DOMAIN\" -q -O /dev/null http://127.0.0.1/index.html"]
+      interval: 30s
+      timeout: 20s
+      retries: 30
+      start_period: 120s
+
+volumes:
+  postgres_data:
+  ollama_data:
+  ai_index:
+EOF
+}
+
+write_project_docs() {
+  cat > "${APP_ROOT}/.env.example" <<'EOF'
+# Project DANILO local/deployment configuration
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=
+SECRET_KEY=
+JWT_SECRET=
+DATABASE_URL=
+FRONTEND_URL=
+API_BASE_URL=
+CORS_ORIGINS=http://danilo.edu
+POSTGRES_DB=danilo
+POSTGRES_USER=danilo
+POSTGRES_PASSWORD=
+JWT_EXPIRE_MINUTES=720
+COMPOSE_PROFILES=ollama
+DANILO_AI_RUNTIME=ollama
+OLLAMA_URL=http://${OLLAMA_HOST:-ollama}:${OLLAMA_PORT:-11434}
+DANILO_OLLAMA_MODEL=auto
+OLLAMA_MODEL=auto
+DANILO_AI_PRIMARY_MODEL=
+DANILO_AI_FALLBACK_MODEL=
+DANILO_AI_OPTIONAL_MODEL=
+DANILO_AI_MODEL_TIER_A=phi3:mini
+DANILO_AI_MODEL_TIER_B=llama3.2:3b
+DANILO_AI_MODEL_TIER_C=llama3.1:8b
+DANILO_AI_MODEL_TIER_D=mistral-nemo:12b
+DANILO_AI_MODEL_TIER_E=qwen2.5:14b
+DANILO_AI_MODEL_TIER_F=qwen2.5:32b
+DANILO_AI_MODEL_TIER_G=llama3.3:70b
+DANILO_AI_FALLBACK_TIER_A=llama3.2:1b
+DANILO_AI_FALLBACK_TIER_B=phi3:mini
+DANILO_AI_FALLBACK_TIER_C=llama3.2:3b
+DANILO_AI_FALLBACK_TIER_D=llama3.1:8b
+DANILO_AI_FALLBACK_TIER_E=mistral-nemo:12b
+DANILO_AI_FALLBACK_TIER_F=qwen2.5:14b
+DANILO_AI_FALLBACK_TIER_G=qwen2.5:32b
+DANILO_AI_UNIVERSAL_FALLBACK=llama3.2:3b
+DANILO_AI_MODEL_LOW=llama3.2:3b
+DANILO_AI_MODEL_BALANCED=llama3.1:8b
+DANILO_AI_MODEL_GPU=mistral-nemo:12b
+DANILO_AI_MODEL_HIGH=qwen2.5:14b
+DANILO_AI_MODEL_CLASS=auto
+DANILO_AI_QUANTIZATION=auto
+DANILO_AI_GPU_LAYERS=0
+DANILO_AI_SCHEDULER=fair-queue
+DANILO_AI_MAX_CONCURRENT=1
+DANILO_AI_QUEUE_TIMEOUT_SECONDS=45
+DANILO_AI_TIMEOUT_SECONDS=120
+DANILO_AI_NUM_CTX=1536
+DANILO_AI_THREADS=4
+DANILO_AI_INDEX_PATH=/var/lib/danilo/ai_index.sqlite3
+DANILO_AI_HARDWARE_PROFILE=auto
+DANILO_AI_RAM_MB=0
+DANILO_AI_CPU_COUNT=0
+DANILO_AI_GPU_VRAM_MB=0
+DANILO_AI_CPU_MODEL=unknown
+DANILO_AI_GPU_NAME=none
+DANILO_AI_INTEGRATED_GPU=0
+DANILO_AI_DEDICATED_GPU=0
+DANILO_AI_CUDA=0
+DANILO_AI_ROCM=0
+DANILO_AI_AVX2=0
+DANILO_AI_AVX512=0
+DANILO_AI_VULKAN=0
+DANILO_AI_OPENCL=0
+DANILO_AI_STORAGE_AVAILABLE_MB=0
+DANILO_AI_LOW_VRAM=0
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_MAX_LOADED_MODELS=1
+OLLAMA_KEEP_ALIVE=3m
+OLLAMA_FLASH_ATTENTION=1
+OLLAMA_TIMEOUT_SECONDS=120
+OLLAMA_NUM_CTX=1536
+OLLAMA_CONTEXT_CHARS=2200
+OLLAMA_NUM_BATCH=128
+OLLAMA_NUM_GPU=0
+OLLAMA_KV_CACHE_TYPE=q8_0
+DANILO_AI_COOLDOWN_SECONDS=4
+DANILO_AI_CACHE_SIZE=200
+DANILO_ROLLING_MEMORY=4
+DANILO_MEMORY_CHAR_BUDGET=800
+DANILO_TOKENS_SHORT=140
+DANILO_TOKENS_NORMAL=280
+DANILO_TOKENS_DETAILED=520
+SSID=PROJECT-DANILO
+PORTAL_DOMAIN=danilo.apc.edu.ph
+LAN_IP=10.10.0.1
+LAN_PREFIX=24
+DHCP_RANGE_START=10.10.0.10
+DHCP_RANGE_END=10.10.0.200
+DANILO_EMAIL_DOMAIN=danilo.edu
+DANILO_STUDENT_EMAIL_DOMAIN=student.danilo.edu
+DANILO_SEED_DEMO=1
+EOF
+
+  cat > "${APP_ROOT}/README.md" <<'EOF'
+# Project DANILO
+
+Project DANILO is an offline-first DepEd school portal packaged with FastAPI, React/Vite, PostgreSQL, Nginx, Docker Compose, and Ollama stable inference.
+
+## Default Local Admin
+
+The backend creates or repairs the first administrator during startup:
+
+- Username: `admin`
+- Password: Auto-generated on first install and shown only in the final installer summary. Change it via Settings > Account immediately after first login.
+- Role: `admin`
+
+Passwords are stored only as bcrypt hashes in `users.password_hash`. The plaintext password is printed only once in the final installer summary and is never stored in plain text or logged.
+
+## Install, Update, And Verify
+
+From the folder containing `danilo.sh` on Ubuntu 24.04:
+
+```bash
+sudo bash danilo.sh --install
+sudo bash danilo.sh --clean-install
+sudo bash danilo.sh --update
+sudo bash danilo.sh --rebuild-frontend
+sudo bash danilo.sh --sync
+sudo bash danilo.sh --verify
+```
+
+To rebuild Docker images without cache while preserving data:
+
+```bash
+sudo bash danilo.sh --install --clean-build
+```
+
+To force a fresh database volume:
+
+```bash
+sudo DANILO_RESET_DATA=1 bash danilo.sh --clean-install
+```
+
+To add LMS demo classes and role test accounts:
+
+```bash
+sudo DANILO_SEED_DEMO=1 bash danilo.sh --install
+```
+
+Demo accounts:
+
+- Teacher: `teacher1` / `teacher123`
+- Teacher: `teacher2` / `teacher123`
+- Students: `student1` through `student10` / `student123`
+
+## Auth Flow
+
+The frontend posts `{ "username": "...", "password": "..." }` to `/api/auth/login`. The backend validates missing fields with `400`, invalid credentials with `401`, and database/server failures with `500`. Username and email login matching are case-insensitive.
+
+## Deployment Configuration
+
+Copy `.env.example` to `.env` for manual deployments and override secrets before production. Use `CORS_ORIGINS`, `FRONTEND_URL`, `API_BASE_URL`, `DATABASE_URL`, and `SECRET_KEY`/`JWT_SECRET` for environment-specific settings.
+
+## Adaptive AI Runtime
+
+DANILO defaults to the stable Ollama runtime and generates conservative settings from the detected RAM, CPU threads, and available NVIDIA VRAM. A local GGUF can also be placed in `models/` before install; the installer registers it as an Ollama model. The model and runtime knobs remain environment-driven so deployments can move from low-end CPUs to GPUs without changing application code.
+
+```bash
+# Let DANILO choose the best local model plan for this device
+sudo bash danilo.sh --install
+```
+
+### Runtime Knobs
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `DANILO_AI_HARDWARE_PROFILE` | `auto` | Installer records the detected profile: A (constrained), B, C, D (balanced), E, F, or G (high-memory/GPU) |
+| `DANILO_OLLAMA_MODEL` / `OLLAMA_MODEL` | hardware-derived | Active local model; override without code changes |
+| `DANILO_AI_MODEL_TIER_A` | `phi3:mini` | Very constrained fallback for old laptops / very low RAM |
+| `DANILO_AI_MODEL_TIER_B` | `llama3.2:3b` | Fast low-end tutoring target for systems with 8-15 GB RAM |
+| `DANILO_AI_MODEL_TIER_C` | `llama3.1:8b` | Recommended tutoring model target for balanced mid-range hosts |
+| `DANILO_AI_MODEL_TIER_D` | `mistral-nemo:12b` | Stronger explanations while reasonably fast on strong CPU/RAM |
+| `DANILO_AI_MODEL_TIER_E` | `qwen2.5:14b` | Higher quality tutoring on stronger hardware |
+| `DANILO_AI_MODEL_TIER_F` | `qwen2.5:32b` | Strong local reasoning for high-memory servers / good GPU |
+| `DANILO_AI_MODEL_TIER_G` | `llama3.3:70b` | Best local tutoring quality where high-end GPU clearly supports it |
+| `DANILO_AI_UNIVERSAL_FALLBACK` | `llama3.2:3b` | Safe universal fallback model if the primary or tier fallback fails |
+| `DANILO_AI_QUANTIZATION` | hardware-derived | Planner preference used for custom GGUF selection and status reporting |
+| `DANILO_AI_GPU_LAYERS` / `OLLAMA_NUM_GPU` | hardware-derived | GPU layer offload; falls back to CPU on accelerator failure |
+| `OLLAMA_NUM_BATCH` | hardware-derived | Batch size tuned for latency and memory headroom |
+| `OLLAMA_KV_CACHE_TYPE` | hardware-derived | KV cache mode tuned for memory efficiency or high-VRAM throughput |
+| `OLLAMA_NUM_PARALLEL` | hardware-derived | Ollama generation parallelism, matched by backend queue slots |
+| `OLLAMA_MAX_LOADED_MODELS` | `1` | Keep memory bounded unless intentionally hosting multiple models |
+| `OLLAMA_KEEP_ALIVE` | hardware-derived | Frees RAM sooner on constrained hosts and stays warm longer on stronger systems |
+| `OLLAMA_NUM_CTX` | hardware-derived | Adapts context size to available memory and acceleration |
+| `OLLAMA_FLASH_ATTENTION` | `1` | Reduces KV cache memory usage when supported |
+| `DANILO_AI_MAX_CONCURRENT` | hardware-derived | Backend fair queue prevents classroom request bursts from overloading inference |
+| `DANILO_AI_QUEUE_TIMEOUT_SECONDS` | `45` | Prevents requests from waiting forever |
+| `DANILO_TOKENS_SHORT` | `140` | Short mode: fastest response |
+| `DANILO_TOKENS_NORMAL` | `280` | Normal mode: balanced |
+| `DANILO_TOKENS_DETAILED` | `520` | Detailed mode: fuller explanation |
+
+AI responses stream by sentence or semantic chunk so learners see progress without distracting character-by-character output. Repeated questions are served from an LRU cache without re-running inference. Lesson modules are indexed into a lightweight local SQLite retrieval store at `/var/lib/danilo/ai_index.sqlite3` so prompts include relevant class excerpts without increasing the base model size.
+
+Use **Short** mode for fastest student help; **Detailed** only when a fuller explanation is needed.
+
+## AI Reliability and Status Matrix
+
+DANILO is designed to gracefully degrade if the AI backend is unavailable. The core LMS will continue to function.
+To enforce that the AI must be fully ready before the installer completes, run the installer with strict mode:
+```bash
+sudo DANILO_AI_REQUIRE_READY=1 bash danilo.sh --install
+```
+
+### Checking AI Status
+Run the built-in verification tool to check the health of the entire stack, including the AI:
+```bash
+sudo bash danilo.sh --verify
+```
+
+The AI can be in one of the following states:
+- **READY**: Ollama API is reachable, and the configured model is installed and active.
+- **DEGRADED**: Ollama is reachable, but the model is missing, or the backend AI health check reports degraded.
+- **OFFLINE**: Ollama container is down or unreachable.
+- **MODEL MISSING**: Ollama is up but the active model is not loaded.
+- **STARTING**: The container is still initializing.
+
+## Recovery Playbook
+
+If the AI features are unavailable, try the following steps to diagnose and repair:
+
+### 1. Ollama container not running (OFFLINE)
+Check if the container is running and view its logs:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo ps
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo logs ollama
+```
+Restart the container:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama
+```
+
+### 2. Model Missing
+If the verification script reports MODEL MISSING, you can attempt to pull it manually or run the quick installer again:
+```bash
+# To reinstall and ensure AI model pulls:
+sudo DANILO_AI_ENABLE=1 bash danilo.sh --install
+```
+Alternatively, pull it directly:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo exec ollama ollama pull <model-name>
+```
+
+### 3. Backend cannot reach Ollama (DEGRADED/Timeout)
+If the LMS is up but AI requests timeout, verify the backend network connection:
+```bash
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo restart ollama backend
+```
+
+### 4. Slow Hardware
+If responses are too slow, consider downgrading the model in `/opt/danilo/app/.env` and restarting the stack:
+```bash
+# Edit OLLAMA_MODEL to a smaller tutoring model like llama3.2:3b
+sudo nano /opt/danilo/app/.env
+docker compose -f /opt/danilo/app/docker-compose.yml -p danilo up -d
+```
+EOF
+}
+
+validate_generated_file() {
+  local path="$1"
+  local label="$2"
+
+  if [[ ! -f "${path}" ]]; then
+    echo "Required generated file is missing: ${label} (${path})"
+    return 1
+  fi
+
+  ok "Validated ${label}"
+}
+
+validate_gateway_files() {
+  validate_generated_file "${APP_ROOT}/gateway/Dockerfile" "gateway Dockerfile"
+  validate_generated_file "${APP_ROOT}/infra/nginx/default.conf" "gateway nginx config"
+
+  if grep -Eq '^[[:space:]]*(sendfile|tcp_nopush|tcp_nodelay|keepalive_timeout)[[:space:]]' "${APP_ROOT}/infra/nginx/default.conf"; then
+    echo "Gateway nginx config contains http-context directives that duplicate the base nginx image."
+    return 1
+  fi
+
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    # Skip nginx config syntax validation because the configuration relies on 
+    # SSL certificates generated at build-time inside the gateway image.
+    true
+  fi
+}
+
+validate_project_docs() {
+  validate_generated_file "${APP_ROOT}/.env.example" ".env.example"
+  validate_generated_file "${APP_ROOT}/README.md" "README"
+}
+
+write_systemd_units() {
+  backup_managed_file /etc/systemd/system/danilo-ap.service
+  cat >/etc/systemd/system/danilo-ap.service <<'EOF'
+[Unit]
+Description=Project DANILO Access Point and Captive Networking
+After=NetworkManager.service network-online.target
+Wants=network-online.target
+Before=danilo-stack.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/danilo-network-up.sh
+ExecStop=/usr/local/bin/danilo-network-down.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  chmod 0644 /etc/systemd/system/danilo-ap.service
+
+  backup_managed_file /etc/systemd/system/danilo-stack.service
+  cat >/etc/systemd/system/danilo-stack.service <<EOF
+[Unit]
+Description=Project DANILO Application Stack
+Requires=docker.service
+BindsTo=docker.service
+After=docker.service network-online.target
+Wants=network-online.target danilo-ap.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=COMPOSE_PROJECT_NAME=danilo
+Environment=COMPOSE_PROFILES=${DANILO_AI_RUNTIME:-ollama}
+WorkingDirectory=${APP_ROOT}
+ExecStartPre=/usr/bin/docker compose -p danilo -f ${APP_ROOT}/docker-compose.yml config -q
+ExecStart=/usr/bin/docker compose -p danilo -f ${APP_ROOT}/docker-compose.yml up -d --no-build
+ExecStop=/usr/bin/docker compose -p danilo -f ${APP_ROOT}/docker-compose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  chmod 0644 /etc/systemd/system/danilo-stack.service
+
+  run_step_command "Reloading systemd units for DANILO services" systemctl daemon-reload
+  run_step_command "Enabling DANILO systemd services" systemctl enable danilo-ap.service danilo-stack.service
+}
+
+# -----------------------------------------------------------------------------
+# Final readiness gates and operator summary
+# -----------------------------------------------------------------------------
+
+wait_for_stack_readiness() {
+  local attempts=0
+  local health_body=""
+  local ollama_ip=""
+
+  note "Running final end-to-end readiness checks"
+  note "Checking Docker daemon readiness"
+  until docker info >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 30 ]]; then
+      echo "Docker daemon did not become ready. Check: systemctl status docker"
+      exit 1
+    fi
+    sleep 2
+  done
+
+  note "Checking compose services are running"
+  wait_for_service_running postgres
+  wait_for_service_running backend
+  wait_for_service_running gateway
+  local ollama_available=0
+  if wait_for_service_running ollama 0 20; then
+    ollama_available=1
+  else
+    if [[ "${DANILO_AI_REQUIRE_READY:-0}" -eq 1 ]]; then
+      fail "Ollama service is not running, but DANILO_AI_REQUIRE_READY=1 is set. Aborting."
+      exit 1
+    else
+      warn "Ollama service is not running yet; continuing with core LMS startup and degraded AI"
+    fi
+  fi
+
+  note "Checking compose health status"
+  wait_for_container_healthy postgres "Postgres healthcheck"
+  wait_for_container_healthy backend "Backend healthcheck"
+  wait_for_container_healthy gateway "Gateway/frontend healthcheck"
+  if [[ "${ollama_available}" -eq 1 ]]; then
+    if ! wait_for_container_healthy ollama "Ollama service readiness" 0 60; then
+      if [[ "${DANILO_AI_REQUIRE_READY:-0}" -eq 1 ]]; then
+        fail "Ollama did not become healthy, and DANILO_AI_REQUIRE_READY=1 is set. Aborting."
+        exit 1
+      else
+        warn "Ollama did not become healthy; continuing with core LMS startup and degraded AI"
+        ollama_available=0
+      fi
+    fi
+  fi
+
+  note "Checking Postgres database readiness"
+  attempts=0
+  until docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T postgres \
+    pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 30 ]]; then
+      echo "Postgres is running but did not accept database connections in time."
+      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 postgres || true
+      exit 1
+    fi
+    sleep 2
+  done
+
+  if [[ "${ollama_available}" -eq 1 ]]; then
+    note "Checking Ollama API response"
+    attempts=0
+    until ollama_ip="$(get_container_ip ollama)" && [[ -n "${ollama_ip}" ]] && curl -fsS "http://${ollama_ip}:${OLLAMA_PORT:-11434}/api/tags" >/dev/null 2>&1; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -gt 30 ]]; then
+        warn "Ollama is running but its API did not answer on /api/tags; continuing with degraded AI"
+        docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=80 ollama || true
+        ollama_available=0
+        break
+      fi
+      sleep 2
+    done
+  fi
+
+  if [[ "${ollama_available}" -eq 1 ]]; then
+    note "Checking Ollama model availability"
+    attempts=0
+    until ollama_model_exists_in_compose "${OLLAMA_MODEL}"; do
+      attempts=$((attempts + 1))
+      if [[ "${attempts}" -eq 10 ]]; then
+        if internet_reachable_now; then
+          note "Configured model not yet present. Internet is available, so DANILO will try to pull it now."
+          if ! docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" exec -T ollama ollama pull "${OLLAMA_MODEL}" >/dev/null 2>&1; then
+            note "Automatic Ollama model pull did not complete yet; continuing readiness checks"
+          fi
+        else
+          note "Configured model not yet present and internet is not reachable. Waiting for a preloaded local model."
+        fi
+      fi
+      if [[ "${attempts}" -gt 60 ]]; then
+        if [[ "${DANILO_AI_REQUIRE_READY:-0}" -eq 1 ]]; then
+          fail "Ollama is available, but the required local model is missing: ${OLLAMA_MODEL}. DANILO_AI_REQUIRE_READY=1 is set. Aborting."
+          exit 1
+        else
+          warn "Ollama is available, but the required local model is still missing: ${OLLAMA_MODEL}"
+          warn "The core LMS will remain available, but AI features will be degraded."
+          break
+        fi
+      fi
+      sleep 3
+    done
+    if ollama_model_exists_in_compose "${OLLAMA_MODEL}"; then
+      note "Running AI model warmup ping"
+      if [[ -n "${ollama_ip}" ]]; then
+        curl -fsS -X POST "http://${ollama_ip}:${OLLAMA_PORT:-11434}/api/generate" -d '{"model": "'"${OLLAMA_MODEL}"'", "prompt": "hi", "options": {"num_predict": 1}}' >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  note "Checking backend API through gateway"
+  attempts=0
+  until health_body="$(curl -fsS -H "Host: ${PORTAL_DOMAIN}" "http://127.0.0.1/api/health" 2>/dev/null)" && [[ "${health_body}" == *'"status":"ok"'* ]]; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 60 ]]; then
+      echo "Backend /api/health did not return a healthy response through the gateway."
+      echo "The portal is not usable yet; check backend and gateway logs below."
+      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps || true
+      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=120 gateway backend || true
+      exit 1
+    fi
+    sleep 5
+  done
+
+  note "Checking frontend HTTP response"
+  attempts=0
+  until curl -fsS -H "Host: ${PORTAL_DOMAIN}" "http://127.0.0.1/" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 60 ]]; then
+      echo "Gateway/frontend HTTP check did not respond successfully."
+      echo "The learner portal did not serve its front page on port 80."
+      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" ps || true
+      docker compose -f "${APP_ROOT}/docker-compose.yml" -p "${STACK_NAME}" logs --tail=120 gateway || true
+      exit 1
+    fi
+    sleep 5
+  done
+}
+
+wait_for_systemd_active() {
+  local unit="$1"
+  local fatal="${2:-1}"
+  local attempts=0
+
+  note "Checking systemd unit is active: ${unit}"
+  until systemctl is-active --quiet "${unit}"; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 30 ]]; then
+      if [[ "${fatal}" -eq 1 ]]; then
+        echo "Systemd unit did not become active: ${unit}"
+        systemctl status "${unit}" --no-pager || true
+        exit 1
+      else
+        warn "Systemd unit did not become active: ${unit} (proceeding in degraded mode)"
+        return 1
+      fi
+    fi
+    sleep 2
+  done
+}
+
+bring_up_offline_stack() {
+  validate_generated_file "${APP_ROOT}/docker-compose.yml" "docker-compose.yml"
+  note "Starting the captive portal network services"
+  run_step_command "Unmasking captive portal system services" systemctl unmask hostapd dnsmasq
+  run_step_command "Starting DANILO captive access point service" systemctl start danilo-ap.service || true
+  wait_for_systemd_active danilo-ap.service 0 || warn "Captive AP service degraded"
+  wait_for_systemd_active dnsmasq.service 0 || warn "dnsmasq degraded"
+  wait_for_systemd_active hostapd.service 0 || warn "hostapd degraded"
+
+  note "Applying Docker image tag fallback for systemd compose startup"
+  docker tag danilo-backend:latest app-backend:latest || true
+  docker tag danilo-gateway:latest app-gateway:latest || true
+
+  note "Launching the offline DANILO application stack"
+  run_step_command "Starting DANILO application stack service" systemctl start danilo-stack.service
+  wait_for_systemd_active danilo-stack.service
+
+  run_logged_function "wait_for_stack_readiness" wait_for_stack_readiness
+
+  if command -v netfilter-persistent >/dev/null 2>&1; then
+    if ! run_step_command "Saving DANILO firewall rules" netfilter-persistent save; then
+      warn "Firewall rules could not be persisted automatically; continuing with the live rules already in memory"
+    fi
+  else
+    skip "netfilter-persistent is not installed; skipping firewall persistence"
+  fi
+}

@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  backend:
+    build: backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://danilo:password@db:5432/danilo
+      PORTAL_DOMAIN: danilo.local
+      JWT_SECRET: secret
+      DANILO_SEED_DEMO: 1
+      OLLAMA_URL: http://ollama:11434
